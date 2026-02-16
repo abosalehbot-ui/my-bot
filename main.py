@@ -35,7 +35,7 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # ====== ⚙️ الإعدادات ======
-BOT_TOKEN = "8330556429:AAHTUv_lPmnFyoJRZg-R_AgoIr0BYCeLnx8"
+BOT_TOKEN = "8577787177:AAHAH06rraN86cZQykyhnxV3hxkIQOCyxk8"
 ADMIN_ID = 1635871816
 API_URL = "https://api.redeem999.org/process"
 PRODUCT_ID = "2191d640-7319-486e-857b-afcd2b0ed921"
@@ -342,4 +342,5 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("admin", admin_panel))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
+
     app.run_polling()
