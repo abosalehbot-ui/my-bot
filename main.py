@@ -33,7 +33,7 @@ logging.getLogger("googleapiclient").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # ====== ⚙️ الإعدادات ======
-BOT_TOKEN = "8577787177:AAH3mOmWIcabCOmfL1tIVDBSF0KSIkdTBsg"
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ADMIN_ID = 1635871816
 API_BASE_URL = "https://buzzmaster.shop" 
 PRODUCT_ID = "24h-nongmail"
@@ -827,5 +827,6 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
     app.add_handler(MessageHandler(filters.Document.ALL, document_handler))
     app.run_polling(drop_pending_updates=True)
+
 
 
