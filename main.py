@@ -184,3 +184,20 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, txt_msg))
     # التشغيل مع تجاهل الرسائل القديمة لمنع التضارب
     app.run_polling(drop_pending_updates=True)
+if __name__ == "__main__":
+    # تشغيل سيرفر Flask في الخلفية
+    threading.Thread(target=run_flask).start()
+    
+    print("🚀 Starting Bot...")
+    
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    
+    # إضافة المعالجات
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(btns))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, txt_msg))
+    
+    # التعديل السحري هنا:
+    # drop_pending_updates=True: يتجاهل الرسائل القديمة
+    # close_loop=True: يغلق أي اتصالات قديمة عالقة
+    app.run_polling(drop_pending_updates=True, stop_signals=None)
