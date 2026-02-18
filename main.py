@@ -21,12 +21,13 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 
-# ====== 📝 إعداد اللوجز (System Logs) ======
+# ====== 📝 إعداد اللوجز (بسيط ونظيف كما طلبت) ======
 logging.basicConfig(
+    format='%(asctime)s - %(message)s', # تنسيق بسيط: الوقت - الرسالة
     level=logging.INFO,
-    format='%(asctime)s - %(message)s',
     handlers=[logging.StreamHandler()]
 )
+
 # تقليل رسائل المكتبات المزعجة
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("googleapiclient").setLevel(logging.WARNING)
@@ -42,12 +43,12 @@ PRODUCT_ID = "24h-nongmail"
 
 # إعدادات جوجل درايف
 DRIVE_CREDENTIALS_FILE = "credentials.json"
-DB_FILE_NAME = "bot_system_v5_final.json" 
+DB_FILE_NAME = "bot_system_v6_final.json" 
 
 # إعدادات الموظفين
-EMPLOYEE_DAILY_LIMIT = 20  # الحد الأقصى لسحب أكواد ببجي يومياً للموظف
+EMPLOYEE_DAILY_LIMIT = 20
 
-# ====== ☁️ دوال Google Drive (Database) ======
+# ====== ☁️ دوال Google Drive ======
 def get_drive_service():
     try:
         creds = service_account.Credentials.from_service_account_file(
@@ -55,12 +56,11 @@ def get_drive_service():
         )
         return build('drive', 'v3', credentials=creds)
     except Exception as e:
-        logger.error(f"❌ Drive Auth Error: {e}")
+        logger.error(f"Drive Auth Error: {e}")
         return None
 
 def download_db_from_drive():
     service = get_drive_service()
-    # الهيكل الأساسي لقاعدة البيانات
     default_db = {
         "users": {}, 
         "stock": [], 
@@ -77,7 +77,7 @@ def download_db_from_drive():
         items = results.get('files', [])
 
         if not items:
-            logger.info("ℹ️ إنشاء قاعدة بيانات جديدة.")
+            logger.info("ℹ️ Creating new DB on Drive.")
             return default_db
 
         file_id = items[0]['id']
@@ -91,17 +91,15 @@ def download_db_from_drive():
         fh.seek(0)
         data = json.load(fh)
         
-        # تصحيح مفاتيح الـ IDs لتكون أرقاماً
         if "users" in data:
             data["users"] = {int(k): v for k, v in data["users"].items()}
         
-        # دمج أي حقول ناقصة (للتحديثات المستقبلية)
         for key in default_db:
             if key not in data: data[key] = default_db[key]
             
         return data
     except Exception as e:
-        logger.error(f"❌ Download Error: {e}")
+        logger.error(f"Download Error: {e}")
         return default_db
 
 def upload_db_to_drive(data):
@@ -122,16 +120,15 @@ def upload_db_to_drive(data):
             file_metadata = {'name': DB_FILE_NAME}
             service.files().create(body=file_metadata, media_body=media).execute()
     except Exception as e:
-        logger.error(f"❌ Upload Error: {e}")
+        logger.error(f"Upload Error: {e}")
 
-# ====== 💾 إدارة البيانات واللوجز ======
+# ====== 💾 إدارة البيانات ======
 DB = download_db_from_drive()
 
 def save_db_changes():
     threading.Thread(target=upload_db_to_drive, args=(DB,)).start()
 
 def log_activity(user_id, action):
-    """تسجيل نشاط المستخدم"""
     if user_id not in DB["users"]: return
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_entry = f"[{timestamp}] {action}"
@@ -139,7 +136,6 @@ def log_activity(user_id, action):
     if "logs" not in DB["users"][user_id]: DB["users"][user_id]["logs"] = []
     DB["users"][user_id]["logs"].append(log_entry)
     
-    # الاحتفاظ بآخر 200 سجل فقط
     if len(DB["users"][user_id]["logs"]) > 200:
         DB["users"][user_id]["logs"] = DB["users"][user_id]["logs"][-200:]
     
@@ -148,20 +144,19 @@ def log_activity(user_id, action):
 # ====== 🌐 سيرفر Flask ======
 app_server = Flask(__name__)
 @app_server.route('/')
-def home(): return "✅ Bot is Online (V5 Enterprise)!", 200
+def home(): return "✅ Bot is Online!", 200
 def run_flask(): app_server.run(host="0.0.0.0", port=8080)
 
-# ====== ⌨️ الكيبوردات (UI) ======
+# ====== ⌨️ الكيبوردات ======
+
+# 1. كيبورد المستخدم/الموظف (واجهة السحب)
 def get_main_keyboard(role):
     buttons = []
-    
-    # 1. زر السحب (يختلف حسب الرتبة)
     if role in ["employee", "admin"]:
         buttons.append([InlineKeyboardButton("📦 سحب من المخزن (ببجي)", callback_data="pull_stock")])
     
     buttons.append([InlineKeyboardButton("🚀 سحب حسابات (API)", callback_data="pull_api")])
     
-    # 2. إدارة التوكنات والرصيد
     buttons.append([
         InlineKeyboardButton("➕ إضافة توكن", callback_data="add_tokens"),
         InlineKeyboardButton("🗑 حذف توكن", callback_data="clear_tokens")
@@ -172,14 +167,18 @@ def get_main_keyboard(role):
         InlineKeyboardButton("🔢 العدد", callback_data="set_count")
     ])
     
-    # 3. الأرشيف والمساعدة
     buttons.append([
         InlineKeyboardButton("📂 أرشيفي", callback_data="my_history"),
         InlineKeyboardButton("❓ مساعدة", callback_data="help_menu")
     ])
+
+    # لو أدمن، نضيف زر للدخول للوحة التحكم
+    if role == "admin":
+        buttons.append([InlineKeyboardButton("⚙️ لوحة الأدمن", callback_data="admin_panel")])
     
     return InlineKeyboardMarkup(buttons)
 
+# 2. كيبورد الأدمن الرئيسية
 def admin_keyboard():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("👥 إدارة المستخدمين", callback_data="admin_users_menu")],
@@ -187,26 +186,30 @@ def admin_keyboard():
         [InlineKeyboardButton("📝 تقارير وسجلات", callback_data="admin_logs_menu")],
         [InlineKeyboardButton("🛠 وضع الصيانة", callback_data="toggle_maintenance")],
         [InlineKeyboardButton("📢 إذاعة عامة", callback_data="admin_broadcast")],
-        [InlineKeyboardButton("🏠 وضع المستخدم", callback_data="back_home")]
+        [InlineKeyboardButton("🏠 وضع المستخدم (خروج)", callback_data="back_home")] # يرجع لواجهة المستخدم
     ])
 
+# 3. كيبورد إدارة المخزن
 def stock_manage_keyboard():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📥 رفع ملف أكواد (.txt)", callback_data="admin_upload_stock_file")],
         [InlineKeyboardButton("✍️ إضافة كود يدوياً", callback_data="admin_add_stock_text")],
         [InlineKeyboardButton("🗑 تصفير المخزن", callback_data="admin_clear_stock")],
-        [InlineKeyboardButton("🔙 رجوع", callback_data="admin_panel")]
+        [InlineKeyboardButton("🔙 رجوع للأدمن", callback_data="admin_panel")] # يرجع للوحة الأدمن
     ])
 
-def back_btn():
+# 4. أزرار الرجوع
+def back_btn(): # رجوع للمستخدم
     return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="back_home")]])
+
+def admin_back_btn(): # رجوع للأدمن
+    return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع للأدمن", callback_data="admin_panel")]])
 
 # ====== 🚀 البداية ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     name = update.effective_user.first_name
     
-    # تهيئة الأدمن
     if user_id == ADMIN_ID and user_id not in DB["users"]:
         DB["users"][user_id] = {
             "role": "admin", "tokens": [], "max": 1, "history": [], "logs": [], 
@@ -215,37 +218,45 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_db_changes()
 
     if user_id not in DB["users"]:
-        await update.message.reply_text("⛔ **البوت خاص.** تواصل مع الإدارة للتفعيل.", parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text("⛔ **البوت خاص.** تواصل مع الإدارة.", parse_mode=ParseMode.MARKDOWN)
         return
 
-    # تحديث البيانات
     DB["users"][user_id]["name"] = name
     if "stats" not in DB["users"][user_id]: DB["users"][user_id]["stats"] = {"api": 0, "stock": 0}
     save_db_changes()
     
     role = DB["users"][user_id].get("role", "user")
-    role_ar = "👑 أدمن" if role == "admin" else "👔 موظف" if role == "employee" else "👤 مستخدم"
-
+    
     await update.message.reply_text(
-        f"👋 **أهلاً بك يا {name}**\n\n🔹 **رتبتك:** {role_ar}\n🔹 **حالة البوت:** {'✅ يعمل' if not DB['settings']['maintenance'] else '⚠️ صيانة'}",
+        f"👋 **أهلاً بك يا {name}**\n\n🔹 **الرتبة:** {role}\n🔹 **الحالة:** {'✅ يعمل' if not DB['settings']['maintenance'] else '⚠️ صيانة'}",
         reply_markup=get_main_keyboard(role),
         parse_mode=ParseMode.MARKDOWN
     )
 
 # ====== 👑 لوحة الأدمن ======
-async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id == ADMIN_ID:
-        status = "🔴 مفعل" if DB['settings']['maintenance'] else "🟢 معطل"
-        stock_count = len(DB["stock"])
-        await update.message.reply_text(
-            f"🛠 **لوحة التحكم المركزية**\n\n"
-            f"📦 **المخزن:** {stock_count} كود\n"
-            f"👥 **المستخدمين:** {len(DB['users'])}\n"
-            f"🛠 **وضع الصيانة:** {status}",
-            reply_markup=admin_keyboard(), parse_mode=ParseMode.MARKDOWN
-        )
+async def admin_panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID: return
+    
+    # يمكن استدعاؤها من رسالة أو زر
+    target_msg = update.message if update.message else update.callback_query.message
+    
+    status = "🔴 مفعل" if DB['settings']['maintenance'] else "🟢 معطل"
+    stock_count = len(DB["stock"])
+    
+    txt = (
+        f"🛠 **لوحة التحكم المركزية**\n\n"
+        f"📦 **المخزن:** {stock_count} كود\n"
+        f"👥 **المستخدمين:** {len(DB['users'])}\n"
+        f"🛠 **وضع الصيانة:** {status}"
+    )
+    
+    # لو الاستدعاء من زرار نعدل الرسالة، لو كوماند نبعت جديد
+    if update.callback_query:
+        await update.callback_query.edit_message_text(txt, reply_markup=admin_keyboard(), parse_mode=ParseMode.MARKDOWN)
+    else:
+        await target_msg.reply_text(txt, reply_markup=admin_keyboard(), parse_mode=ParseMode.MARKDOWN)
 
-# ====== 🕹 معالج الأزرار (The Brain) ======
+# ====== 🕹 المعالج الرئيسي ======
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.from_user.id
@@ -256,110 +267,83 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = DB["users"][user_id]
     role = user_data.get("role", "user")
 
-    # 🛑 فحص الصيانة (يستثنى الأدمن)
     if DB["settings"].get("maintenance") and role != "admin":
-        await query.edit_message_text("⚠️ **النظام في وضع الصيانة حالياً.**\nيرجى المحاولة لاحقاً.", reply_markup=None, parse_mode=ParseMode.MARKDOWN)
+        await query.edit_message_text("⚠️ **الصيانة جارية...**", reply_markup=None, parse_mode=ParseMode.MARKDOWN)
         return
 
-    # --- 🏠 العودة ---
+    # --- التنقلات ---
     if data == "back_home":
-        context.user_data.clear() # تنظيف الحالات
+        context.user_data.clear()
         await query.edit_message_text("🏠 **القائمة الرئيسية:**", reply_markup=get_main_keyboard(role), parse_mode=ParseMode.MARKDOWN)
         return
     
     if data == "admin_panel":
-        await admin_panel(query, context)
+        await admin_panel_handler(update, context)
         return
 
-    # ==========================
-    # ❓ قسم المساعدة (Help)
-    # ==========================
+    # --- المساعدة ---
     if data == "help_menu":
-        msg = "❓ **دليل المساعدة:**\n\n"
+        msg = "❓ **المساعدة:**\n\n"
         if role == "user":
-            msg += ("1️⃣ **إضافة توكن:** انسخ التوكنات وأرسلها للبوت.\n"
-                    "2️⃣ **سحب حسابات:** اضغط سحب لاستخراج إيميلات.\n"
-                    "3️⃣ **الأرشيف:** لمراجعة ما قمت بسحبه.")
+            msg += "1️⃣ إضافة توكن > سحب حسابات API.\n2️⃣ تابع أرشيفك باستمرار."
         elif role == "employee":
-            msg += ("1️⃣ **سحب من المخزن:** لسحب أكواد ببجي (لك حد يومي).\n"
-                    "2️⃣ **سحب API:** لسحب إيميلات عادية.\n"
-                    "3️⃣ **مشكلة؟** تواصل مع الأدمن.")
+            msg += "1️⃣ سحب مخزن (ببجي) متاح لك بحد يومي.\n2️⃣ سحب API متاح بلا حدود."
         elif role == "admin":
-            msg += ("👑 **أنت المدير.** يمكنك التحكم في المخزن والمستخدمين.\n"
-                    "- لرفع أكواد: استخدم قائمة 'إدارة المخزن'.\n"
-                    "- لتحميل السجلات: استخدم قائمة 'تقارير'.")
-        
+            msg += "👑 استخدم لوحة الأدمن لإدارة كل شيء."
         await query.edit_message_text(msg, reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
         return
 
-    # ==========================
-    # 📦 سحب من المخزن (للموظفين والأدمن)
-    # ==========================
+    # --- سحب مخزن (ببجي) ---
     if data == "pull_stock":
-        if role == "user": return # حماية إضافية
+        if role == "user": return
         
         count = user_data.get("max", 1)
         stock_len = len(DB["stock"])
 
-        # 1. فحص توفر الكمية
         if stock_len < count:
-            await query.edit_message_text(f"⚠️ **المخزن لا يكفي!**\nالمتاح: {stock_len}", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
+            await query.edit_message_text(f"⚠️ **الكمية غير متوفرة!**\nالمتاح: {stock_len}", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
             return
 
-        # 2. فحص الكوتا اليومية (للموظفين فقط)
         if role == "employee":
             today = datetime.now().strftime("%Y-%m-%d")
             quota = user_data.get("quota", {"date": today, "count": 0})
-            
-            # تصفير العداد لو يوم جديد
-            if quota["date"] != today:
-                quota = {"date": today, "count": 0}
+            if quota["date"] != today: quota = {"date": today, "count": 0}
             
             if quota["count"] + count > EMPLOYEE_DAILY_LIMIT:
                 rem = EMPLOYEE_DAILY_LIMIT - quota["count"]
-                await query.edit_message_text(f"⛔ **تجاوزت الحد اليومي!**\nمتبقي لك اليوم: {rem} كود", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
+                await query.edit_message_text(f"⛔ **الحد اليومي!**\nمتبقي: {rem}", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
                 return
             
-            # تحديث الكوتا
             quota["count"] += count
             DB["users"][user_id]["quota"] = quota
 
-        # 3. السحب الفعلي (FIFO)
         pulled = []
         for _ in range(count):
-            code = DB["stock"].pop(0)
-            pulled.append(code)
+            pulled.append(DB["stock"].pop(0))
         
-        # 4. الحفظ والتسجيل
         DB["stats"]["total_stock"] += len(pulled)
         DB["users"][user_id]["stats"]["stock"] += len(pulled)
-        log_activity(user_id, f"سحب {len(pulled)} كود من المخزن")
+        log_activity(user_id, f"Stock Pull ({len(pulled)})")
         
-        # حفظ في الأرشيف
-        formatted_codes = []
-        for c in pulled:
-            formatted_codes.append(f"📦 Code: {c}")
-        
+        # حفظ الأرشيف
         if "history" not in DB["users"][user_id]: DB["users"][user_id]["history"] = []
-        DB["users"][user_id]["history"].extend(formatted_codes)
+        for c in pulled:
+            DB["users"][user_id]["history"].append(f"📦 {c}")
         
         save_db_changes()
 
-        # 5. العرض (تنسيق النسخ)
         msg_text = ""
         for code in pulled:
             msg_text += f"🎮 <code>{code}</code>\n"
             
         await query.edit_message_text(
-            f"✅ **تم السحب بنجاح:**\n\n{msg_text}\n\n📦 المتبقي في المخزن: {len(DB['stock'])}",
-            parse_mode=ParseMode.HTML, # HTML عشان النسخ
-            reply_markup=back_btn()
+            f"✅ **تم السحب:**\n\n{msg_text}\n📦 المتبقي: {len(DB['stock'])}",
+            parse_mode=ParseMode.HTML,
+            reply_markup=back_btn() # يرجع للمستخدم
         )
         return
 
-    # ==========================
-    # 🚀 سحب API (للجميع)
-    # ==========================
+    # --- سحب API ---
     if data == "pull_api":
         tokens = user_data.get("tokens", [])
         count = user_data.get("max", 1)
@@ -381,15 +365,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 if res.get("success"):
                     for acc in res.get("accounts", []):
-                        # تنسيق HTML للنسخ الذكي
                         email = acc.get('email')
                         password = acc.get('password')
-                        # حفظ في الأرشيف
+                        
                         full_acc_str = f"{email}:{password}"
                         if "history" not in DB["users"][user_id]: DB["users"][user_id]["history"] = []
                         DB["users"][user_id]["history"].append(full_acc_str)
                         
-                        # تنسيق العرض
                         fmt_acc = (
                             f"📧 <code>{email}</code>\n"
                             f"🔑 <code>{password}</code>\n"
@@ -397,18 +379,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         )
                         accounts.append(fmt_acc)
 
-                    log_activity(user_id, f"سحب API ناجح ({len(accounts)})")
+                    log_activity(user_id, f"API Pull ({len(accounts)})")
                     DB["stats"]["total_api"] += len(accounts)
                     DB["users"][user_id]["stats"]["api"] += len(accounts)
-                    break # خروج عند النجاح
+                    break
                 else:
                     if "Invalid token" in res.get("message", ""):
                         tokens_to_remove.append(token)
             except Exception as e:
-                logger.error(f"API Error: {e}")
+                logger.error(f"API: {e}")
                 continue
         
-        # تنظيف التوكنات
         if tokens_to_remove:
             for t in tokens_to_remove:
                 if t in DB["users"][user_id]["tokens"]: DB["users"][user_id]["tokens"].remove(t)
@@ -417,44 +398,34 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if accounts:
             msg_body = "\n".join(accounts)
-            if len(msg_body) > 3500: msg_body = msg_body[:3500] + "\n...(باقي الحسابات في الأرشيف)"
-            
-            await query.edit_message_text(
-                f"✅ **تمت العملية:**\n\n{msg_body}",
-                parse_mode=ParseMode.HTML,
-                reply_markup=back_btn()
-            )
+            if len(msg_body) > 3500: msg_body = msg_body[:3500] + "\n..."
+            await query.edit_message_text(f"✅ **تم:**\n\n{msg_body}", parse_mode=ParseMode.HTML, reply_markup=back_btn())
         else:
-            await query.edit_message_text("❌ **فشل السحب.** تأكد من رصيد التوكنات.", reply_markup=back_btn())
+            await query.edit_message_text("❌ **فشل السحب.**", reply_markup=back_btn())
         return
 
-    # ==========================
-    # ⚙️ أدوات عامة (Token, Count, History)
-    # ==========================
+    # --- أدوات المستخدم ---
     if data == "add_tokens":
         context.user_data["state"] = "waiting_tokens"
-        await query.edit_message_text("📝 **أرسل التوكنات الآن (كل توكن في سطر):**", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
+        await query.edit_message_text("📝 **أرسل التوكنات:**", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
         return
 
     if data == "clear_tokens":
         DB["users"][user_id]["tokens"] = []
         save_db_changes()
-        await query.edit_message_text("🗑 **تم حذف جميع التوكنات.**", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
+        await query.edit_message_text("🗑 **تم الحذف.**", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
         return
 
     if data == "set_count":
         context.user_data["state"] = "waiting_count"
-        await query.edit_message_text("🔢 **أرسل الرقم الجديد:**", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
+        await query.edit_message_text("🔢 **أرسل العدد:**", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
         return
 
     if data == "check_balance":
         t_count = len(user_data.get("tokens", []))
         stats = user_data.get("stats", {})
         await query.edit_message_text(
-            f"💰 **محفظتك:**\n\n"
-            f"🔑 التوكنات المحفوظة: {t_count}\n"
-            f"📊 إجمالي سحب (API): {stats.get('api', 0)}\n"
-            f"🎮 إجمالي سحب (مخزن): {stats.get('stock', 0)}",
+            f"💰 **المحفظة:**\n🔑 توكنات: {t_count}\n📊 سحب API: {stats.get('api', 0)}\n🎮 سحب مخزن: {stats.get('stock', 0)}",
             reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN
         )
         return
@@ -462,61 +433,59 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "my_history":
         hist = user_data.get("history", [])
         if not hist:
-            await query.edit_message_text("📂 أرشيفك فارغ.", reply_markup=back_btn())
+            await query.edit_message_text("📂 فارغ.", reply_markup=back_btn())
         else:
-            # عرض آخر 5 فقط لتجنب طول الرسالة
-            last_5 = hist[-5:]
-            txt = "\n".join(last_5)
-            await query.edit_message_text(f"📂 **آخر 5 عمليات:**\n\n{txt}", reply_markup=back_btn())
+            txt = "\n".join(hist[-5:])
+            await query.edit_message_text(f"📂 **آخر 5:**\n\n{txt}", reply_markup=back_btn())
         return
 
-    # ==========================
-    # 👑 أدوات الأدمن (إدارة المخزن والمستخدمين)
-    # ==========================
+    # --- أدوات الأدمن (اللوحة) ---
     if role == "admin":
         if data == "admin_stock_menu":
-            await query.edit_message_text(f"📦 **إدارة المخزن**\nالعدد الحالي: {len(DB['stock'])}", reply_markup=stock_manage_keyboard())
+            await query.edit_message_text(f"📦 **إدارة المخزن**\nالعدد: {len(DB['stock'])}", reply_markup=stock_manage_keyboard())
             return
         
         if data == "admin_add_stock_text":
             context.user_data["state"] = "admin_adding_stock"
-            await query.edit_message_text("✍️ **أرسل الأكواد (كل كود في سطر):**", reply_markup=back_btn())
+            await query.edit_message_text("✍️ **أرسل الأكواد:**", reply_markup=admin_back_btn())
             return
         
         if data == "admin_upload_stock_file":
             context.user_data["state"] = "admin_uploading_file"
-            await query.edit_message_text("📂 **أرسل ملف .txt يحتوي على الأكواد:**", reply_markup=back_btn())
+            await query.edit_message_text("📂 **أرسل ملف .txt:**", reply_markup=admin_back_btn())
             return
         
         if data == "admin_clear_stock":
             DB["stock"] = []
             save_db_changes()
-            await query.answer("🗑 تم تصفير المخزن!", show_alert=True)
-            await query.edit_message_text("🗑 المخزن فارغ الآن.", reply_markup=back_btn())
+            await query.answer("🗑 تم التصفير!", show_alert=True)
+            await query.edit_message_text("🗑 المخزن فارغ.", reply_markup=admin_back_btn())
             return
 
         if data == "admin_users_menu":
-            # اختصار: عرض إحصائية سريعة
             msg = f"👥 **المستخدمين:** {len(DB['users'])}\n\n"
             for uid, u in DB["users"].items():
                 msg += f"👤 {u['name']} | {u.get('role')} | ID: `{uid}`\n"
-            await query.edit_message_text(msg, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("➕ إضافة مستخدم/موظف", callback_data="admin_add_user_prompt")], [InlineKeyboardButton("🔙 رجوع", callback_data="admin_panel")]]))
+            # زر إضافة مستخدم وزر رجوع للأدمن
+            kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("➕ إضافة مستخدم/موظف", callback_data="admin_add_user_prompt")],
+                [InlineKeyboardButton("🔙 رجوع للأدمن", callback_data="admin_panel")]
+            ])
+            await query.edit_message_text(msg, parse_mode=ParseMode.MARKDOWN, reply_markup=kb)
             return
 
         if data == "admin_add_user_prompt":
             context.user_data["state"] = "admin_adding_user"
-            await query.edit_message_text("✍️ **أرسل ID المستخدم:**", reply_markup=back_btn())
+            await query.edit_message_text("✍️ **أرسل ID المستخدم:**", reply_markup=admin_back_btn())
             return
         
         if data == "toggle_maintenance":
             DB["settings"]["maintenance"] = not DB["settings"]["maintenance"]
             save_db_changes()
-            st = "مفعل" if DB["settings"]["maintenance"] else "معطل"
-            await query.answer(f"تم تغيير وضع الصيانة إلى: {st}", show_alert=True)
-            await admin_panel(query, context)
+            await admin_panel_handler(update, context) # تحديث اللوحة
             return
 
-# ====== 📩 معالج النصوص والملفات ======
+# ====== 📩 معالجة الرسائل والملفات ======
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text
@@ -524,35 +493,32 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if not state: return
 
-    # --- إضافة توكنات (User/Employee) ---
+    # إضافة توكنات (مستخدم/موظف)
     if state == "waiting_tokens":
         lines = text.splitlines()
         added = 0
         if "tokens" not in DB["users"][user_id]: DB["users"][user_id]["tokens"] = []
-        
         for t in lines:
             t = t.strip()
             if t and t not in DB["users"][user_id]["tokens"]:
                 DB["users"][user_id]["tokens"].append(t)
                 added += 1
-        
         save_db_changes()
         context.user_data.clear()
-        await update.message.reply_text(f"✅ تم إضافة {added} توكن جديد.", reply_markup=back_btn())
+        await update.message.reply_text(f"✅ تم إضافة {added} توكن.", reply_markup=back_btn())
         return
 
-    # --- تعيين العدد (User/Employee) ---
+    # تعيين العدد
     if state == "waiting_count":
         if text.isdigit() and int(text) > 0:
             DB["users"][user_id]["max"] = int(text)
             save_db_changes()
             context.user_data.clear()
-            await update.message.reply_text(f"✅ تم تعيين عدد السحب: {text}", reply_markup=back_btn())
+            await update.message.reply_text(f"✅ تم تعيين العدد: {text}", reply_markup=back_btn())
         return
 
-    # --- أدوات الأدمن ---
+    # أدوات الأدمن
     if user_id == ADMIN_ID:
-        # إضافة أكواد نصية
         if state == "admin_adding_stock":
             lines = text.splitlines()
             added = 0
@@ -563,44 +529,40 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     added += 1
             save_db_changes()
             context.user_data.clear()
-            await update.message.reply_text(f"📦 تم إضافة {added} كود للمخزن.", reply_markup=back_btn())
+            await update.message.reply_text(f"📦 تم إضافة {added} كود.", reply_markup=admin_back_btn())
             return
         
-        # إضافة مستخدم
         if state == "admin_adding_user":
             try:
                 target_id = int(text.strip())
                 if target_id not in DB["users"]:
-                    # افتراضياً نضيفه كموظف (يمكنك تغييرها)
                     DB["users"][target_id] = {
                         "role": "employee", "tokens": [], "max": 1, "history": [], "logs": [], 
                         "stats": {"api": 0, "stock": 0}, "name": "New Employee"
                     }
                     save_db_changes()
-                    await update.message.reply_text(f"✅ تم إضافة {target_id} كموظف.", reply_markup=back_btn())
+                    await update.message.reply_text(f"✅ تم إضافة {target_id} كموظف.", reply_markup=admin_back_btn())
                 else:
-                    await update.message.reply_text("⚠️ المستخدم موجود بالفعل.", reply_markup=back_btn())
+                    await update.message.reply_text("⚠️ المستخدم موجود.", reply_markup=admin_back_btn())
             except:
-                await update.message.reply_text("❌ تأكد من أن الـ ID رقم صحيح.", reply_markup=back_btn())
+                pass
             context.user_data.clear()
             return
 
 async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # معالج ملفات المخزن (Admin Only)
     user_id = update.effective_user.id
     state = context.user_data.get("state")
     
     if user_id == ADMIN_ID and state == "admin_uploading_file":
         doc = update.message.document
         if not doc.file_name.endswith(".txt"):
-            await update.message.reply_text("❌ الملف يجب أن يكون .txt", reply_markup=back_btn())
+            await update.message.reply_text("❌ ملف .txt فقط.", reply_markup=admin_back_btn())
             return
             
         file = await doc.get_file()
         content = await file.download_as_bytearray()
-        decoded_text = content.decode("utf-8")
+        lines = content.decode("utf-8").splitlines()
         
-        lines = decoded_text.splitlines()
         added = 0
         for code in lines:
             code = code.strip()
@@ -610,17 +572,17 @@ async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
         save_db_changes()
         context.user_data.clear()
-        await update.message.reply_text(f"📂 تم استيراد {added} كود من الملف.", reply_markup=back_btn())
+        await update.message.reply_text(f"📂 تم استيراد {added} كود.", reply_markup=admin_back_btn())
 
 # ====== 🏁 التشغيل ======
 if __name__ == "__main__":
     threading.Thread(target=run_flask).start()
-    print("🚀 Bot Started Successfully!")
+    print("🚀 Bot Started")
     
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("admin", admin_panel))
+    app.add_handler(CommandHandler("admin", admin_panel_handler)) # كوماند مباشر للأدمن
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
     app.add_handler(MessageHandler(filters.Document.ALL, document_handler))
