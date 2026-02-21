@@ -1,6 +1,7 @@
 import os
 import logging
 import asyncio
+import traceback
 from datetime import datetime
 import io
 import threading
@@ -25,14 +26,14 @@ MONGO_URI = os.environ.get("MONGO_URI", "mongodb+srv://abosalehlt_db_user:7_RvkP
 db_client = AsyncIOMotorClient(MONGO_URI)
 db = db_client["salehzon_db"]
 
-# ====== 📝 إعداد اللوجز ======
+# ====== 📝 إعداد اللوجز (نظام التتبع الشامل) ======
 logging.basicConfig(
-    format='%(asctime)s - %(levelname)s - %(message)s',
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO,
     handlers=[logging.StreamHandler()]
 )
 logging.getLogger("httpx").setLevel(logging.WARNING)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("SalehZonBot")
 
 # ====== ⚙️ الإعدادات ======
 BOT_TOKEN = os.environ.get("BOT_TOKEN") 
@@ -49,8 +50,7 @@ def run_flask(): app_server.run(host="0.0.0.0", port=8080)
 
 # ====== 💾 دوال مساعدة لقاعدة البيانات ======
 async def get_user(user_id):
-    user = await db.users.find_one({"_id": user_id})
-    return user
+    return await db.users.find_one({"_id": user_id})
 
 async def log_activity(user_id, user_name, action):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -132,7 +132,6 @@ async def categories_keyboard(action_prefix):
     row = []
     for cat in UC_CATEGORIES:
         count = await db.stock.count_documents({"category": cat})
-        # إشارات المرور الذكية للمخزن
         icon = "🔴" if count == 0 else ("🟡" if count < 5 else "🟢")
         btn_text = f"{icon} {cat} UC ({count})"
         row.append(InlineKeyboardButton(btn_text, callback_data=f"{action_prefix}_{cat}"))
@@ -155,11 +154,21 @@ def back_btn(): return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجو�
 def admin_back_btn(): return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع للأدمن", callback_data="admin_panel")]])
 def admin_users_back_btn(): return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع للمستخدمين", callback_data="admin_users_menu")]])
 
+
+# ====== 🚨 نظام التقاط الأخطاء الشامل (Error Handler) ======
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """تسجيل جميع الأخطاء البرمجية التي تحدث وتوضيح سببها في السيرفر"""
+    logger.error("❌ حدث خطأ برمجي (Exception):", exc_info=context.error)
+    tb_list = traceback.format_exception(None, context.error, context.error.__traceback__)
+    tb_string = "".join(tb_list)
+    logger.error(f"التفاصيل الدقيقة للخطأ:\n{tb_string}")
+
 # ====== 🚀 Handlers ======
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     name = update.effective_user.first_name
+    logger.info(f"👤 أرسل {name} ({user_id}) أمر /start")
     
     user = await get_user(user_id)
     
@@ -189,6 +198,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.from_user.id
     data = query.data
+    logger.info(f"🔘 ضغط المستخدم {user_id} على زر: {data}")
+    
     await query.answer()
     
     user = await get_user(user_id)
@@ -213,7 +224,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         today_str = datetime.now().strftime("%Y-%m-%d")
         orders_today = await db.orders.count_documents({"date": {"$regex": f"^{today_str}"}})
         
-        # حساب إجمالي التوكنات الفعالة في النظام
         pipeline = [{"$project": {"token_count": {"$size": {"$ifNull": ["$tokens", []]}}}}, {"$group": {"_id": None, "total": {"$sum": "$token_count"}}}]
         res = await db.users.aggregate(pipeline).to_list(length=1)
         total_tokens = res[0]["total"] if res else 0
@@ -222,7 +232,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(msg, reply_markup=await admin_keyboard(), parse_mode=ParseMode.MARKDOWN)
         return
 
-    # --- بطاقة حساب المستخدم (Profile) ---
+    # --- بطاقة حساب المستخدم ---
     if data == "my_profile":
         t_count = len(user.get("tokens", []))
         stats = user.get("stats", {"api": 0, "stock": 0})
@@ -231,13 +241,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(msg, reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
         return
 
-    # --- إدارة التوكنات بذكاء ---
+    # --- إدارة التوكنات ---
     if data == "view_my_tokens":
         tokens = user.get("tokens", [])
         if not tokens:
             await query.edit_message_text("📭 لا يوجد لديك توكنات نشطة.", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
             return
-        # إخفاء جزء من التوكنات للأمان
         txt = "\n".join([f"🔑 `{t[:8]}...{t[-4:]}`" for t in tokens])
         btns = [[InlineKeyboardButton("🗑 حذف جميع توكناتي", callback_data="clear_tokens")], [InlineKeyboardButton("🔙 رجوع", callback_data="back_home")]]
         await query.edit_message_text(f"📋 **توكناتك الحالية ({len(tokens)}):**\n\n{txt}", reply_markup=InlineKeyboardMarkup(btns), parse_mode=ParseMode.MARKDOWN)
@@ -248,7 +257,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("🗑 **تم حذف جميع التوكنات.**", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
         return
 
-    # --- إدارة المستخدمين ---
+    # --- إدارة المستخدمين للأدمن ---
     if data == "admin_users_menu" and role == "admin":
         context.user_data.clear()
         users_count = await db.users.count_documents({})
@@ -357,7 +366,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         docs = [{"_id": c, "category": cat, "added_at": datetime.now()} for c in codes_to_add]
         if docs:
             try: await db.stock.insert_many(docs, ordered=False) 
-            except Exception: pass
+            except Exception as e: logger.error(f"Error adding stock: {e}")
         context.user_data.clear()
         await query.edit_message_text(f"✅ تم إضافة الأكواد بنجاح لفئة {cat}.", reply_markup=admin_back_btn())
         return
@@ -404,7 +413,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("🎮 **اختر فئة الشدات للسحب:**", reply_markup=await categories_keyboard("pull_cat"))
         return
 
-    # طلب عدد الأكواد
     if data.startswith("pull_cat_"):
         if role not in ["admin", "employee"]: return
         cat = data.split("_")[-1]
@@ -413,7 +421,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(f"🔢 **أرسل عدد الأكواد التي تريد سحبها من فئة {cat} UC:**", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
         return
 
-    # طلب عدد حسابات API
     if data == "pull_api":
         tokens = user.get("tokens", [])
         if not tokens:
@@ -423,14 +430,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("🔢 **أرسل عدد الحسابات التي تريد سحبها:**\n*(سيقوم البوت بالبحث في توكناتك حتى إكمال العدد)*", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
         return
 
-# ====== 📩 معالج الرسائل النصية وطلبات السحب ======
+# ====== 📩 معالج الرسائل النصية ======
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text: return
     uid = update.effective_user.id
     txt = update.message.text.strip()
     state = context.user_data.get("state")
     
-    # 🌟 الحماية من تجاهل الرسائل
+    logger.info(f"📩 رسالة نصية من {uid} | الحالة الحالية: {state} | المحتوى: {txt[:30]}")
+    
     if not state: 
         await update.message.reply_text("💡 يرجى اختيار العملية من القائمة أولاً.", reply_markup=back_btn())
         return 
@@ -508,7 +516,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     elif "Invalid" in r.get("message", ""): 
                         tokens_to_remove.append(t)
                 except Exception as e:
-                    logger.error(f"API Error: {e}")
+                    logger.error(f"❌ API Error during pull: {e}")
                     continue
         
         if tokens_to_remove:
@@ -532,6 +540,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         lines = [t.strip() for t in txt.splitlines() if t.strip()]
         if lines: 
             await db.users.update_one({"_id": uid}, {"$addToSet": {"tokens": {"$each": lines}}})
+            logger.info(f"✅ تم إضافة {len(lines)} توكن للمستخدم {uid}")
         context.user_data.clear()
         await update.message.reply_text(f"✅ تم إضافة التوكنات بنجاح.", reply_markup=back_btn())
 
@@ -651,11 +660,17 @@ async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     threading.Thread(target=run_flask).start()
     app = ApplicationBuilder().token(BOT_TOKEN).build()
+    
+    # ربط معالجات الأوامر
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
     app.add_handler(MessageHandler(filters.Document.ALL, document_handler))
-    print("🚀 Bot Started with Async MongoDB Engine!")
+    
+    # 🚨 تفعيل صائد الأخطاء الشامل هنا
+    app.add_error_handler(error_handler)
+    
+    logger.info("🚀 Bot Started with Async MongoDB Engine & Advanced Logging!")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
