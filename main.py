@@ -36,7 +36,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # ====== ⚙️ الإعدادات ======
-BOT_TOKEN = os.environ.get("BOT_TOKE") # تأكد إن التوكن محطوط في السيرفر
+BOT_TOKEN = os.environ.get("BOT_TOKEN") # تأكد إن التوكن محطوط في السيرفر
 ADMIN_ID = 1635871816
 API_BASE_URL = "https://buzzmaster.shop" 
 PRODUCT_ID = "24h-nongmail"
@@ -595,4 +595,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
