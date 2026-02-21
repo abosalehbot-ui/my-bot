@@ -49,13 +49,18 @@ def run_flask(): app_server.run(host="0.0.0.0", port=8080)
 
 # ====== 💾 دوال مساعدة لقاعدة البيانات ======
 async def get_user(user_id):
-    return await db.users.find_one({"_id": user_id})
+    user = await db.users.find_one({"_id": user_id})
+    return user
 
 async def log_activity(user_id, user_name, action):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_entry = f"[{timestamp}] {action}"
     logger.info(f"📝 Activity | User: {user_id} | {action}")
-    await db.users.update_one({"_id": user_id}, {"$push": {"logs": {"$each": [log_entry], "$slice": -200}}})
+    
+    await db.users.update_one(
+        {"_id": user_id},
+        {"$push": {"logs": {"$each": [log_entry], "$slice": -200}}}
+    )
 
 async def get_next_order_id():
     stat = await db.stats.find_one_and_update(
@@ -127,6 +132,7 @@ async def categories_keyboard(action_prefix):
     row = []
     for cat in UC_CATEGORIES:
         count = await db.stock.count_documents({"category": cat})
+        # إشارات المرور الذكية للمخزن
         icon = "🔴" if count == 0 else ("🟡" if count < 5 else "🟢")
         btn_text = f"{icon} {cat} UC ({count})"
         row.append(InlineKeyboardButton(btn_text, callback_data=f"{action_prefix}_{cat}"))
@@ -134,6 +140,7 @@ async def categories_keyboard(action_prefix):
             buttons.append(row)
             row = []
     if row: buttons.append(row)
+    
     back_cb = "admin_stock_menu" if "admin" in action_prefix else "back_home"
     buttons.append([InlineKeyboardButton("🔙 رجوع", callback_data=back_cb)])
     return InlineKeyboardMarkup(buttons)
@@ -155,6 +162,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = update.effective_user.first_name
     
     user = await get_user(user_id)
+    
     if user_id == ADMIN_ID and not user:
         new_admin = {"_id": user_id, "role": "admin", "name": name, "tokens": [], "history": [], "logs": [], "stats": {"api": 0, "stock": 0}}
         await db.users.insert_one(new_admin)
@@ -205,6 +213,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         today_str = datetime.now().strftime("%Y-%m-%d")
         orders_today = await db.orders.count_documents({"date": {"$regex": f"^{today_str}"}})
         
+        # حساب إجمالي التوكنات الفعالة في النظام
         pipeline = [{"$project": {"token_count": {"$size": {"$ifNull": ["$tokens", []]}}}}, {"$group": {"_id": None, "total": {"$sum": "$token_count"}}}]
         res = await db.users.aggregate(pipeline).to_list(length=1)
         total_tokens = res[0]["total"] if res else 0
@@ -213,7 +222,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(msg, reply_markup=await admin_keyboard(), parse_mode=ParseMode.MARKDOWN)
         return
 
-    # --- بطاقة حساب المستخدم ---
+    # --- بطاقة حساب المستخدم (Profile) ---
     if data == "my_profile":
         t_count = len(user.get("tokens", []))
         stats = user.get("stats", {"api": 0, "stock": 0})
@@ -222,12 +231,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(msg, reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
         return
 
-    # --- إدارة التوكنات ---
+    # --- إدارة التوكنات بذكاء ---
     if data == "view_my_tokens":
         tokens = user.get("tokens", [])
         if not tokens:
             await query.edit_message_text("📭 لا يوجد لديك توكنات نشطة.", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
             return
+        # إخفاء جزء من التوكنات للأمان
         txt = "\n".join([f"🔑 `{t[:8]}...{t[-4:]}`" for t in tokens])
         btns = [[InlineKeyboardButton("🗑 حذف جميع توكناتي", callback_data="clear_tokens")], [InlineKeyboardButton("🔙 رجوع", callback_data="back_home")]]
         await query.edit_message_text(f"📋 **توكناتك الحالية ({len(tokens)}):**\n\n{txt}", reply_markup=InlineKeyboardMarkup(btns), parse_mode=ParseMode.MARKDOWN)
@@ -238,7 +248,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("🗑 **تم حذف جميع التوكنات.**", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
         return
 
-    # --- إدارة المستخدمين للأدمن ---
+    # --- إدارة المستخدمين ---
     if data == "admin_users_menu" and role == "admin":
         context.user_data.clear()
         users_count = await db.users.count_documents({})
@@ -379,22 +389,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         status = "🔴 مفعل" if new_status else "🟢 معطل"
         await query.edit_message_text(f"🛠 **لوحة الأدمن**\n📦 الحالة: {status}", reply_markup=await admin_keyboard(), parse_mode=ParseMode.MARKDOWN)
         return
-
-    if data == "admin_get_logs" and role == "admin":
-        await query.edit_message_text("⏳ **جاري جلب السجلات...**", parse_mode=ParseMode.MARKDOWN)
-        cursor = db.users.find({"logs": {"$exists": True, "$ne": []}}).limit(10)
-        all_logs = []
-        async for u in cursor:
-            all_logs.append(f"--- 👤 {u.get('name')} ({u['_id']}) ---")
-            all_logs.extend(u["logs"][-5:])
-        
-        if not all_logs:
-            await query.edit_message_text("📭 لا توجد سجلات.", reply_markup=admin_back_btn(), parse_mode=ParseMode.MARKDOWN)
-        else:
-            report = "\n".join(all_logs)
-            if len(report) > 4000: report = report[:4000] + "\n..."
-            await query.edit_message_text(f"📝 **ملخص النشاط:**\n\n{report}", reply_markup=admin_back_btn(), parse_mode=ParseMode.MARKDOWN)
-        return
         
     if data in ["admin_reverse_search", "admin_search_order"] and role == "admin":
         state = "waiting_reverse_code" if data == "admin_reverse_search" else "waiting_admin_order_search"
@@ -410,6 +404,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("🎮 **اختر فئة الشدات للسحب:**", reply_markup=await categories_keyboard("pull_cat"))
         return
 
+    # طلب عدد الأكواد
     if data.startswith("pull_cat_"):
         if role not in ["admin", "employee"]: return
         cat = data.split("_")[-1]
@@ -418,13 +413,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(f"🔢 **أرسل عدد الأكواد التي تريد سحبها من فئة {cat} UC:**", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
         return
 
+    # طلب عدد حسابات API
     if data == "pull_api":
         tokens = user.get("tokens", [])
         if not tokens:
             await query.edit_message_text("⚠️ **لا يوجد توكنات!** أضف توكن أولاً من القائمة الرئيسية.", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
             return
         context.user_data["state"] = "waiting_api_count"
-        await query.edit_message_text("🔢 **أرسل عدد الحسابات التي تريد سحبها:**\n*(سيقوم البوت بجمع الحسابات من كل توكناتك حتى إكمال العدد)*", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
+        await query.edit_message_text("🔢 **أرسل عدد الحسابات التي تريد سحبها:**\n*(سيقوم البوت بالبحث في توكناتك حتى إكمال العدد)*", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
         return
 
 # ====== 📩 معالج الرسائل النصية وطلبات السحب ======
@@ -434,7 +430,10 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     txt = update.message.text.strip()
     state = context.user_data.get("state")
     
-    if not state: return # تجاهل أي رسالة بدون حالة (زر)
+    # 🌟 الحماية من تجاهل الرسائل
+    if not state: 
+        await update.message.reply_text("💡 يرجى اختيار العملية من القائمة أولاً.", reply_markup=back_btn())
+        return 
     
     user = await get_user(uid)
     if not user: return
@@ -485,6 +484,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
         qty = int(txt)
         context.user_data.clear()
+        
         tokens = list(user.get("tokens", []))
         if not tokens: return
         
@@ -498,6 +498,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for t in tokens:
                 if len(accs) >= qty: break
                 needed = qty - len(accs)
+                
                 try:
                     res = await client.post(f"{API_BASE_URL}/api/redeem-bulk", json={"token":t, "product":PRODUCT_ID, "qty":needed}, timeout=15.0)
                     r = res.json()
