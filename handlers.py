@@ -28,17 +28,14 @@ async def process_api_pull(uid, reply_func, user, qty, context):
     role = user.get("role", "user")
     personal_tokens = list(user.get("tokens", []))
     
-    # جلب التوكنات المشتركة من قاعدة البيانات
     shared_doc = await db.settings.find_one({"_id": "shared_tokens"})
     shared_tokens = shared_doc.get("tokens", []) if shared_doc else []
     
-    # الحساب الذكي للتوكنات (يأخذ الشخصي أولاً، ثم المشترك)
     needed = qty
     personal_to_use = personal_tokens[:needed]
     needed -= len(personal_to_use)
     
     shared_to_use = []
-    # فقط الأدمن والموظف يحق لهم استخدام التوكنات المشتركة إذا نقصت توكناتهم الشخصية
     if needed > 0 and role in ["admin", "employee"]:
         shared_to_use = shared_tokens[:needed]
         needed -= len(shared_to_use)
@@ -71,7 +68,6 @@ async def process_api_pull(uid, reply_func, user, qty, context):
             except Exception as e:
                 token_logs_updates.append(f"⚠️ خطأ | {short_t}")
 
-    # تحديث التوكنات وحذف ما تم استهلاكه
     db_updates = {}
     if used_personal: db_updates["$pull"] = {"tokens": {"$in": used_personal}}
     if token_logs_updates: db_updates["$push"] = {"token_logs": {"$each": token_logs_updates, "$slice": -500}}
@@ -84,7 +80,6 @@ async def process_api_pull(uid, reply_func, user, qty, context):
     reply_markup = InlineKeyboardMarkup(btns)
     
     if accs:
-        # تسجيل وحفظ الطلب
         tracked_users = await get_tracked_users()
         if uid in tracked_users and raw_accs:
             cached_docs = [{"account": raw, "added_at": datetime.now()} for raw in raw_accs]
@@ -96,10 +91,9 @@ async def process_api_pull(uid, reply_func, user, qty, context):
         await log_important_action(uid, user["name"], f"🚀 سحب {len(accs)} حساب API (طلب #{order_id})", " | ".join(raw_accs))
         
         display_txt = "\n━━━━━━━━━━━━\n".join(accs)
-        await waiting_msg.edit_text(f"✅ <b>تم السحب بنجاح (طلب <code>#{order_id}</code>):</b>\n\n{display_txt}\n\n📝 <i>(تم حذف التوكنات المستخدمة)</i>", parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+        await waiting_msg.edit_text(f"✅ <b>تم السحب بنجاح (طلب <code>#{order_id}</code>):</b>\n\n{display_txt}\n\n📝 <i>(تم استهلاك التوكنات)</i>", parse_mode=ParseMode.HTML, reply_markup=reply_markup)
     else:
         await waiting_msg.edit_text("❌ <b>فشل السحب من التوكنات.</b>", parse_mode=ParseMode.HTML, reply_markup=reply_markup)
-
 
 async def process_stock_pull(uid, reply_func, user, cat, count, context):
     if await db.stock.count_documents({"category": cat}) < count: 
@@ -145,7 +139,7 @@ async def process_cache_pull(uid, reply_func, user, qty, context):
         msg = "\n━━━━━━━━━━━━\n".join(pulled_accs)
         return await reply_func(f"✅ <b>سحب {len(pulled_accs)} حساب:</b>\n\n{msg}", parse_mode=ParseMode.HTML, reply_markup=retry_keyboard("pull_cached_api", "back_home"))
 
-# ====== 🚀 الأوامر السريعة (Shortcuts) ======
+# ====== 🚀 الأوامر السريعة ======
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = await get_user(update.effective_user.id)
     if not user or user["role"] not in ["admin", "employee"]: return
@@ -287,7 +281,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "add_tokens":
         await query.answer()
         context.user_data["state"] = "waiting_tokens"
-        return await query.edit_message_text("📝 <b>أرسل التوكنات:</b>", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="view_my_tokens")]]), parse_mode=ParseMode.HTML)
+        return await query.edit_message_text("📝 <b>أرسل التوكنات (يدوياً أو كملف نصي من المتجر):</b>", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="view_my_tokens")]]), parse_mode=ParseMode.HTML)
 
     if data == "my_history":
         await query.answer()
@@ -369,6 +363,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await db.stock.delete_many({"category": cat})
         return await query.edit_message_text(f"🗑 <b>تم تصفير فئة {cat} UC بنجاح.</b>", reply_markup=admin_back_btn(), parse_mode=ParseMode.HTML)
 
+    # معالجة إضافة الأكواد للمخزن من الملف
     if data.startswith("smart_cat_") and role == "admin":
         await query.answer()
         cat = data.split("_")[-1]
@@ -406,6 +401,33 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if len(dupes_list) > 50: txt += f"\n... و {len(dupes_list)-50} أكواد أخرى."
         await query.answer() 
         return await query.message.reply_text(f"⚠️ <b>الأكواد المكررة ({len(dupes_list)} كود):</b>\n\n{txt}", parse_mode=ParseMode.HTML)
+
+    # معالجة إضافة التوكنات من الملف (فلتر ذكي)
+    if data in ["file_shared_tokens", "file_personal_tokens"] and role in ["admin", "employee"]:
+        await query.answer()
+        lines = context.user_data.get("smart_upload_lines", [])
+        valid_tokens = []
+        for line in lines:
+            line = line.strip()
+            if not line or "===" in line or "↓↓" in line or "Заказ" in line: continue
+            token = line.split(";")[0].strip()
+            if len(token) > 15 and "http" not in token and " " not in token:
+                valid_tokens.append(token)
+        
+        if not valid_tokens:
+            return await query.edit_message_text("❌ <b>لم يتم العثور على أي توكنات صالحة في هذا الملف!</b>", parse_mode=ParseMode.HTML)
+            
+        if data == "file_shared_tokens" and role == "admin":
+            await db.settings.update_one({"_id": "shared_tokens"}, {"$push": {"tokens": {"$each": valid_tokens}}}, upsert=True)
+            await log_important_action(uid, user["name"], f"رفع ملف: استخراج وإضافة {len(valid_tokens)} توكن مشترك")
+            msg = f"✅ <b>الاستخراج الذكي:</b>\nتم تصفية الملف وإضافة <code>{len(valid_tokens)}</code> توكن مشترك بنجاح."
+        else:
+            await db.users.update_one({"_id": uid}, {"$push": {"tokens": {"$each": valid_tokens}}})
+            await log_important_action(uid, user["name"], f"رفع ملف: استخراج وإضافة {len(valid_tokens)} توكن شخصي")
+            msg = f"✅ <b>الاستخراج الذكي:</b>\nتم تصفية الملف وإضافة <code>{len(valid_tokens)}</code> توكن لحسابك الشخصي بنجاح."
+            
+        context.user_data.clear()
+        return await query.edit_message_text(msg, parse_mode=ParseMode.HTML, reply_markup=back_btn())
 
     if data == "cancel_add_stock" and role == "admin":
         await query.answer()
@@ -593,10 +615,22 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await process_api_pull(uid, update.message.reply_text, user, qty, context)
 
     elif state == "waiting_tokens":
-        lines = [t.strip() for t in txt.splitlines() if t.strip()]
-        if lines: await db.users.update_one({"_id": uid}, {"$addToSet": {"tokens": {"$each": lines}}})
+        valid_tokens = []
+        for line in txt.splitlines():
+            line = line.strip()
+            if not line or "===" in line or "↓↓" in line or "Заказ" in line: continue
+            token = line.split(";")[0].strip()
+            if len(token) > 15 and "http" not in token and " " not in token:
+                valid_tokens.append(token)
+                
+        if valid_tokens: 
+            await db.users.update_one({"_id": uid}, {"$addToSet": {"tokens": {"$each": valid_tokens}}})
+            msg = f"✅ <b>الاستخراج الذكي:</b>\nتم العثور على <code>{len(valid_tokens)}</code> توكن صالح وإضافتهم بنجاح."
+        else:
+            msg = "❌ لم يتم العثور على أي توكنات صالحة في النص."
+            
         context.user_data.clear()
-        return await update.message.reply_text(f"✅ <b>تم إضافة التوكنات.</b>", reply_markup=retry_keyboard("add_tokens", "view_my_tokens"), parse_mode=ParseMode.HTML)
+        return await update.message.reply_text(msg, reply_markup=retry_keyboard("add_tokens", "view_my_tokens"), parse_mode=ParseMode.HTML)
 
     elif state == "waiting_add_user_id" and uid == ADMIN_ID:
         if not txt.isdigit(): return
@@ -650,28 +684,36 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg = f"📊 <b>تقرير الأكواد المدخلة:</b>\n\nإجمالي الأكواد: <code>{len(all_codes)}</code>\n✅ أكواد جديدة: <code>{len(new_codes)}</code>\n⚠️ أكواد مكررة/مسحوبة: <code>{len(dupes)}</code>\n\n❓ ماذا تريد أن تفعل؟"
             return await waiting_msg.edit_text(msg, reply_markup=InlineKeyboardMarkup(btns), parse_mode=ParseMode.HTML)
 
-# ====== 📂 الرفع الذكي للملفات ======
+# ====== 📂 الرفع الذكي للملفات (أكواد وتوكنات) ======
 async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
-    if uid != ADMIN_ID: return
+    user = await get_user(uid)
+    if not user or user["role"] not in ["admin", "employee"]: return
     
     doc = update.message.document
     if not doc.file_name.endswith(".txt"): return
     
-    waiting_msg = await update.message.reply_text("⏳ <b>جاري قراءة الملف الذكي...</b>", parse_mode=ParseMode.HTML)
+    waiting_msg = await update.message.reply_text("⏳ <b>جاري قراءة الملف وتحليله...</b>", parse_mode=ParseMode.HTML)
     file = await doc.get_file()
     content = await file.download_as_bytearray()
     lines = [c.strip() for c in content.decode("utf-8", errors="ignore").splitlines() if c.strip()]
     if not lines: return await waiting_msg.edit_text("❌ الملف فارغ!")
     
     context.user_data["smart_upload_lines"] = lines
-    btns, row = [], []
-    for cat in UC_CATEGORIES:
-        row.append(InlineKeyboardButton(f"{cat} UC", callback_data=f"smart_cat_{cat}"))
-        if len(row) == 3:
-            btns.append(row)
-            row = []
-    if row: btns.append(row)
+    
+    btns = []
+    if user["role"] == "admin":
+        row = []
+        for cat in UC_CATEGORIES:
+            row.append(InlineKeyboardButton(f"{cat} UC", callback_data=f"smart_cat_{cat}"))
+            if len(row) == 3:
+                btns.append(row)
+                row = []
+        if row: btns.append(row)
+    
+    if user["role"] == "admin":
+        btns.append([InlineKeyboardButton("🔑 استخراج وإضافة كتوكنات مشتركة", callback_data="file_shared_tokens")])
+    btns.append([InlineKeyboardButton("🔐 استخراج وإضافة كتوكنات شخصية", callback_data="file_personal_tokens")])
     btns.append([InlineKeyboardButton("❌ إلغاء", callback_data="cancel_add_stock")])
     
-    await waiting_msg.edit_text(f"📂 <b>تم استلام ملف (<code>{len(lines)}</code> كود)</b>\n\n🎯 <b>اختر الفئة لإضافة الأكواد إليها:</b>", reply_markup=InlineKeyboardMarkup(btns), parse_mode=ParseMode.HTML)
+    await waiting_msg.edit_text(f"📂 <b>تم استلام ملف يحتوي على (<code>{len(lines)}</code> سطر)</b>\n\n🎯 <b>ماذا تريد أن تفعل بهذا الملف؟</b>", reply_markup=InlineKeyboardMarkup(btns), parse_mode=ParseMode.HTML)
