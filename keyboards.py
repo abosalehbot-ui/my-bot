@@ -2,13 +2,22 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from config import UC_CATEGORIES
 
 def get_main_keyboard(role):
-    # تم إزالة زر المرتجعات من هنا
-    btns = [[InlineKeyboardButton("💳 حسابي", callback_data="my_profile")], [InlineKeyboardButton("📜 سجل عملياتي", callback_data="my_history")]]
+    # إزالة سجل العمليات من هنا، وترك حسابي والسحب فقط
+    btns = [[InlineKeyboardButton("💳 حسابي", callback_data="my_profile")]]
     if role in ["admin", "employee"]:
         btns.insert(0, [InlineKeyboardButton("🚀 سحب حسابات API", callback_data="pull_api"), InlineKeyboardButton("🎮 سحب أكواد UC", callback_data="pull_stock_menu")])
     if role == "admin":
         btns.append([InlineKeyboardButton("🛠 لوحة التحكم (الأدمن)", callback_data="admin_panel")])
         btns.append([InlineKeyboardButton("♻️ سحب من التخزين (24س)", callback_data="pull_cached_api")])
+    return InlineKeyboardMarkup(btns)
+
+def profile_keyboard(role):
+    # تم نقل سجل العمليات ليكون بداخل حسابي
+    btns = [
+        [InlineKeyboardButton("🔑 توكناتي الشخصية", callback_data="view_my_tokens")],
+        [InlineKeyboardButton("📜 سجل عملياتي", callback_data="my_history")],
+        [InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="back_home")]
+    ]
     return InlineKeyboardMarkup(btns)
 
 async def admin_keyboard():
@@ -67,11 +76,6 @@ async def categories_keyboard(prefix, db):
             row = []
     if row: btns.append(row)
     btns.append([InlineKeyboardButton("🔙 رجوع", callback_data="admin_stock_menu" if "admin" in prefix else "back_home")])
-    return InlineKeyboardMarkup(btns)
-
-def profile_keyboard(role):
-    btns = [[InlineKeyboardButton("🔑 توكناتي الشخصية", callback_data="view_my_tokens")]]
-    btns.append([InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="back_home")])
     return InlineKeyboardMarkup(btns)
 
 def success_pull_keyboard(again_data):
