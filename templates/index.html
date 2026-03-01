@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة تحكم صالح زون</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; }
+        .stat-card { border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: transform 0.2s; }
+        .stat-card:hover { transform: translateY(-5px); }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark mb-4 shadow">
+        <div class="container">
+            <span class="navbar-brand mb-0 h1 fs-3">🎮 لوحة تحكم صالح زون</span>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="row mb-4 text-center">
+            <div class="col-md-3 col-6 mb-3">
+                <div class="card stat-card text-white bg-primary h-100">
+                    <div class="card-body">
+                        <h6 class="card-title">إجمالي المستخدمين</h6>
+                        <h2 class="fw-bold">{{ users_count }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6 mb-3">
+                <div class="card stat-card text-white bg-success h-100">
+                    <div class="card-body">
+                        <h6 class="card-title">أكواد المخزن</h6>
+                        <h2 class="fw-bold">{{ stock_count }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6 mb-3">
+                <div class="card stat-card text-white bg-info h-100">
+                    <div class="card-body">
+                        <h6 class="card-title">حسابات التخزين (24س)</h6>
+                        <h2 class="fw-bold">{{ cached_count }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6 mb-3">
+                <div class="card stat-card text-dark bg-warning h-100">
+                    <div class="card-body">
+                        <h6 class="card-title">إجمالي الطلبات</h6>
+                        <h2 class="fw-bold">{{ orders_count }}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white py-3">
+                <h5 class="mb-0 fw-bold">🛒 أحدث الطلبات</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>رقم الطلب</th>
+                                <th>المستخدم</th>
+                                <th>النوع</th>
+                                <th>التاريخ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in recent_orders %}
+                            <tr>
+                                <td><span class="badge bg-secondary">#{{ order._id }}</span></td>
+                                <td>{{ order.user }}</td>
+                                <td>{{ order.type }}</td>
+                                <td dir="ltr" class="text-end">{{ order.date }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center py-4">لا توجد طلبات حتى الآن</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
