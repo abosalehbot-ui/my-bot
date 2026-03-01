@@ -6,7 +6,7 @@ from fastapi.templating import Jinja2Templates
 import motor.motor_asyncio
 from datetime import datetime
 
-app = FastAPI(title="SalehZon Dashboard")
+app = FastAPI(title="SalehZone Dashboard")
 
 # تفعيل مجلد الملفات الثابتة (للصور واللوجو)
 os.makedirs("static", exist_ok=True)
