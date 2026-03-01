@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Store Admin - Saleh Zone</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>tailwind.config={theme:{extend:{colors:{szgreen:'#7dfc89',szcyan:'#5eead4',darkbg:'#050505',panelbg:'#111'}}}}</script>
+</head>
+<body class="bg-darkbg text-gray-300 font-sans flex h-screen overflow-hidden selection:bg-yellow-500 selection:text-black">
+    <aside class="w-64 bg-panelbg border-r border-gray-900 flex flex-col h-full">
+        <div class="h-20 flex items-center px-6 border-b border-gray-900">
+            <span class="text-xl font-black tracking-wider text-yellow-500">STORE ADMIN</span>
+        </div>
+        <nav class="mt-6 flex flex-col gap-2 px-3">
+            <a href="/" class="text-gray-400 hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition flex items-center border border-gray-800 bg-black"><i class="fas fa-arrow-left w-6"></i> Back to Master Admin</a>
+            <div class="my-2 border-t border-gray-800"></div>
+            <a href="/store-admin" class="bg-yellow-500/10 border-l-2 border-yellow-500 text-yellow-500 px-4 py-3 rounded-r-lg text-sm font-bold"><i class="fas fa-wallet w-6"></i> Prices & Wallets</a>
+            <a href="/shop" target="_blank" class="text-szcyan hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition flex items-center mt-auto"><i class="fas fa-external-link-alt w-6"></i> Open Live Shop</a>
+        </nav>
+    </aside>
+
+    <main class="flex-1 p-10 overflow-y-auto">
+        <h2 class="text-3xl font-bold text-white mb-8"><i class="fas fa-shopping-cart text-yellow-500 mr-3"></i>B2C Store Management</h2>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="bg-panelbg border border-gray-800 p-6 rounded-xl">
+                <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-tags text-yellow-500 mr-2"></i> Shop Prices (EGP)</h3>
+                <form action="/api/store/update_prices" method="POST" class="space-y-3">
+                    {% for cat in ['60', '325', '660', '1800', '3850', '8100'] %}
+                    <div class="flex justify-between items-center bg-black p-3 rounded border border-gray-800">
+                        <span class="text-white font-bold">{{ cat }} UC</span>
+                        <input type="number" name="p_{{ cat }}" value="{{ store_prices.get(cat, 0) }}" class="w-24 bg-[#111] border border-gray-700 text-yellow-500 font-bold px-2 py-1 rounded text-right outline-none">
+                    </div>
+                    {% endfor %}
+                    <button class="w-full bg-yellow-500 text-black font-bold py-3 rounded-lg mt-4">Save Prices</button>
+                </form>
+            </div>
+
+            <div class="bg-panelbg border border-gray-800 rounded-xl lg:col-span-2 flex flex-col h-[600px]">
+                <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-[#0a0a0a]">
+                    <h3 class="font-bold text-white uppercase text-sm">Customer Wallets</h3>
+                    <form action="/api/store/add_customer" method="POST" class="flex gap-2">
+                        <input type="text" name="name" placeholder="Name" required class="w-32 bg-black border border-gray-700 text-white px-3 py-1.5 rounded text-sm outline-none">
+                        <input type="text" name="phone" placeholder="Phone Number" required class="w-32 bg-black border border-gray-700 text-white px-3 py-1.5 rounded text-sm outline-none">
+                        <button class="bg-yellow-500 text-black px-4 py-1.5 rounded text-sm font-bold">+ Create</button>
+                    </form>
+                </div>
+                <div class="overflow-x-auto p-4 flex-1">
+                    <table class="w-full text-left text-sm whitespace-nowrap">
+                        <thead class="text-gray-500 uppercase text-xs"><tr><th class="px-4 py-3">Customer</th><th class="px-4 py-3">Balance</th><th class="px-4 py-3">Add Funds</th></tr></thead>
+                        <tbody class="divide-y divide-gray-900">
+                            {% for c in store_customers %}
+                            <tr class="hover:bg-gray-900/50">
+                                <td class="px-4 py-3"><div class="font-bold text-white">{{ c.name }}</div><div class="text-[10px] text-gray-500">{{ c.phone }}</div></td>
+                                <td class="px-4 py-3"><span class="text-yellow-500 font-black text-lg">{{ c.balance }} EGP</span></td>
+                                <td class="px-4 py-3">
+                                    <form action="/api/store/add_balance" method="POST" class="flex gap-2">
+                                        <input type="hidden" name="phone" value="{{ c.phone }}">
+                                        <input type="number" name="amount" placeholder="Amount" required class="w-24 bg-black border border-gray-700 text-white px-2 py-1 rounded text-xs outline-none focus:border-yellow-500">
+                                        <button class="bg-gray-800 text-yellow-500 px-3 py-1 rounded hover:bg-yellow-500 hover:text-black font-bold">Charge</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+</body>
+</html>
