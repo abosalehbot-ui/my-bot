@@ -1,4 +1,5 @@
 import io
+import re
 import httpx
 import traceback
 from datetime import datetime, timedelta
@@ -11,7 +12,8 @@ from database import db, get_user, check_maintenance, get_tracked_users, get_nex
 from keyboards import (get_main_keyboard, admin_keyboard, auto_cache_keyboard, 
                        admin_users_keyboard, stock_manage_keyboard, categories_keyboard, 
                        success_pull_keyboard, back_btn, admin_back_btn, admin_users_back_btn, 
-                       profile_keyboard, admin_logs_keyboard, admin_logs_back_btn, retry_keyboard)
+                       profile_keyboard, admin_logs_keyboard, admin_logs_back_btn, retry_keyboard,
+                       shared_tokens_keyboard)
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.error("❌ حدث خطأ:", exc_info=context.error)
@@ -225,6 +227,34 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.clear()
         return await query.edit_message_text("📜 <b>مركز السجلات والبحث والتخزين</b>", reply_markup=admin_logs_keyboard(), parse_mode=ParseMode.HTML)
 
+    # 🔗 إدارة التوكنات المشتركة من البوت
+    if data == "admin_shared_tokens_menu" and role == "admin":
+        await query.answer()
+        doc = await db.settings.find_one({"_id": "shared_tokens"})
+        count = len(doc.get("tokens", [])) if doc else 0
+        return await query.edit_message_text(f"🔗 <b>إدارة التوكنات المشتركة</b>\n\nالعدد الحالي: <code>{count}</code> توكن", reply_markup=shared_tokens_keyboard(), parse_mode=ParseMode.HTML)
+
+    if data == "view_shared_tokens" and role == "admin":
+        await query.answer()
+        doc = await db.settings.find_one({"_id": "shared_tokens"})
+        tokens = doc.get("tokens", []) if doc else []
+        if not tokens:
+            return await query.edit_message_text("📭 <b>لا يوجد توكنات مشتركة حالياً.</b>", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="admin_shared_tokens_menu")]]), parse_mode=ParseMode.HTML)
+        txt = "\n".join([f"<code>{t}</code>" for t in tokens])
+        if len(txt) > 4000: txt = txt[:4000] + "\n... (يوجد المزيد، راجع الويب)"
+        return await query.edit_message_text(f"📋 <b>التوكنات المشتركة ({len(tokens)}):</b>\n\n{txt}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="admin_shared_tokens_menu")]]), parse_mode=ParseMode.HTML)
+
+    if data == "add_shared_tokens_btn" and role == "admin":
+        await query.answer()
+        context.user_data["state"] = "waiting_shared_tokens"
+        return await query.edit_message_text("📝 <b>أرسل التوكنات (يدوياً أو كملف نصي من المتجر):</b>\nسيتم استخدام الفلتر الذكي لاستخراج التوكنات الصالحة فقط.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="admin_shared_tokens_menu")]]), parse_mode=ParseMode.HTML)
+
+    if data == "clear_shared_tokens" and role == "admin":
+        await query.answer()
+        await db.settings.update_one({"_id": "shared_tokens"}, {"$set": {"tokens": []}}, upsert=True)
+        return await query.edit_message_text("🗑 <b>تم تصفير التوكنات المشتركة بنجاح.</b>", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="admin_shared_tokens_menu")]]), parse_mode=ParseMode.HTML)
+
+
     if data == "admin_global_search" and role == "admin":
         await query.answer()
         context.user_data["state"] = "waiting_global_search"
@@ -363,7 +393,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await db.stock.delete_many({"category": cat})
         return await query.edit_message_text(f"🗑 <b>تم تصفير فئة {cat} UC بنجاح.</b>", reply_markup=admin_back_btn(), parse_mode=ParseMode.HTML)
 
-    # معالجة إضافة الأكواد للمخزن من الملف
     if data.startswith("smart_cat_") and role == "admin":
         await query.answer()
         cat = data.split("_")[-1]
@@ -402,16 +431,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer() 
         return await query.message.reply_text(f"⚠️ <b>الأكواد المكررة ({len(dupes_list)} كود):</b>\n\n{txt}", parse_mode=ParseMode.HTML)
 
-    # معالجة إضافة التوكنات من الملف (فلتر ذكي)
     if data in ["file_shared_tokens", "file_personal_tokens"] and role in ["admin", "employee"]:
         await query.answer()
         lines = context.user_data.get("smart_upload_lines", [])
         valid_tokens = []
         for line in lines:
             line = line.strip()
-            if not line or "===" in line or "↓↓" in line or "Заказ" in line: continue
-            token = line.split(";")[0].strip()
-            if len(token) > 15 and "http" not in token and " " not in token:
+            if not line: continue
+            token = re.split(r'[;:\s\|]', line)[0].strip()
+            if len(token) > 15 and re.match(r'^[A-Za-z0-9\-_]+$', token):
                 valid_tokens.append(token)
         
         if not valid_tokens:
@@ -512,29 +540,29 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     user = await get_user(uid)
     if not user: return
+    role = user.get("role", "user")
     
     if not state: return await update.message.reply_text("💡 يرجى اختيار عملية من القائمة أولاً.", reply_markup=back_btn())
 
-    if state == "waiting_add_tracked" and user["role"] == "admin":
+    if state == "waiting_add_tracked" and role == "admin":
         if not txt.isdigit(): return await update.message.reply_text("❌ أرسل آيدي صحيح.", reply_markup=retry_keyboard("add_tracked_user", "admin_auto_cache_menu"))
         target_id = int(txt)
         await db.settings.update_one({"_id": "cache_config"}, {"$addToSet": {"tracked_users": target_id}}, upsert=True)
         context.user_data.clear()
         return await update.message.reply_text(f"✅ تم إضافة <code>{target_id}</code> للمراقبة.", parse_mode=ParseMode.HTML, reply_markup=retry_keyboard("add_tracked_user", "admin_auto_cache_menu"))
 
-    elif state == "waiting_remove_tracked" and user["role"] == "admin":
+    elif state == "waiting_remove_tracked" and role == "admin":
         if not txt.isdigit(): return await update.message.reply_text("❌ أرسل آيدي صحيح.", reply_markup=retry_keyboard("remove_tracked_user", "admin_auto_cache_menu"))
         target_id = int(txt)
         await db.settings.update_one({"_id": "cache_config"}, {"$pull": {"tracked_users": target_id}}, upsert=True)
         context.user_data.clear()
         return await update.message.reply_text(f"🗑 تم إزالة <code>{target_id}</code>.", parse_mode=ParseMode.HTML, reply_markup=retry_keyboard("remove_tracked_user", "admin_auto_cache_menu"))
 
-    elif state == "waiting_cached_api_count" and user["role"] == "admin":
+    elif state == "waiting_cached_api_count" and role == "admin":
         if not txt.isdigit() or int(txt) <= 0: return await update.message.reply_text("❌ أرسل رقم صحيح.", reply_markup=back_btn())
         await process_cache_pull(uid, update.message.reply_text, user, int(txt), context)
 
-    # 🔍 البحث الشامل الذكي
-    elif state == "waiting_global_search" and user["role"] == "admin":
+    elif state == "waiting_global_search" and role == "admin":
         if txt.isdigit():
             order = await db.orders.find_one({"_id": int(txt)})
             if order:
@@ -556,7 +584,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         in_stock = await db.stock.count_documents({"$or": [{"_id": txt}, {"code": txt}]})
         
         if not records and in_stock == 0:
-            await update.message.reply_text("❌ <b>لم يتم العثور على أي نتائج!</b> (لا يوجد طلب، أو مستخدم، أو كود بهذا النص).", reply_markup=retry_keyboard("admin_global_search", "admin_logs_hub"), parse_mode=ParseMode.HTML)
+            await update.message.reply_text("❌ <b>لم يتم العثور على أي نتائج!</b>", reply_markup=retry_keyboard("admin_global_search", "admin_logs_hub"), parse_mode=ParseMode.HTML)
         else:
             msg = f"🔍 <b>نتيجة البحث عن الكود:</b>\n<code>{txt}</code>\n\n"
             if in_stock > 0: msg += f"📦 <b>موجود حالياً في المخزن</b> (العدد: <code>{in_stock}</code>)\n\n"
@@ -571,7 +599,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif state == "waiting_order_id":
         if not txt.isdigit(): return await update.message.reply_text("❌ أرسل رقم صحيح.", reply_markup=retry_keyboard("check_order_id", "my_history"))
         order = await db.orders.find_one({"_id": int(txt)})
-        if order and (order["user_id"] == uid or user["role"] == "admin"):
+        if order and (order["user_id"] == uid or role == "admin"):
             items_str = "\n".join([f"<code>{i}</code>" for i in order["items"]])
             res_msg = f"📄 <b>الطلب <code>#{txt}</code></b>\n📅 {order['date']}\n⬇️ العناصر:\n{items_str}"
         else: res_msg = "❌ الطلب غير موجود أو يخص شخصاً آخر."
@@ -581,11 +609,11 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif state == "waiting_return_order_id":
         if not txt.isdigit(): return await update.message.reply_text("❌ أرسل رقم صحيح.", reply_markup=back_btn())
         order = await db.orders.find_one({"_id": int(txt)})
-        if not order or (order["user_id"] != uid and user["role"] != "admin"): return await update.message.reply_text("❌ الطلب غير موجود أو لا تملك صلاحية.", reply_markup=back_btn())
+        if not order or (order["user_id"] != uid and role != "admin"): return await update.message.reply_text("❌ الطلب غير موجود أو لا تملك صلاحية.", reply_markup=back_btn())
         if "PUBG Stock" not in order["type"]: return await update.message.reply_text("❌ لا يمكن إرجاع هذا النوع من الطلبات.", reply_markup=back_btn())
             
         order_time = datetime.strptime(order['date'], "%Y-%m-%d %H:%M:%S")
-        if (datetime.now() - order_time).total_seconds() > 900 and user["role"] != "admin":
+        if (datetime.now() - order_time).total_seconds() > 900 and role != "admin":
             return await update.message.reply_text("⏳ <b>انتهت مهلة الإرجاع (15 دقيقة).</b>", reply_markup=back_btn(), parse_mode=ParseMode.HTML)
             
         cat = order["type"].split("(")[1].split(" ")[0]
@@ -618,9 +646,9 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         valid_tokens = []
         for line in txt.splitlines():
             line = line.strip()
-            if not line or "===" in line or "↓↓" in line or "Заказ" in line: continue
-            token = line.split(";")[0].strip()
-            if len(token) > 15 and "http" not in token and " " not in token:
+            if not line: continue
+            token = re.split(r'[;:\s\|]', line)[0].strip()
+            if len(token) > 15 and re.match(r'^[A-Za-z0-9\-_]+$', token):
                 valid_tokens.append(token)
                 
         if valid_tokens: 
@@ -632,7 +660,26 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.clear()
         return await update.message.reply_text(msg, reply_markup=retry_keyboard("add_tokens", "view_my_tokens"), parse_mode=ParseMode.HTML)
 
-    elif state == "waiting_add_user_id" and uid == ADMIN_ID:
+    # استقبال التوكنات المشتركة
+    elif state == "waiting_shared_tokens" and role == "admin":
+        valid_tokens = []
+        for line in txt.splitlines():
+            line = line.strip()
+            if not line: continue
+            token = re.split(r'[;:\s\|]', line)[0].strip()
+            if len(token) > 15 and re.match(r'^[A-Za-z0-9\-_]+$', token):
+                valid_tokens.append(token)
+                
+        if valid_tokens: 
+            await db.settings.update_one({"_id": "shared_tokens"}, {"$push": {"tokens": {"$each": valid_tokens}}}, upsert=True)
+            msg = f"✅ <b>الاستخراج الذكي:</b>\nتم العثور على <code>{len(valid_tokens)}</code> توكن صالح وإضافتهم للمشتركة بنجاح."
+        else:
+            msg = "❌ لم يتم العثور على أي توكنات صالحة في النص."
+            
+        context.user_data.clear()
+        return await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="admin_shared_tokens_menu")]]), parse_mode=ParseMode.HTML)
+
+    elif state == "waiting_add_user_id" and role == "admin":
         if not txt.isdigit(): return
         new_uid = int(txt)
         if await get_user(new_uid): return await update.message.reply_text("⚠️ هذا المستخدم موجود بالفعل!", reply_markup=retry_keyboard("admin_add_user_btn", "admin_users_menu"))
@@ -640,13 +687,13 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         btns = [[InlineKeyboardButton("موظف 👤", callback_data="set_role_employee")], [InlineKeyboardButton("مستخدم عادي 🆕", callback_data="set_role_user")]]
         return await update.message.reply_text(f"👤 <b>اختر الرتبة للآيدي:</b> <code>{new_uid}</code>", reply_markup=InlineKeyboardMarkup(btns), parse_mode=ParseMode.HTML)
 
-    elif state == "waiting_remove_user_id" and uid == ADMIN_ID:
+    elif state == "waiting_remove_user_id" and role == "admin":
         if txt.isdigit():
             await db.users.delete_one({"_id": int(txt)})
             context.user_data.clear()
             return await update.message.reply_text(f"🗑 تم الحذف بنجاح.", reply_markup=retry_keyboard("admin_remove_user_btn", "admin_users_menu"))
 
-    elif state == "waiting_manage_user_id" and uid == ADMIN_ID:
+    elif state == "waiting_manage_user_id" and role == "admin":
         if not txt.isdigit(): return
         target = await get_user(int(txt))
         if target:
@@ -661,7 +708,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ الحساب غير موجود.", reply_markup=retry_keyboard("admin_search_manage_user", "admin_users_menu"))
         context.user_data.clear()
 
-    elif state == "waiting_user_logs_id" and uid == ADMIN_ID:
+    elif state == "waiting_user_logs_id" and role == "admin":
         if not txt.isdigit(): return
         target = await get_user(int(txt))
         if target and target.get("logs"):
@@ -671,7 +718,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("📭 لا توجد سجلات لهذا الحساب.", reply_markup=retry_keyboard("admin_get_user_logs_btn", "admin_users_menu"))
         context.user_data.clear()
 
-    elif state == "adding_stock_manual" and uid == ADMIN_ID:
+    elif state == "adding_stock_manual" and role == "admin":
         lines = [c.strip() for c in txt.splitlines() if c.strip()]
         cat = context.user_data.get("target_cat")
         if cat and lines:
@@ -684,7 +731,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg = f"📊 <b>تقرير الأكواد المدخلة:</b>\n\nإجمالي الأكواد: <code>{len(all_codes)}</code>\n✅ أكواد جديدة: <code>{len(new_codes)}</code>\n⚠️ أكواد مكررة/مسحوبة: <code>{len(dupes)}</code>\n\n❓ ماذا تريد أن تفعل؟"
             return await waiting_msg.edit_text(msg, reply_markup=InlineKeyboardMarkup(btns), parse_mode=ParseMode.HTML)
 
-# ====== 📂 الرفع الذكي للملفات (أكواد وتوكنات) ======
+# ====== 📂 الرفع الذكي للملفات ======
 async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     user = await get_user(uid)
@@ -712,8 +759,8 @@ async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if row: btns.append(row)
     
     if user["role"] == "admin":
-        btns.append([InlineKeyboardButton("🔑 استخراج وإضافة كتوكنات مشتركة", callback_data="file_shared_tokens")])
-    btns.append([InlineKeyboardButton("🔐 استخراج وإضافة كتوكنات شخصية", callback_data="file_personal_tokens")])
+        btns.append([InlineKeyboardButton("🔑 استخراج التوكنات (مشتركة)", callback_data="file_shared_tokens")])
+    btns.append([InlineKeyboardButton("🔐 استخراج التوكنات (شخصية)", callback_data="file_personal_tokens")])
     btns.append([InlineKeyboardButton("❌ إلغاء", callback_data="cancel_add_stock")])
     
     await waiting_msg.edit_text(f"📂 <b>تم استلام ملف يحتوي على (<code>{len(lines)}</code> سطر)</b>\n\n🎯 <b>ماذا تريد أن تفعل بهذا الملف؟</b>", reply_markup=InlineKeyboardMarkup(btns), parse_mode=ParseMode.HTML)
