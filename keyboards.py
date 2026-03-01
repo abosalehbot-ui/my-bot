@@ -6,18 +6,32 @@ def get_main_keyboard(role):
     buttons = []
     if role in ["employee", "admin"]:
         buttons.append([
-            InlineKeyboardButton("🎮 سحب كود (UC)", callback_data="pull_stock_menu"),
-            InlineKeyboardButton("↩️ إرجاع طلب (15د)", callback_data="return_order")
+            InlineKeyboardButton("🎮 سحب كود (UC)", callback_data="pull_stock_menu")
         ])
+    
     buttons.append([InlineKeyboardButton("🚀 سحب حسابات (API)", callback_data="pull_api")])
     buttons.append([InlineKeyboardButton("📋 توكناتي", callback_data="view_my_tokens")])
+    
     buttons.append([
-        InlineKeyboardButton("💳 حسابي وإحصائياتي", callback_data="my_profile"), 
-        InlineKeyboardButton("📂 أرشيفي", callback_data="my_history")
+        InlineKeyboardButton("💳 حسابي وإحصائياتي", callback_data="my_profile")
     ])
+    
     if role == "admin": 
-        buttons.append([InlineKeyboardButton("♻️ سحب من المخزن (24س)", callback_data="pull_cached_api")])
+        buttons.append([
+            InlineKeyboardButton("♻️ سحب من المخزن (24س)", callback_data="pull_cached_api")
+        ])
         buttons.append([InlineKeyboardButton("⚙️ لوحة الأدمن", callback_data="admin_panel")])
+    return InlineKeyboardMarkup(buttons)
+
+# 🆕 كيبورد جديد خاص بصفحة الإحصائيات
+def profile_keyboard(role):
+    buttons = [
+        [InlineKeyboardButton("📂 أرشيفي", callback_data="my_history")]
+    ]
+    if role in ["employee", "admin"]:
+        buttons.append([InlineKeyboardButton("↩️ إرجاع طلب (15د)", callback_data="return_order")])
+    
+    buttons.append([InlineKeyboardButton("🔙 رجوع", callback_data="back_home")])
     return InlineKeyboardMarkup(buttons)
 
 async def admin_keyboard():
