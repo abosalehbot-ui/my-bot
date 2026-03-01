@@ -2,10 +2,10 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from config import UC_CATEGORIES
 
 def get_main_keyboard(role):
+    # تم إزالة زر المرتجعات من هنا
     btns = [[InlineKeyboardButton("💳 حسابي", callback_data="my_profile")], [InlineKeyboardButton("📜 سجل عملياتي", callback_data="my_history")]]
     if role in ["admin", "employee"]:
         btns.insert(0, [InlineKeyboardButton("🚀 سحب حسابات API", callback_data="pull_api"), InlineKeyboardButton("🎮 سحب أكواد UC", callback_data="pull_stock_menu")])
-        btns.append([InlineKeyboardButton("↩️ إرجاع طلب (Return)", callback_data="return_order")])
     if role == "admin":
         btns.append([InlineKeyboardButton("🛠 لوحة التحكم (الأدمن)", callback_data="admin_panel")])
         btns.append([InlineKeyboardButton("♻️ سحب من التخزين (24س)", callback_data="pull_cached_api")])
