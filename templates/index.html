@@ -158,12 +158,30 @@
     </main>
 
     <script>
+      
         function switchTab(tabId) {
+            
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            
             document.getElementById('tab-' + tabId).classList.remove('hidden');
-            document.querySelectorAll('[id^="btn-"]').forEach(el => { el.classList.remove('nav-active', 'text-white'); el.classList.add('text-gray-500'); });
+            
+          
+            document.querySelectorAll('[id^="btn-"]').forEach(el => { 
+                el.classList.remove('nav-active', 'text-white'); 
+                el.classList.add('text-gray-500'); 
+            });
             document.getElementById('btn-' + tabId).classList.add('nav-active', 'text-white');
+            document.getElementById('btn-' + tabId).classList.remove('text-gray-500');
+
+            
+            window.history.pushState({}, '', '/?tab=' + tabId);
         }
+        
+        document.addEventListener("DOMContentLoaded", () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const tab = urlParams.get('tab') || 'overview';
+            switchTab(tab);
+        });
 
         async function toggleMaintenance() {
             await fetch('/api/toggle_maintenance', {method: 'POST'});
@@ -183,3 +201,4 @@
     </script>
 </body>
 </html>
+
