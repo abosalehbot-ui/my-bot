@@ -9,3 +9,6 @@ python-telegram-bot
 tornado
 motor
 httpx
+fastapi
+uvicorn
+jinja2
