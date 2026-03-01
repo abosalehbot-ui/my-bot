@@ -137,7 +137,12 @@ def get_main_keyboard(role):
         InlineKeyboardButton("📂 أرشيفي", callback_data="my_history")
     ])
     
-    if role == "admin": buttons.append([InlineKeyboardButton("⚙️ لوحة الأدمن", callback_data="admin_panel")])
+    if role == "admin": 
+        buttons.append([
+            InlineKeyboardButton("📥 إضافة للمخزن (24س)", callback_data="add_cached_api"),
+            InlineKeyboardButton("♻️ سحب من المخزن (24س)", callback_data="pull_cached_api")
+        ])
+        buttons.append([InlineKeyboardButton("⚙️ لوحة الأدمن", callback_data="admin_panel")])
     return InlineKeyboardMarkup(buttons)
 
 async def admin_keyboard():
@@ -241,6 +246,21 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "back_home":
         context.user_data.clear()
         return await query.edit_message_text("🏠 القائمة الرئيسية:", reply_markup=get_main_keyboard(role))
+
+    if data == "add_cached_api" and role == "admin":
+        context.user_data["state"] = "waiting_add_cached_api"
+        return await query.edit_message_text("📥 **أرسل الحسابات المراد تخزينها (كل حساب في سطر):**\n*(سيتم حذفها تلقائياً بعد 24 ساعة من الآن)*", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
+
+    if data == "pull_cached_api" and role == "admin":
+        # تنظيف الحسابات المنتهية أولاً
+        await db.cached_accounts.delete_many({"added_at": {"$lt": datetime.now() - timedelta(hours=24)}})
+        
+        count = await db.cached_accounts.count_documents({})
+        if count == 0:
+            return await query.edit_message_text("📭 المخزن فارغ، أو الحسابات انتهت صلاحيتها (مر عليها 24 ساعة).", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
+            
+        context.user_data["state"] = "waiting_cached_api_count"
+        return await query.edit_message_text(f"♻️ **المتاح الآن:** {count} حساب\n\n🔢 **أرسل عدد الحسابات للسحب:**", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
 
     if data == "my_profile":
         t_count = len(user.get("tokens", []))
@@ -444,7 +464,41 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if not state: return await update.message.reply_text("💡 يرجى اختيار عملية من القائمة أولاً.", reply_markup=back_btn())
 
-    if state == "waiting_order_id":
+    if state == "waiting_add_cached_api" and user["role"] == "admin":
+        lines = [line.strip() for line in txt.splitlines() if line.strip()]
+        if lines:
+            docs = [{"account": line, "added_at": datetime.now()} for line in lines]
+            await db.cached_accounts.insert_many(docs)
+            context.user_data.clear()
+            return await update.message.reply_text(f"✅ تم إضافة {len(lines)} حساب للمخزن بنجاح.", reply_markup=back_btn())
+        return await update.message.reply_text("❌ لم يتم التعرف على الحسابات.", reply_markup=back_btn())
+
+    elif state == "waiting_cached_api_count" and user["role"] == "admin":
+        if not txt.isdigit() or int(txt) <= 0: 
+            return await update.message.reply_text("❌ أرسل رقم صحيح.", reply_markup=back_btn())
+        
+        qty = int(txt)
+        context.user_data.clear()
+        
+        # تأكيد حذف المنتهي قبل السحب
+        await db.cached_accounts.delete_many({"added_at": {"$lt": datetime.now() - timedelta(hours=24)}})
+        
+        available = await db.cached_accounts.count_documents({})
+        if qty > available:
+            return await update.message.reply_text(f"⚠️ الكمية غير كافية! المتاح: {available}", reply_markup=back_btn())
+            
+        pulled_accs = []
+        for _ in range(qty):
+            # سحب أقدم حساب متاح وحذفه من القاعدة
+            doc = await db.cached_accounts.find_one_and_delete({}, sort=[("added_at", 1)])
+            if doc:
+                pulled_accs.append(doc["account"])
+                
+        if pulled_accs:
+            msg = "\n━━━━━━━━━━━━\n".join(pulled_accs)
+            return await update.message.reply_text(f"✅ **سحب {len(pulled_accs)} حساب:**\n\n`{msg}`", parse_mode=ParseMode.MARKDOWN, reply_markup=back_btn())
+
+    elif state == "waiting_order_id":
         if not txt.isdigit(): return await update.message.reply_text("❌ أرسل رقم صحيح.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 العودة للأرشيف", callback_data="my_history")]]))
         order = await db.orders.find_one({"_id": int(txt)})
         
