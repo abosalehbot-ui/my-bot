@@ -16,14 +16,38 @@ SECRET_TOKEN = "salehzon_secure_2026"
 def check_auth(request: Request):
     return request.cookies.get("admin_session") == SECRET_TOKEN
 
-# 1. واجهة إدارة المتجر (لوحة الأدمن الخاصة بالزباين)
+# ==========================================
+# 1. لوحة تحكم المتجر الشاملة للأدمن
+# ==========================================
 @router.get("/store-admin", response_class=HTMLResponse)
 async def store_admin_page(request: Request):
     if not check_auth(request): return RedirectResponse(url="/login")
+    
+    # جلب البيانات
     store_prices = await db.settings.find_one({"_id": "store_prices"}) or {}
-    store_customers = await db.store_customers.find().sort("created_at", -1).to_list(50)
+    store_customers = await db.store_customers.find().sort("created_at", -1).to_list(100)
+    store_orders = await db.store_orders.find().sort("date", -1).to_list(100)
+    
+    # حساب الإحصائيات
+    total_revenue = sum(int(o.get("price", 0)) for o in store_orders)
+    total_orders = len(store_orders)
+    customers_count = len(store_customers)
+    
+    # المخزن المتاح للمتجر
+    categories = ["60", "325", "660", "1800", "3850", "8100"]
+    stock_details = {cat: await db.stock.count_documents({"category": cat}) for cat in categories}
+
     return templates.TemplateResponse("store_admin.html", {
-        "request": request, "store_prices": store_prices, "store_customers": store_customers
+        "request": request, 
+        "store_prices": store_prices, 
+        "store_customers": store_customers,
+        "store_orders": store_orders,
+        "stats": {
+            "revenue": total_revenue,
+            "orders": total_orders,
+            "customers": customers_count
+        },
+        "stock": stock_details
     })
 
 @router.post("/api/store/update_prices")
@@ -37,14 +61,27 @@ async def store_update_prices(request: Request, p_60: int = Form(0), p_325: int 
 async def store_add_customer(request: Request, phone: str = Form(...), name: str = Form(...), balance: int = Form(0)):
     if not check_auth(request): return RedirectResponse("/login")
     if not await db.store_customers.find_one({"phone": phone}):
-        await db.store_customers.insert_one({"phone": phone, "name": name, "balance": balance, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")})
+        await db.store_customers.insert_one({
+            "phone": phone, "name": name, "balance": balance, 
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+        })
     return RedirectResponse(url="/store-admin", status_code=status.HTTP_302_FOUND)
 
-@router.post("/api/store/add_balance")
-async def store_add_balance(request: Request, phone: str = Form(...), amount: int = Form(...)):
+@router.post("/api/store/manage_balance")
+async def store_manage_balance(request: Request, phone: str = Form(...), amount: int = Form(...), action: str = Form(...)):
     if not check_auth(request): return RedirectResponse("/login")
-    await db.store_customers.update_one({"phone": phone}, {"$inc": {"balance": amount}})
+    if action == "add":
+        await db.store_customers.update_one({"phone": phone}, {"$inc": {"balance": amount}})
+    elif action == "set":
+        await db.store_customers.update_one({"phone": phone}, {"$set": {"balance": amount}})
     return RedirectResponse(url="/store-admin", status_code=status.HTTP_302_FOUND)
+
+@router.post("/api/store/delete_customer")
+async def store_delete_customer(request: Request, phone: str = Form(...)):
+    if not check_auth(request): return RedirectResponse("/login")
+    await db.store_customers.delete_one({"phone": phone})
+    return RedirectResponse(url="/store-admin", status_code=status.HTTP_302_FOUND)
+
 
 # ==========================================
 # 2. واجهة متجر الزبائن العام (موقع الزبون)
@@ -83,7 +120,16 @@ async def customer_buy_uc(request: Request, phone: str = Form(...), category: st
     
     # خصم الرصيد وتسجيل الطلب
     await db.store_customers.update_one({"phone": phone}, {"$inc": {"balance": -price}})
-    order_id = int(datetime.now().timestamp() % 1000000)
-    await db.store_orders.insert_one({"_id": order_id, "phone": phone, "category": category, "code": code_str, "price": price, "date": datetime.now().strftime("%Y-%m-%d %H:%M")})
+    order_id = int(datetime.now().timestamp() % 100000)
+    
+    await db.store_orders.insert_one({
+        "_id": order_id, 
+        "phone": phone,
+        "name": user["name"],
+        "category": category, 
+        "code": code_str, 
+        "price": price, 
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M")
+    })
     
     return JSONResponse({"success": True, "code": code_str, "new_balance": user["balance"] - price, "msg": "تم الشراء بنجاح!"})
