@@ -3,20 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - SalehZone</title>
+    <title>Saleh Zone - Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            theme: { extend: { colors: { szgreen: '#7dfc89', szcyan: '#5eead4', darkbg: '#050505', panelbg: '#111' } } }
-        }
-    </script>
+    <script>tailwind.config={theme:{extend:{colors:{szgreen:'#7dfc89',szcyan:'#5eead4',darkbg:'#050505',panelbg:'#111'}}}}</script>
     <style>
-        /* شريط التمرير الأنيق */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #050505; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #7dfc89; }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #050505; } ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
         .nav-active { background: linear-gradient(90deg, rgba(125,252,137,0.1) 0%, transparent 100%); border-left: 3px solid #7dfc89; color: #7dfc89; }
     </style>
 </head>
@@ -25,14 +17,14 @@
     <aside class="w-64 bg-panelbg border-r border-gray-900 flex flex-col justify-between hidden md:flex">
         <div>
             <div class="h-20 flex items-center px-6 border-b border-gray-900">
-                <img src="/static/logo.png" alt="9S" class="h-10 mr-3 drop-shadow-[0_0_8px_rgba(125,252,137,0.5)]" onerror="this.src='https://via.placeholder.com/40/050505/7dfc89?text=9S'">
+                <img src="/static/logo.png" alt="9S" class="h-10 mr-3 drop-shadow-[0_0_8px_rgba(125,252,137,0.5)]">
                 <span class="text-xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan">SALEH ZONE</span>
             </div>
             <nav class="mt-6 flex flex-col gap-1 px-3">
-                <button onclick="switchTab('overview')" id="btn-overview" class="nav-active text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-chart-pie w-6"></i> Overview</button>
+                <button onclick="switchTab('overview')" id="btn-overview" class="nav-active text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-chart-pie w-6"></i> Overview & Logs</button>
                 <button onclick="switchTab('stock')" id="btn-stock" class="text-gray-500 text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-box-open w-6"></i> Stock Manage</button>
-                <button onclick="switchTab('users')" id="btn-users" class="text-gray-500 text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-users w-6"></i> Users & Staff</button>
-                <button onclick="switchTab('logs')" id="btn-logs" class="text-gray-500 text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-terminal w-6"></i> System Logs</button>
+                <button onclick="switchTab('users')" id="btn-users" class="text-gray-500 text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-users w-6"></i> Users & Tokens</button>
+                <button onclick="switchTab('tools')" id="btn-tools" class="text-gray-500 text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-tools w-6"></i> Advanced Tools</button>
             </nav>
         </div>
         <div class="p-4 border-t border-gray-900">
@@ -40,110 +32,73 @@
         </div>
     </aside>
 
-    <main class="flex-1 flex flex-col h-screen overflow-y-auto">
-        <header class="h-16 bg-panelbg border-b border-gray-900 flex items-center justify-between px-6 md:hidden">
-            <span class="text-lg font-black text-szgreen">SALEH ZONE</span>
-            <a href="/logout" class="text-gray-500"><i class="fas fa-power-off"></i></a>
-        </header>
-
-        <div class="p-6 md:p-10 w-full max-w-7xl mx-auto">
-            
-            <div id="tab-overview" class="tab-content block">
-                <h2 class="text-2xl font-bold text-white mb-6">System <span class="text-szgreen">Overview</span></h2>
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                    <div class="bg-panelbg border border-gray-800 p-5 rounded-xl"><div class="text-gray-500 text-xs font-bold mb-1 uppercase tracking-wider">Total Users</div><div class="text-3xl font-black text-white">{{ users_count }}</div></div>
-                    <div class="bg-panelbg border border-gray-800 p-5 rounded-xl relative overflow-hidden">
-                        <div class="text-szgreen text-xs font-bold mb-1 uppercase tracking-wider">Available UC Stock</div>
-                        <div class="text-3xl font-black text-white">{{ stock_count }}</div>
-                        <i class="fas fa-gamepad absolute -bottom-2 -right-2 text-6xl text-szgreen opacity-10"></i>
-                    </div>
-                    <div class="bg-panelbg border border-gray-800 p-5 rounded-xl"><div class="text-szcyan text-xs font-bold mb-1 uppercase tracking-wider">Cached Accounts</div><div class="text-3xl font-black text-white">{{ cached_count }}</div></div>
-                    <div class="bg-panelbg border border-gray-800 p-5 rounded-xl"><div class="text-gray-500 text-xs font-bold mb-1 uppercase tracking-wider">Processed Orders</div><div class="text-3xl font-black text-white">{{ orders_count }}</div></div>
-                </div>
-
-                <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden">
-                    <div class="px-6 py-4 border-b border-gray-800"><h3 class="font-bold text-white uppercase text-sm">Recent Activity</h3></div>
-                    <table class="w-full text-left text-sm">
-                        <thead class="bg-[#151515] text-gray-500"><tr><th class="px-6 py-3">ID</th><th class="px-6 py-3">User</th><th class="px-6 py-3">Action</th><th class="px-6 py-3 text-right">Time</th></tr></thead>
-                        <tbody class="divide-y divide-gray-900">
-                            {% for order in recent_orders %}
-                            <tr class="hover:bg-gray-900/50">
-                                <td class="px-6 py-4 text-gray-400">#{{ order._id }}</td>
-                                <td class="px-6 py-4 font-bold text-gray-300">{{ order.user }}</td>
-                                <td class="px-6 py-4"><span class="px-2 py-1 rounded text-xs bg-gray-800 text-szcyan">{{ order.type }}</span></td>
-                                <td class="px-6 py-4 text-right text-gray-600">{{ order.date }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+    <main class="flex-1 flex flex-col h-screen overflow-y-auto p-6 md:p-10">
+        
+        <div id="tab-overview" class="tab-content block">
+            <h2 class="text-2xl font-bold text-white mb-6">System <span class="text-szgreen">Overview</span></h2>
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div class="bg-panelbg border border-gray-800 p-5 rounded-xl"><div class="text-gray-500 text-xs font-bold uppercase">Total Users</div><div class="text-3xl font-black text-white">{{ users_count }}</div></div>
+                <div class="bg-panelbg border border-gray-800 p-5 rounded-xl"><div class="text-szgreen text-xs font-bold uppercase">UC Stock</div><div class="text-3xl font-black text-white">{{ stock_count }}</div></div>
+                <div class="bg-panelbg border border-gray-800 p-5 rounded-xl"><div class="text-szcyan text-xs font-bold uppercase">Shared Tokens</div><div class="text-3xl font-black text-white">{{ shared_tokens_count }}</div></div>
+                <div class="bg-panelbg border border-gray-800 p-5 rounded-xl"><div class="text-gray-500 text-xs font-bold uppercase">Orders Processed</div><div class="text-3xl font-black text-white">{{ orders_count }}</div></div>
             </div>
-
-            <div id="tab-stock" class="tab-content hidden">
-                <h2 class="text-2xl font-bold text-white mb-6">Stock <span class="text-szcyan">Management</span></h2>
-                
-                <div class="grid grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
-                    {% for cat, count in stock_details.items() %}
-                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center">
-                        <div class="text-xl font-black text-white mb-1">{{ cat }}</div>
-                        <div class="text-xs text-gray-500 uppercase">UC Count: <span class="text-szgreen">{{ count }}</span></div>
+            
+            <div class="bg-black border border-gray-800 rounded-xl p-6 relative overflow-hidden">
+                <h3 class="text-white font-bold mb-4 uppercase text-xs tracking-widest text-szcyan"><i class="fas fa-terminal mr-2"></i> Live System Logs</h3>
+                <div class="h-64 overflow-y-auto font-mono text-xs space-y-2 pb-10">
+                    {% for log in logs %}
+                    <div class="border-l-2 border-szgreen pl-3 py-1 bg-white/5">
+                        <span class="text-gray-500">[{{ log.time }}]</span> <span class="text-szcyan">{{ log.name }}:</span> <span class="text-gray-300">{{ log.action }}</span>
                     </div>
+                    {% else %}
+                    <p class="text-gray-500">Waiting for system activity...</p>
                     {% endfor %}
                 </div>
+            </div>
+        </div>
 
-                <div class="bg-panelbg border border-gray-800 rounded-xl p-6 max-w-2xl">
-                    <h3 class="font-bold text-white mb-4"><i class="fas fa-plus-circle text-szgreen mr-2"></i>Add New Stock</h3>
-                    <form action="/api/add_stock" method="POST">
-                        <div class="grid grid-cols-2 gap-4 mb-4">
-                            <div>
-                                <label class="block text-gray-500 text-xs mb-2 uppercase">Select Category</label>
-                                <select name="category" class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-szcyan">
-                                    <option value="60">60 UC</option><option value="325">325 UC</option>
-                                    <option value="660">660 UC</option><option value="1800">1800 UC</option>
-                                    <option value="3850">3850 UC</option><option value="8100">8100 UC</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="mb-4">
-                            <label class="block text-gray-500 text-xs mb-2 uppercase">Paste Codes (One per line)</label>
-                            <textarea name="codes" rows="5" class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-szcyan font-mono text-sm" placeholder="code1\ncode2..." required></textarea>
-                        </div>
-                        <button type="submit" class="bg-szgreen text-black font-bold py-2 px-6 rounded-lg hover:bg-white transition"><i class="fas fa-upload mr-2"></i> Upload Stock</button>
+        <div id="tab-users" class="tab-content hidden">
+            <h2 class="text-2xl font-bold text-white mb-6">Users & <span class="text-szcyan">Tokens Pool</span></h2>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                <div class="bg-panelbg border border-gray-800 p-6 rounded-xl lg:col-span-1">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-white uppercase text-sm text-szcyan"><i class="fas fa-users mr-2"></i> Shared Tokens</h3>
+                        <form action="/api/clear_shared_tokens" method="POST"><button class="text-red-500 text-xs"><i class="fas fa-trash"></i> Clear</button></form>
+                    </div>
+                    <p class="text-xs text-gray-500 mb-4">Available for Employees automatically when personal tokens run out. (Count: {{ shared_tokens_count }})</p>
+                    <form action="/api/add_shared_tokens" method="POST">
+                        <textarea name="tokens" rows="4" class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg mb-3 text-xs font-mono" placeholder="Paste shared tokens..."></textarea>
+                        <button class="w-full bg-szcyan text-black font-bold py-2 rounded-lg">Add to Shared Pool</button>
                     </form>
                 </div>
-            </div>
-
-            <div id="tab-users" class="tab-content hidden">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-2xl font-bold text-white">Manage <span class="text-szgreen">Users</span></h2>
-                </div>
                 
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div class="bg-panelbg border border-gray-800 rounded-xl p-6 lg:col-span-1 h-fit">
-                        <h3 class="font-bold text-white mb-4">Add New User</h3>
-                        <form action="/api/add_user" method="POST">
-                            <input type="number" name="user_id" placeholder="Telegram ID" required class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg mb-3">
-                            <input type="text" name="name" placeholder="Name" required class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg mb-3">
-                            <select name="role" class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg mb-4">
-                                <option value="user">Regular User</option>
-                                <option value="employee">Employee / Staff</option>
-                            </select>
-                            <button type="submit" class="w-full bg-szcyan text-black font-bold py-3 rounded-lg hover:bg-white transition">Create User</button>
-                        </form>
-                    </div>
-                    
-                    <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden lg:col-span-2">
+                <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden lg:col-span-2">
+                    <div class="px-6 py-4 border-b border-gray-800"><h3 class="font-bold text-white uppercase text-sm">User Personal Tokens</h3></div>
+                    <div class="overflow-x-auto h-80 overflow-y-auto">
                         <table class="w-full text-left text-sm">
-                            <thead class="bg-[#151515] text-gray-500"><tr><th class="px-6 py-3">ID</th><th class="px-6 py-3">Name</th><th class="px-6 py-3">Role</th><th class="px-6 py-3">Tokens</th></tr></thead>
+                            <thead class="bg-[#151515] text-gray-500 sticky top-0"><tr><th class="px-4 py-3">ID / Name</th><th class="px-4 py-3">Role</th><th class="px-4 py-3">Add Tokens</th></tr></thead>
                             <tbody class="divide-y divide-gray-900">
                                 {% for u in all_users %}
                                 <tr class="hover:bg-gray-900/50">
-                                    <td class="px-6 py-4 text-gray-400 font-mono">{{ u._id }}</td>
-                                    <td class="px-6 py-4 font-bold text-white">{{ u.name }}</td>
-                                    <td class="px-6 py-4">
-                                        <span class="px-2 py-1 rounded text-xs {% if u.role == 'admin' %}bg-red-900 text-red-300{% elif u.role == 'employee' %}bg-szcyan/20 text-szcyan{% else %}bg-gray-800 text-gray-400{% endif %} uppercase tracking-wider">{{ u.role }}</span>
+                                    <td class="px-4 py-3">
+                                        <div class="font-bold text-white">{{ u.name }}</div>
+                                        <div class="text-xs text-gray-500">{{ u._id }} | Tokens: {{ u.tokens|length }}</div>
                                     </td>
-                                    <td class="px-6 py-4 text-gray-500"><i class="fas fa-key mr-1"></i> {{ u.tokens|length }}</td>
+                                    <td class="px-4 py-3">
+                                        <form action="/api/user_action" method="POST">
+                                            <input type="hidden" name="user_id" value="{{ u._id }}">
+                                            <input type="hidden" name="action" value="toggle_role">
+                                            <button class="px-2 py-1 rounded text-xs {% if u.role == 'admin' %}bg-red-900 text-red-300{% elif u.role == 'employee' %}bg-szcyan/20 text-szcyan{% else %}bg-gray-800 text-gray-400{% endif %} hover:opacity-75">{{ u.role }}</button>
+                                        </form>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <form action="/api/add_user_tokens" method="POST" class="flex gap-2">
+                                            <input type="hidden" name="user_id" value="{{ u._id }}">
+                                            <input type="text" name="tokens" placeholder="Token..." required class="w-full bg-black border border-gray-700 text-white px-2 py-1 rounded text-xs focus:border-szgreen outline-none">
+                                            <button class="bg-gray-800 text-white px-3 py-1 rounded hover:bg-szgreen hover:text-black transition">+</button>
+                                        </form>
+                                    </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -151,34 +106,80 @@
                     </div>
                 </div>
             </div>
+        </div>
+
+        <div id="tab-tools" class="tab-content hidden">
+            <h2 class="text-2xl font-bold text-white mb-6">Advanced <span class="text-szgreen">Tools</span></h2>
             
-            <div id="tab-logs" class="tab-content hidden">
-                <h2 class="text-2xl font-bold text-white mb-6">System <span class="text-gray-400">Logs</span></h2>
-                <div class="bg-black border border-gray-800 rounded-xl p-6 font-mono text-sm text-szgreen h-[500px] overflow-y-auto">
-                    <p class="text-gray-500">-- Logs functionality will be fully connected here --</p>
-                    <p>> System running smoothly...</p>
-                    <p>> Connected to MongoDB securely.</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-panelbg border border-gray-800 p-6 rounded-xl">
+                    <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-search text-szgreen mr-2"></i> Global Search</h3>
+                    <div class="flex gap-2 mb-4">
+                        <input type="text" id="search-input" placeholder="Order ID, User ID, or UC Code..." class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-szgreen">
+                        <button onclick="performSearch()" class="bg-szgreen text-black font-bold px-6 rounded-lg hover:bg-white"><i class="fas fa-search"></i></button>
+                    </div>
+                    <div id="search-result" class="bg-black border border-gray-800 rounded-lg p-4 text-sm font-mono text-szcyan whitespace-pre-wrap hidden"></div>
+                </div>
+
+                <div class="bg-panelbg border border-gray-800 p-6 rounded-xl flex flex-col justify-center items-center text-center">
+                    <i class="fas fa-hammer text-4xl mb-4 {% if maintenance %}text-red-500{% else %}text-gray-600{% endif %}"></i>
+                    <h3 class="font-bold text-white uppercase text-lg mb-2">Bot Maintenance</h3>
+                    <p class="text-sm text-gray-500 mb-6">Lock the bot for all users except admins.</p>
+                    <button onclick="toggleMaintenance()" class="py-3 px-8 rounded-lg font-bold transition {% if maintenance %}bg-red-900 text-red-300 border border-red-900{% else %}bg-gray-800 text-white hover:bg-szgreen hover:text-black{% endif %}">
+                        {% if maintenance %}TURN MAINTENANCE OFF{% else %}TURN MAINTENANCE ON{% endif %}
+                    </button>
                 </div>
             </div>
-
         </div>
+        
+        <div id="tab-stock" class="tab-content hidden">
+            <h2 class="text-2xl font-bold text-white mb-6">Stock <span class="text-szcyan">Management</span></h2>
+            <div class="grid grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
+                {% for cat, count in stock_details.items() %}
+                <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center">
+                    <div class="text-xl font-black text-white mb-1">{{ cat }}</div>
+                    <div class="text-xs text-gray-500 uppercase">Count: <span class="text-szgreen">{{ count }}</span></div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="bg-panelbg border border-gray-800 rounded-xl p-6 max-w-2xl">
+                <form action="/api/add_stock" method="POST">
+                    <select name="category" class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-szcyan mb-4">
+                        <option value="60">60 UC</option><option value="325">325 UC</option>
+                        <option value="660">660 UC</option><option value="1800">1800 UC</option>
+                        <option value="3850">3850 UC</option><option value="8100">8100 UC</option>
+                    </select>
+                    <textarea name="codes" rows="5" class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-szcyan font-mono text-sm mb-4" placeholder="Paste codes here..."></textarea>
+                    <button class="bg-szgreen text-black font-bold py-2 px-6 rounded-lg w-full">Add Stock</button>
+                </form>
+            </div>
+        </div>
+
     </main>
 
     <script>
-        // سكريبت بسيط للتبديل بين القوائم بدون تحميل الصفحة
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.getElementById('tab-' + tabId).classList.remove('hidden');
-            
-            document.querySelectorAll('[id^="btn-"]').forEach(el => {
-                el.classList.remove('nav-active', 'text-white');
-                el.classList.add('text-gray-500');
-            });
-            let activeBtn = document.getElementById('btn-' + tabId);
-            activeBtn.classList.add('nav-active', 'text-white');
-            activeBtn.classList.remove('text-gray-500');
+            document.querySelectorAll('[id^="btn-"]').forEach(el => { el.classList.remove('nav-active', 'text-white'); el.classList.add('text-gray-500'); });
+            document.getElementById('btn-' + tabId).classList.add('nav-active', 'text-white');
+        }
+
+        async function toggleMaintenance() {
+            await fetch('/api/toggle_maintenance', {method: 'POST'});
+            location.reload();
+        }
+
+        async function performSearch() {
+            const query = document.getElementById('search-input').value;
+            if(!query) return;
+            const resBox = document.getElementById('search-result');
+            const fd = new FormData(); fd.append("query", query);
+            const res = await fetch('/api/search', {method: 'POST', body: fd});
+            const data = await res.json();
+            resBox.classList.remove('hidden');
+            resBox.innerText = data.result;
         }
     </script>
 </body>
 </html>
-
