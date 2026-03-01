@@ -60,7 +60,13 @@ async def process_api_pull(uid, reply_func, user, qty, context):
     if token_logs_updates: db_updates["$push"] = {"token_logs": {"$each": token_logs_updates, "$slice": -500}}
     await db.users.update_one({"_id": uid}, db_updates)
     
-    reply_markup = retry_keyboard("pull_api", "back_home")
+    # 🔙 تم إرجاع قائمة زراير سحب الـ API القديمة هنا
+    btns = [
+        [InlineKeyboardButton(f"🔄 حساب آخر (العدد: {qty})", callback_data="pull_api_again")],
+        [InlineKeyboardButton("✏️ تعديل العدد", callback_data="pull_api")],
+        [InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="back_home")]
+    ]
+    reply_markup = InlineKeyboardMarkup(btns)
     
     if accs:
         tracked_users = await get_tracked_users()
@@ -72,7 +78,6 @@ async def process_api_pull(uid, reply_func, user, qty, context):
         await db.orders.insert_one({"_id": order_id, "type": "API Pull", "user": user["name"], "user_id": uid, "items": accs, "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
         await db.users.update_one({"_id": uid}, {"$push": {"history": f"🚀 طلب #{order_id}"}, "$inc": {"stats.api": len(accs)}})
         
-        # 🆕 تسجيل العملية في اللوجز بالتفاصيل
         details_txt = " | ".join(raw_accs)
         await log_important_action(uid, user["name"], f"🚀 سحب {len(accs)} حساب API (طلب #{order_id})", details_txt)
         
@@ -122,7 +127,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["state"] = "waiting_cached_api_count"
         return await query.edit_message_text(f"♻️ **المتاح الآن:** {count} حساب\n\n🔢 **أرسل عدد الحسابات للسحب:**", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
 
-    # 🆕 قائمة السجلات والتخزين المدمجة
     if data == "admin_logs_hub" and role == "admin":
         await query.answer()
         context.user_data.clear()
@@ -217,6 +221,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["state"] = "waiting_api_count"
         return await query.edit_message_text("🔢 **أرسل عدد الحسابات التي تريد سحبها الآن:**\n*(سيتم استخدام توكن واحد لكل حساب)*", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
 
+    if data == "pull_api_again":
+        await query.answer()
+        qty = context.user_data.get("last_api_count", 1)
+        await process_api_pull(uid, query.message.reply_text, user, qty, context)
+        return
+
     if data == "admin_panel" and role == "admin":
         await query.answer()
         st = await db.stock.count_documents({})
@@ -268,7 +278,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 try: await db.stock.insert_many(docs, ordered=False) 
                 except Exception as e: logger.error(e)
             
-            # 🆕 تسجيل العملية في اللوجز
             await log_important_action(uid, user["name"], f"📥 إضافة {len(docs)} كود لفئة {pending['cat']} UC")
 
         context.user_data.clear()
@@ -346,7 +355,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.clear()
         return await query.edit_message_text(f"✅ تم إضافة الحساب كرتبة **{r}**.", reply_markup=retry_keyboard("admin_add_user_btn", "admin_users_menu"), parse_mode=ParseMode.MARKDOWN)
 
-    # 🆕 نظام عرض السجلات المطور
     if data == "admin_get_logs" and role == "admin":
         await query.answer()
         await query.edit_message_text("⏳ **جاري جلب السجلات...**", parse_mode=ParseMode.MARKDOWN)
@@ -424,7 +432,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     pulled_accs.append(f"`{doc['account']}`")
                 
         if pulled_accs:
-            # 🆕 تسجيل السحب في اللوجز
             details_str = " | ".join(raw_accs_for_log)
             await log_important_action(uid, user["name"], f"♻️ سحب {len(pulled_accs)} حساب من المخزن المحلي (24س)", details_str)
             
@@ -463,7 +470,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await db.orders.delete_one({"_id": int(txt)}) 
         await db.users.update_one({"_id": uid}, {"$inc": {"stats.stock": -len(order["items"])}}) 
         
-        # 🆕 تسجيل الإرجاع في اللوجز
         await log_important_action(uid, user["name"], f"↩️ إرجاع طلب #{txt} للمخزن", f"عدد الأكواد المرجعة: {len(order['items'])}")
         
         context.user_data.clear()
@@ -490,7 +496,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await db.orders.insert_one({"_id": order_id, "type": f"PUBG Stock ({cat} UC)", "user": user["name"], "user_id": uid, "items": pulled_codes, "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
             await db.users.update_one({"_id": uid}, {"$push": {"history": f"📦 طلب #{order_id}"}, "$inc": {"stats.stock": len(pulled_codes)}})
             
-            # 🆕 تسجيل السحب في اللوجز
             details_str = " | ".join(pulled_codes)
             await log_important_action(uid, user["name"], f"🎮 سحب {len(pulled_codes)} كود ({cat} UC) - طلب #{order_id}", details_str)
 
@@ -554,7 +559,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("📭 لا توجد سجلات لهذا الحساب.", reply_markup=retry_keyboard("admin_get_user_logs_btn", "admin_users_menu"))
         context.user_data.clear()
 
-    # 🆕 زر بحث آخر في بحث الطلبات
     elif state == "waiting_admin_order_search" and uid == ADMIN_ID:
         if txt.isdigit():
             order = await db.orders.find_one({"_id": int(txt)})
@@ -566,7 +570,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(res_msg, reply_markup=retry_keyboard("admin_search_order", "admin_logs_hub"), parse_mode=ParseMode.HTML)
         context.user_data.clear()
 
-    # 🆕 زر بحث آخر في البحث العكسي
     elif state == "waiting_reverse_code" and uid == ADMIN_ID:
         records = await db.codes_map.find({"$or": [{"_id": txt}, {"code": txt}]}).to_list(None)
         in_stock = await db.stock.count_documents({"$or": [{"_id": txt}, {"code": txt}]})
