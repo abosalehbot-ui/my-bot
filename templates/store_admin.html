@@ -3,72 +3,208 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Store Admin - Saleh Zone</title>
+    <title>Store ERP - Saleh Zone</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script>tailwind.config={theme:{extend:{colors:{szgreen:'#7dfc89',szcyan:'#5eead4',darkbg:'#050505',panelbg:'#111'}}}}</script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; } 
+        ::-webkit-scrollbar-track { background: #050505; } 
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+    </style>
 </head>
 <body class="bg-darkbg text-gray-300 font-sans flex h-screen overflow-hidden selection:bg-yellow-500 selection:text-black">
-    <aside class="w-64 bg-panelbg border-r border-gray-900 flex flex-col h-full">
+    
+    <aside class="w-64 bg-panelbg border-r border-gray-900 flex flex-col h-full z-10 shadow-2xl relative">
         <div class="h-20 flex items-center px-6 border-b border-gray-900">
-            <span class="text-xl font-black tracking-wider text-yellow-500">STORE ADMIN</span>
+            <div class="bg-yellow-500/10 p-2 rounded-lg text-yellow-500 mr-3"><i class="fas fa-store"></i></div>
+            <span class="text-xl font-black tracking-wider text-yellow-500">STORE ERP</span>
         </div>
         <nav class="mt-6 flex flex-col gap-2 px-3">
-            <a href="/" class="text-gray-400 hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition flex items-center border border-gray-800 bg-black"><i class="fas fa-arrow-left w-6"></i> Back to Master Admin</a>
+            <a href="/" class="text-gray-400 hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition flex items-center bg-black border border-gray-800"><i class="fas fa-arrow-left w-6"></i> Back to Master</a>
             <div class="my-2 border-t border-gray-800"></div>
-            <a href="/store-admin" class="bg-yellow-500/10 border-l-2 border-yellow-500 text-yellow-500 px-4 py-3 rounded-r-lg text-sm font-bold"><i class="fas fa-wallet w-6"></i> Prices & Wallets</a>
-            <a href="/shop" target="_blank" class="text-szcyan hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition flex items-center mt-auto"><i class="fas fa-external-link-alt w-6"></i> Open Live Shop</a>
+            <button onclick="switchTab('dashboard')" id="btn-dashboard" class="nav-btn bg-yellow-500/10 border-l-2 border-yellow-500 text-yellow-500 px-4 py-3 rounded-r-lg text-sm font-bold text-left"><i class="fas fa-chart-line w-6"></i> Overview & Sales</button>
+            <button onclick="switchTab('products')" id="btn-products" class="nav-btn text-gray-500 hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition text-left"><i class="fas fa-box w-6"></i> Product Pricing</button>
+            <button onclick="switchTab('customers')" id="btn-customers" class="nav-btn text-gray-500 hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition text-left"><i class="fas fa-users w-6"></i> Customers CRM</button>
+            
+            <a href="/shop" target="_blank" class="text-szcyan hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition flex items-center mt-auto bg-szcyan/10 border border-szcyan/20"><i class="fas fa-external-link-alt w-6"></i> Live Storefront</a>
         </nav>
     </aside>
 
-    <main class="flex-1 p-10 overflow-y-auto">
-        <h2 class="text-3xl font-bold text-white mb-8"><i class="fas fa-shopping-cart text-yellow-500 mr-3"></i>B2C Store Management</h2>
+    <main class="flex-1 p-8 overflow-y-auto bg-[#0a0a0a]">
         
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div class="bg-panelbg border border-gray-800 p-6 rounded-xl">
-                <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-tags text-yellow-500 mr-2"></i> Shop Prices (EGP)</h3>
-                <form action="/api/store/update_prices" method="POST" class="space-y-3">
-                    {% for cat in ['60', '325', '660', '1800', '3850', '8100'] %}
-                    <div class="flex justify-between items-center bg-black p-3 rounded border border-gray-800">
-                        <span class="text-white font-bold">{{ cat }} UC</span>
-                        <input type="number" name="p_{{ cat }}" value="{{ store_prices.get(cat, 0) }}" class="w-24 bg-[#111] border border-gray-700 text-yellow-500 font-bold px-2 py-1 rounded text-right outline-none">
-                    </div>
-                    {% endfor %}
-                    <button class="w-full bg-yellow-500 text-black font-bold py-3 rounded-lg mt-4">Save Prices</button>
-                </form>
+        <div class="flex justify-between items-end mb-8">
+            <div>
+                <h2 class="text-3xl font-black text-white">Storefront Management</h2>
+                <p class="text-sm text-gray-500 mt-1">Manage B2C operations, sales, and customers in real-time.</p>
+            </div>
+            <div class="text-right">
+                <span class="bg-szgreen/20 text-szgreen px-3 py-1 rounded-full text-xs font-bold border border-szgreen/30"><i class="fas fa-circle text-[8px] mr-1"></i> Store Online</span>
+            </div>
+        </div>
+
+        <div id="tab-dashboard" class="tab-content block">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-panelbg border border-gray-800 p-6 rounded-xl relative overflow-hidden">
+                    <div class="text-gray-500 text-xs font-bold uppercase mb-2">Total Revenue</div>
+                    <div class="text-4xl font-black text-yellow-500">{{ stats.revenue }} <span class="text-lg text-gray-600">EGP</span></div>
+                    <i class="fas fa-wallet absolute -bottom-4 -right-4 text-6xl text-yellow-500/5"></i>
+                </div>
+                <div class="bg-panelbg border border-gray-800 p-6 rounded-xl relative overflow-hidden">
+                    <div class="text-gray-500 text-xs font-bold uppercase mb-2">Total Sales (Orders)</div>
+                    <div class="text-4xl font-black text-white">{{ stats.orders }}</div>
+                    <i class="fas fa-shopping-bag absolute -bottom-4 -right-4 text-6xl text-white/5"></i>
+                </div>
+                <div class="bg-panelbg border border-gray-800 p-6 rounded-xl relative overflow-hidden">
+                    <div class="text-gray-500 text-xs font-bold uppercase mb-2">Active Customers</div>
+                    <div class="text-4xl font-black text-szcyan">{{ stats.customers }}</div>
+                    <i class="fas fa-users absolute -bottom-4 -right-4 text-6xl text-szcyan/5"></i>
+                </div>
             </div>
 
-            <div class="bg-panelbg border border-gray-800 rounded-xl lg:col-span-2 flex flex-col h-[600px]">
-                <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-[#0a0a0a]">
-                    <h3 class="font-bold text-white uppercase text-sm">Customer Wallets</h3>
-                    <form action="/api/store/add_customer" method="POST" class="flex gap-2">
-                        <input type="text" name="name" placeholder="Name" required class="w-32 bg-black border border-gray-700 text-white px-3 py-1.5 rounded text-sm outline-none">
-                        <input type="text" name="phone" placeholder="Phone Number" required class="w-32 bg-black border border-gray-700 text-white px-3 py-1.5 rounded text-sm outline-none">
-                        <button class="bg-yellow-500 text-black px-4 py-1.5 rounded text-sm font-bold">+ Create</button>
-                    </form>
+            <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden">
+                <div class="p-5 border-b border-gray-800 flex justify-between items-center bg-[#111]">
+                    <h3 class="font-bold text-white uppercase text-sm"><i class="fas fa-receipt text-yellow-500 mr-2"></i> Recent Store Transactions</h3>
                 </div>
-                <div class="overflow-x-auto p-4 flex-1">
+                <div class="overflow-x-auto h-[400px]">
                     <table class="w-full text-left text-sm whitespace-nowrap">
-                        <thead class="text-gray-500 uppercase text-xs"><tr><th class="px-4 py-3">Customer</th><th class="px-4 py-3">Balance</th><th class="px-4 py-3">Add Funds</th></tr></thead>
+                        <thead class="bg-[#151515] text-gray-500 uppercase text-[10px] sticky top-0">
+                            <tr><th class="px-5 py-3">Order ID</th><th class="px-5 py-3">Date</th><th class="px-5 py-3">Customer</th><th class="px-5 py-3">Product</th><th class="px-5 py-3">Amount</th><th class="px-5 py-3">Status</th></tr>
+                        </thead>
                         <tbody class="divide-y divide-gray-900">
-                            {% for c in store_customers %}
-                            <tr class="hover:bg-gray-900/50">
-                                <td class="px-4 py-3"><div class="font-bold text-white">{{ c.name }}</div><div class="text-[10px] text-gray-500">{{ c.phone }}</div></td>
-                                <td class="px-4 py-3"><span class="text-yellow-500 font-black text-lg">{{ c.balance }} EGP</span></td>
-                                <td class="px-4 py-3">
-                                    <form action="/api/store/add_balance" method="POST" class="flex gap-2">
-                                        <input type="hidden" name="phone" value="{{ c.phone }}">
-                                        <input type="number" name="amount" placeholder="Amount" required class="w-24 bg-black border border-gray-700 text-white px-2 py-1 rounded text-xs outline-none focus:border-yellow-500">
-                                        <button class="bg-gray-800 text-yellow-500 px-3 py-1 rounded hover:bg-yellow-500 hover:text-black font-bold">Charge</button>
-                                    </form>
-                                </td>
+                            {% for o in store_orders %}
+                            <tr class="hover:bg-gray-900/50 transition">
+                                <td class="px-5 py-3 font-mono text-gray-400">#{{ o._id }}</td>
+                                <td class="px-5 py-3 text-xs text-gray-500">{{ o.date }}</td>
+                                <td class="px-5 py-3"><div class="font-bold text-white">{{ o.name }}</div><div class="text-[10px] text-gray-500">{{ o.phone }}</div></td>
+                                <td class="px-5 py-3"><span class="bg-gray-800 text-white px-2 py-1 rounded text-xs font-bold border border-gray-700">{{ o.category }} UC</span></td>
+                                <td class="px-5 py-3 font-bold text-yellow-500">+{{ o.price }} EGP</td>
+                                <td class="px-5 py-3"><span class="text-szgreen text-xs font-bold"><i class="fas fa-check-circle"></i> Delivered</span></td>
                             </tr>
+                            {% else %}
+                            <tr><td colspan="6" class="text-center py-10 text-gray-600">No sales yet. Share your store link!</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
+
+        <div id="tab-products" class="tab-content hidden">
+            <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden">
+                <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-[#111]">
+                    <h3 class="font-bold text-white uppercase text-sm"><i class="fas fa-tags text-yellow-500 mr-2"></i> Catalog & Pricing Management</h3>
+                    <p class="text-xs text-gray-500">Set price to 0 to hide product from the store.</p>
+                </div>
+                <form action="/api/store/update_prices" method="POST" class="p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {% for cat in ['60', '325', '660', '1800', '3850', '8100'] %}
+                        <div class="bg-[#050505] border border-gray-800 p-5 rounded-xl flex items-center justify-between group hover:border-yellow-500/50 transition">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 bg-gray-900 rounded-lg flex items-center justify-center border border-gray-800">
+                                    <img src="https://i.imgur.com/uC58qC4.png" class="w-8">
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-white text-lg">{{ cat }} UC</h4>
+                                    <span class="text-[10px] uppercase font-bold {% if stock.get(cat, 0) > 0 %}text-szgreen{% else %}text-red-500{% endif %}">In Stock: {{ stock.get(cat, 0) }}</span>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <label class="text-[10px] text-gray-500 uppercase block mb-1">Price (EGP)</label>
+                                <input type="number" name="p_{{ cat }}" value="{{ store_prices.get(cat, 0) }}" class="w-24 bg-[#111] border border-gray-700 text-yellow-500 font-black px-3 py-2 rounded-lg text-right outline-none focus:border-yellow-500 transition">
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="mt-8 border-t border-gray-800 pt-6 text-right">
+                        <button type="submit" class="bg-yellow-500 text-black font-bold py-3 px-10 rounded-xl hover:bg-white transition shadow-lg shadow-yellow-500/20">Save All Catalog Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="tab-customers" class="tab-content hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="bg-panelbg border border-gray-800 p-6 rounded-xl h-fit">
+                    <h3 class="font-bold text-white uppercase text-sm mb-4 border-b border-gray-800 pb-3"><i class="fas fa-user-plus text-yellow-500 mr-2"></i> Register New Customer</h3>
+                    <form action="/api/store/add_customer" method="POST" class="space-y-4">
+                        <div>
+                            <label class="text-xs text-gray-500 mb-1 block">Full Name</label>
+                            <input type="text" name="name" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-500 mb-1 block">Phone Number (Login ID)</label>
+                            <input type="tel" name="phone" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500 font-mono">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-500 mb-1 block">Initial Wallet Balance (EGP)</label>
+                            <input type="number" name="balance" value="0" class="w-full bg-[#050505] border border-gray-800 text-yellow-500 font-bold p-3 rounded-lg outline-none focus:border-yellow-500">
+                        </div>
+                        <button type="submit" class="w-full bg-yellow-500 text-black font-bold py-3 rounded-lg mt-2 hover:bg-yellow-400">Create Account</button>
+                    </form>
+                </div>
+
+                <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden lg:col-span-2 flex flex-col h-[600px]">
+                    <div class="p-5 border-b border-gray-800 flex justify-between items-center bg-[#111]">
+                        <h3 class="font-bold text-white uppercase text-sm"><i class="fas fa-users text-yellow-500 mr-2"></i> Customer Database</h3>
+                    </div>
+                    <div class="overflow-x-auto flex-1 p-2">
+                        <table class="w-full text-left text-sm whitespace-nowrap">
+                            <thead class="bg-[#151515] text-gray-500 uppercase text-[10px]"><tr><th class="px-4 py-3">Customer Info</th><th class="px-4 py-3">Current Balance</th><th class="px-4 py-3">Manage Funds</th><th class="px-4 py-3 text-right">Actions</th></tr></thead>
+                            <tbody class="divide-y divide-gray-900">
+                                {% for c in store_customers %}
+                                <tr class="hover:bg-gray-900/50">
+                                    <td class="px-4 py-3">
+                                        <div class="font-bold text-white text-base">{{ c.name }}</div>
+                                        <div class="text-xs text-gray-500 font-mono mt-1"><i class="fas fa-phone-alt text-[10px] mr-1"></i> {{ c.phone }}</div>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <span class="text-yellow-500 font-black text-xl">{{ c.balance }}</span> <span class="text-xs text-gray-500">EGP</span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <form action="/api/store/manage_balance" method="POST" class="flex gap-2">
+                                            <input type="hidden" name="phone" value="{{ c.phone }}">
+                                            <input type="number" name="amount" placeholder="Amount" required class="w-20 bg-black border border-gray-700 text-white px-2 py-1.5 rounded text-xs outline-none focus:border-yellow-500">
+                                            <select name="action" class="bg-black border border-gray-700 text-white rounded text-xs outline-none">
+                                                <option value="add">Add (+)</option>
+                                                <option value="set">Set (=)</option>
+                                            </select>
+                                            <button class="bg-gray-800 text-yellow-500 px-3 py-1.5 rounded hover:bg-yellow-500 hover:text-black font-bold transition">Update</button>
+                                        </form>
+                                    </td>
+                                    <td class="px-4 py-3 text-right">
+                                        <form action="/api/store/delete_customer" method="POST" onsubmit="return confirm('Are you sure you want to completely delete this customer?');">
+                                            <input type="hidden" name="phone" value="{{ c.phone }}">
+                                            <button class="text-red-600 hover:text-red-400 p-2 rounded bg-red-600/10 transition"><i class="fas fa-trash"></i></button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="4" class="text-center py-10 text-gray-600">No customers registered yet.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </main>
+
+    <script>
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+            
+            // Reset all buttons
+            document.querySelectorAll('.nav-btn').forEach(el => {
+                el.className = 'nav-btn text-gray-500 hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition text-left';
+            });
+            
+            // Highlight active button
+            const activeBtn = document.getElementById('btn-' + tabId);
+            activeBtn.className = 'nav-btn bg-yellow-500/10 border-l-2 border-yellow-500 text-yellow-500 px-4 py-3 rounded-r-lg text-sm font-bold text-left';
+        }
+    </script>
 </body>
 </html>
