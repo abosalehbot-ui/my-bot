@@ -29,6 +29,18 @@ async def web_log(action, details=""):
         "details": details, "time": datetime.now().strftime('%Y-%m-%d %H:%M'), "timestamp": datetime.now()
     })
 
+# دالة الفلترة الذكية للتوكنات
+def clean_and_extract_tokens(raw_text):
+    valid_tokens = []
+    for line in raw_text.splitlines():
+        line = line.strip()
+        if not line or "===" in line or "↓↓" in line or "Заказ" in line: 
+            continue
+        token = line.split(";")[0].strip()
+        if len(token) > 15 and "http" not in token and " " not in token:
+            valid_tokens.append(token)
+    return valid_tokens
+
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request, "error": None})
@@ -103,8 +115,7 @@ async def dashboard(request: Request):
         "global_today": global_today, "global_month": global_month
     })
 
-# --- APIs للميزات الجديدة ---
-
+# --- APIs للتحكم المتقدم ---
 @app.post("/api/toggle_maintenance")
 async def toggle_maint(request: Request):
     if not check_auth(request): return {"status": "error"}
@@ -114,7 +125,6 @@ async def toggle_maint(request: Request):
     await web_log(f"تغيير وضع الصيانة إلى: {'تشغيل' if new_state else 'إيقاف'}")
     return {"status": "success"}
 
-# 🚀 نظام الرفع الذكي من الويب (يفحص التكرار ويرجع تقرير)
 @app.post("/api/add_stock_smart")
 async def api_add_stock_smart(request: Request, category: str = Form(...), codes: str = Form(...)):
     if not check_auth(request): return JSONResponse({"error": "unauth"}, status_code=401)
@@ -129,7 +139,6 @@ async def api_add_stock_smart(request: Request, category: str = Form(...), codes
             seen.add(c)
             unique_input.append(c)
             
-    # فحص قاعدة البيانات للمكرر
     in_stock = await db.stock.find({"$or": [{"_id": {"$in": unique_input}}, {"code": {"$in": unique_input}}]}).to_list(None)
     in_map = await db.codes_map.find({"$or": [{"_id": {"$in": unique_input}}, {"code": {"$in": unique_input}}]}).to_list(None)
     
@@ -155,7 +164,6 @@ async def api_add_stock_smart(request: Request, category: str = Form(...), codes
         "dupes_list": all_dupes
     })
 
-# 👁️ جلب الأكواد الحالية للمشاهدة
 @app.get("/api/view_stock/{category}")
 async def api_view_stock(category: str, request: Request):
     if not check_auth(request): return JSONResponse({"error": "unauth"}, status_code=401)
@@ -173,10 +181,10 @@ async def api_clear_stock(request: Request, category: str = Form(...)):
 @app.post("/api/add_shared_tokens")
 async def api_add_shared(request: Request, tokens: str = Form(...)):
     if not check_auth(request): return RedirectResponse("/login")
-    lines = [t.strip() for t in tokens.splitlines() if t.strip()]
-    if lines: 
-        await db.settings.update_one({"_id": "shared_tokens"}, {"$push": {"tokens": {"$each": lines}}}, upsert=True)
-        await web_log(f"تمت إضافة {len(lines)} توكنات مشتركة")
+    extracted_tokens = clean_and_extract_tokens(tokens)
+    if extracted_tokens: 
+        await db.settings.update_one({"_id": "shared_tokens"}, {"$push": {"tokens": {"$each": extracted_tokens}}}, upsert=True)
+        await web_log(f"إضافة ذكية: تم إضافة {len(extracted_tokens)} توكن مشترك")
     return RedirectResponse(url="/?tab=users", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/clear_shared_tokens")
@@ -189,10 +197,10 @@ async def api_clear_shared(request: Request):
 @app.post("/api/add_user_tokens")
 async def api_add_user_tokens(request: Request, user_id: int = Form(...), tokens: str = Form(...)):
     if not check_auth(request): return RedirectResponse("/login")
-    lines = [t.strip() for t in tokens.splitlines() if t.strip()]
-    if lines: 
-        await db.users.update_one({"_id": user_id}, {"$push": {"tokens": {"$each": lines}}})
-        await web_log(f"إضافة {len(lines)} توكن شخصي للمستخدم {user_id}")
+    extracted_tokens = clean_and_extract_tokens(tokens)
+    if extracted_tokens: 
+        await db.users.update_one({"_id": user_id}, {"$push": {"tokens": {"$each": extracted_tokens}}})
+        await web_log(f"إضافة ذكية: تم إضافة {len(extracted_tokens)} توكن للمستخدم {user_id}")
     return RedirectResponse(url="/?tab=users", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/add_user")
@@ -200,7 +208,7 @@ async def api_add_user(request: Request, user_id: int = Form(...), name: str = F
     if not check_auth(request): return RedirectResponse("/login")
     if not await db.users.find_one({"_id": user_id}):
         await db.users.insert_one({"_id": user_id, "role": role, "name": name, "tokens": [], "history": [], "logs": [], "token_logs": [], "stats": {"api": 0, "stock": 0}})
-        await web_log(f"إضافة مستخدم جديد", f"الاسم: {name} | الآيدي: {user_id} | الرتبة: {role}")
+        await web_log("إضافة مستخدم جديد", f"الاسم: {name} | الآيدي: {user_id} | الرتبة: {role}")
     return RedirectResponse(url="/?tab=users", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/user_action")
