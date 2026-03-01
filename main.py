@@ -99,8 +99,10 @@ async def process_api_pull(uid, reply_func, user, qty, context):
                 r = res.json()
                 if r.get("success") and r.get("accounts"):
                     a = r["accounts"][0]
-                    accs.append(f"📧 `{a['email']}`\n🔑 `{a['password']}`")
-                    raw_accs.append(f"{a['email']}:{a['password']}") # 🆕 حفظ الصيغة الصافية
+                    # تنسيق العرض للمستخدم (تحت بعض ونسخ باللمس)
+                    accs.append(f"`{a['email']}`\n`{a['password']}`")
+                    # حفظ الصيغة الصافية في المخزن المحلي
+                    raw_accs.append(f"{a['email']}:{a['password']}") 
                     token_logs_updates.append(f"✅ نجاح | توكن {short_t} | سحب: {a['email']}")
                 else:
                     err = r.get("message", "مجهول/بايظ")
@@ -123,7 +125,7 @@ async def process_api_pull(uid, reply_func, user, qty, context):
     reply_markup = InlineKeyboardMarkup(btns)
     
     if accs:
-        # 🆕 التخزين التلقائي لو المستخدم في قائمة المراقبة أو هو الأدمن
+        # 🆕 التخزين التلقائي لو المستخدم في قائمة المراقبة
         tracked_users = await get_tracked_users()
         if uid in tracked_users and raw_accs:
             cached_docs = [{"account": raw, "added_at": datetime.now()} for raw in raw_accs]
@@ -158,7 +160,6 @@ def get_main_keyboard(role):
     
     if role == "admin": 
         buttons.append([
-            InlineKeyboardButton("📥 إضافة للمخزن (24س)", callback_data="add_cached_api"),
             InlineKeyboardButton("♻️ سحب من المخزن (24س)", callback_data="pull_cached_api")
         ])
         buttons.append([InlineKeyboardButton("⚙️ لوحة الأدمن", callback_data="admin_panel")])
@@ -168,7 +169,7 @@ async def admin_keyboard():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("👥 إدارة الموظفين والمستخدمين", callback_data="admin_users_menu")],
         [InlineKeyboardButton("📦 إدارة المخزن", callback_data="admin_stock_menu")],
-        [InlineKeyboardButton("♻️ إعدادات التخزين التلقائي", callback_data="admin_auto_cache_menu")], # 🆕
+        [InlineKeyboardButton("♻️ إعدادات التخزين التلقائي", callback_data="admin_auto_cache_menu")], 
         [InlineKeyboardButton("🔍 بحث عكسي (كود)", callback_data="admin_reverse_search"), InlineKeyboardButton("📄 بحث بطلب عام", callback_data="admin_search_order")],
         [InlineKeyboardButton("📝 سجلات النظام", callback_data="admin_get_logs"), InlineKeyboardButton("🛠 الصيانة", callback_data="toggle_maintenance")],
         [InlineKeyboardButton("🏠 خروج", callback_data="back_home")]
@@ -274,10 +275,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "back_home":
         context.user_data.clear()
         return await query.edit_message_text("🏠 القائمة الرئيسية:", reply_markup=get_main_keyboard(role))
-
-    if data == "add_cached_api" and role == "admin":
-        context.user_data["state"] = "waiting_add_cached_api"
-        return await query.edit_message_text("📥 **أرسل الحسابات المراد تخزينها يدويًا (كل حساب في سطر):**\n*(سيتم حذفها تلقائياً بعد 24 ساعة من الآن)*", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
 
     if data == "pull_cached_api" and role == "admin":
         await db.cached_accounts.delete_many({"added_at": {"$lt": datetime.now() - timedelta(hours=24)}})
@@ -521,15 +518,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.clear()
         return await update.message.reply_text(f"🗑 تم إزالة `{target_id}` من قائمة التخزين التلقائي.", parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="admin_auto_cache_menu")]]))
 
-    elif state == "waiting_add_cached_api" and user["role"] == "admin":
-        lines = [line.strip() for line in txt.splitlines() if line.strip()]
-        if lines:
-            docs = [{"account": line, "added_at": datetime.now()} for line in lines]
-            await db.cached_accounts.insert_many(docs)
-            context.user_data.clear()
-            return await update.message.reply_text(f"✅ تم إضافة {len(lines)} حساب للمخزن بنجاح.", reply_markup=back_btn())
-        return await update.message.reply_text("❌ لم يتم التعرف على الحسابات.", reply_markup=back_btn())
-
     elif state == "waiting_cached_api_count" and user["role"] == "admin":
         if not txt.isdigit() or int(txt) <= 0: 
             return await update.message.reply_text("❌ أرسل رقم صحيح.", reply_markup=back_btn())
@@ -544,11 +532,16 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pulled_accs = []
         for _ in range(qty):
             doc = await db.cached_accounts.find_one_and_delete({}, sort=[("added_at", 1)])
-            if doc: pulled_accs.append(doc["account"])
+            if doc: 
+                try:
+                    e, p = doc["account"].split(":", 1)
+                    pulled_accs.append(f"`{e}`\n`{p}`")
+                except:
+                    pulled_accs.append(f"`{doc['account']}`")
                 
         if pulled_accs:
             msg = "\n━━━━━━━━━━━━\n".join(pulled_accs)
-            return await update.message.reply_text(f"✅ **سحب {len(pulled_accs)} حساب:**\n\n`{msg}`", parse_mode=ParseMode.MARKDOWN, reply_markup=back_btn())
+            return await update.message.reply_text(f"✅ **سحب {len(pulled_accs)} حساب:**\n\n{msg}", parse_mode=ParseMode.MARKDOWN, reply_markup=back_btn())
 
     elif state == "waiting_order_id":
         if not txt.isdigit(): return await update.message.reply_text("❌ أرسل رقم صحيح.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 العودة للأرشيف", callback_data="my_history")]]))
