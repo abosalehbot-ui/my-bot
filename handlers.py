@@ -25,18 +25,38 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 # ====== 🚀 دوال السحب المجمعة ======
 async def process_api_pull(uid, reply_func, user, qty, context):
-    tokens = list(user.get("tokens", []))
-    if not tokens:
-        return await reply_func("⚠️ <b>لا يوجد لديك توكنات!</b>", reply_markup=back_btn(), parse_mode=ParseMode.HTML)
-
-    tokens_to_use = tokens[:qty]
-    waiting_msg = await reply_func(f"⏳ <b>جاري السحب باستخدام {len(tokens_to_use)} توكن...</b>", parse_mode=ParseMode.HTML)
+    role = user.get("role", "user")
+    personal_tokens = list(user.get("tokens", []))
     
-    accs, raw_accs, used_tokens, token_logs_updates = [], [], [], []
+    # جلب التوكنات المشتركة من قاعدة البيانات
+    shared_doc = await db.settings.find_one({"_id": "shared_tokens"})
+    shared_tokens = shared_doc.get("tokens", []) if shared_doc else []
+    
+    # الحساب الذكي للتوكنات (يأخذ الشخصي أولاً، ثم المشترك)
+    needed = qty
+    personal_to_use = personal_tokens[:needed]
+    needed -= len(personal_to_use)
+    
+    shared_to_use = []
+    # فقط الأدمن والموظف يحق لهم استخدام التوكنات المشتركة إذا نقصت توكناتهم الشخصية
+    if needed > 0 and role in ["admin", "employee"]:
+        shared_to_use = shared_tokens[:needed]
+        needed -= len(shared_to_use)
+        
+    if needed > 0:
+        return await reply_func("⚠️ <b>لا يوجد توكنات كافية!</b>\n(التوكنات الشخصية والمشتركة معاً لا تكفي لإتمام العدد المطلوب).", reply_markup=back_btn(), parse_mode=ParseMode.HTML)
+        
+    tokens_to_use = personal_to_use + shared_to_use
+    waiting_msg = await reply_func(f"⏳ <b>جاري السحب باستخدام {len(tokens_to_use)} توكن...</b>\n<i>(شخصي: {len(personal_to_use)} | مشترك: {len(shared_to_use)})</i>", parse_mode=ParseMode.HTML)
+    
+    accs, raw_accs, token_logs_updates = [], [], []
+    used_personal, used_shared = [], []
+    
     async with httpx.AsyncClient() as client:
         tasks = [(t, client.post(f"{API_BASE_URL}/api/redeem-bulk", json={"token": t, "product": PRODUCT_ID, "qty": 1}, timeout=15.0)) for t in tokens_to_use]
         for t, req in tasks:
-            used_tokens.append(t)
+            if t in personal_to_use: used_personal.append(t)
+            else: used_shared.append(t)
             short_t = f"{t[:8]}...{t[-4:]}"
             try:
                 res = await req
@@ -45,22 +65,26 @@ async def process_api_pull(uid, reply_func, user, qty, context):
                     a = r["accounts"][0]
                     accs.append(f"<code>{a['email']}</code>\n<code>{a['password']}</code>")
                     raw_accs.append(f"{a['email']}:{a['password']}") 
-                    token_logs_updates.append(f"✅ نجاح | توكن {short_t} | سحب: {a['email']}")
+                    token_logs_updates.append(f"✅ نجاح | {short_t} | {a['email']}")
                 else:
-                    token_logs_updates.append(f"❌ فشل | توكن {short_t} | السبب: {r.get('message', 'مجهول')}")
+                    token_logs_updates.append(f"❌ فشل | {short_t} | {r.get('message', 'مجهول')}")
             except Exception as e:
-                token_logs_updates.append(f"⚠️ خطأ | توكن {short_t}")
-                logger.error(f"API Error for token {t}: {e}")
+                token_logs_updates.append(f"⚠️ خطأ | {short_t}")
 
-    db_updates = {"$pull": {"tokens": {"$in": used_tokens}}}
+    # تحديث التوكنات وحذف ما تم استهلاكه
+    db_updates = {}
+    if used_personal: db_updates["$pull"] = {"tokens": {"$in": used_personal}}
     if token_logs_updates: db_updates["$push"] = {"token_logs": {"$each": token_logs_updates, "$slice": -500}}
-    await db.users.update_one({"_id": uid}, db_updates)
+    if db_updates: await db.users.update_one({"_id": uid}, db_updates)
     
-    # 🔙 زراير الـ API كما كانت
-    btns = [[InlineKeyboardButton(f"🔄 حساب آخر (العدد: {qty})", callback_data="pull_api_again")], [InlineKeyboardButton("✏️ تعديل العدد", callback_data="pull_api")], [InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="back_home")]]
+    if used_shared:
+        await db.settings.update_one({"_id": "shared_tokens"}, {"$pull": {"tokens": {"$in": used_shared}}})
+
+    btns = [[InlineKeyboardButton(f"🔄 حساب آخر ({qty})", callback_data="pull_api_again")], [InlineKeyboardButton("✏️ تعديل العدد", callback_data="pull_api")], [InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="back_home")]]
     reply_markup = InlineKeyboardMarkup(btns)
     
     if accs:
+        # تسجيل وحفظ الطلب
         tracked_users = await get_tracked_users()
         if uid in tracked_users and raw_accs:
             cached_docs = [{"account": raw, "added_at": datetime.now()} for raw in raw_accs]
@@ -75,6 +99,7 @@ async def process_api_pull(uid, reply_func, user, qty, context):
         await waiting_msg.edit_text(f"✅ <b>تم السحب بنجاح (طلب <code>#{order_id}</code>):</b>\n\n{display_txt}\n\n📝 <i>(تم حذف التوكنات المستخدمة)</i>", parse_mode=ParseMode.HTML, reply_markup=reply_markup)
     else:
         await waiting_msg.edit_text("❌ <b>فشل السحب من التوكنات.</b>", parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+
 
 async def process_stock_pull(uid, reply_func, user, cat, count, context):
     if await db.stock.count_documents({"category": cat}) < count: 
@@ -295,7 +320,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "pull_api":
         await query.answer()
         tokens = user.get("tokens", [])
-        if not tokens: return await query.edit_message_text("⚠️ <b>لا يوجد توكنات!</b> أضف توكن أولاً.", reply_markup=back_btn(), parse_mode=ParseMode.HTML)
+        shared_doc = await db.settings.find_one({"_id": "shared_tokens"})
+        shared_tokens = shared_doc.get("tokens", []) if shared_doc else []
+        
+        if not tokens and (role == "user" or not shared_tokens):
+             return await query.edit_message_text("⚠️ <b>لا يوجد توكنات متاحة!</b> أضف توكن أولاً.", reply_markup=back_btn(), parse_mode=ParseMode.HTML)
+             
         context.user_data["state"] = "waiting_api_count"
         return await query.edit_message_text("🔢 <b>أرسل عدد الحسابات التي تريد سحبها الآن:</b>", reply_markup=back_btn(), parse_mode=ParseMode.HTML)
 
@@ -382,7 +412,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.clear()
         return await query.edit_message_text("❌ <b>تم الإلغاء.</b>", reply_markup=admin_back_btn(), parse_mode=ParseMode.HTML)
 
-    # 🆕 التعديل الخاص بدمج عرض المستخدمين وأزرار التحكم في شاشة واحدة
     if data == "admin_users_menu" and role == "admin":
         await query.answer()
         context.user_data.clear()
