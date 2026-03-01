@@ -4,8 +4,6 @@ import asyncio
 import traceback
 from datetime import datetime, timedelta
 import io
-import threading
-from flask import Flask
 import httpx
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -38,11 +36,9 @@ API_BASE_URL = "https://buzzmaster.shop"
 PRODUCT_ID = "24h-nongmail"
 UC_CATEGORIES = ["60", "325", "660", "1800", "3850", "8100"]
 
-# ====== 🌐 سيرفر Flask ======
-app_server = Flask(__name__)
-@app_server.route('/')
-def home(): return "✅ Saleh Zon Bot Online!", 200
-def run_flask(): app_server.run(host="0.0.0.0", port=8080)
+# إعدادات الـ Webhook (إذا لم يتم تعيينها سيعمل البوت بنظام Polling للتجربة المحلية)
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL") # ضع هنا رابط السيرفر الخاص بك (مثال: https://your-app.onrender.com)
+PORT = int(os.environ.get("PORT", 8080))
 
 # ====== 💾 دوال مساعدة ======
 async def get_user(user_id): 
@@ -130,10 +126,6 @@ def get_main_keyboard(role):
     if role in ["employee", "admin"]:
         buttons.append([
             InlineKeyboardButton("🎮 سحب كود (UC)", callback_data="pull_stock_menu"),
-            InlineKeyboardButton("🎯 سحب آيديات للعمل", callback_data="pull_ids_task")
-        ])
-        buttons.append([
-            InlineKeyboardButton("✅ تقفيل الآيديات المنجزة", callback_data="finish_ids_task"),
             InlineKeyboardButton("↩️ إرجاع طلب (15د)", callback_data="return_order")
         ])
     
@@ -151,17 +143,10 @@ def get_main_keyboard(role):
 async def admin_keyboard():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("👥 إدارة الموظفين والمستخدمين", callback_data="admin_users_menu")],
-        [InlineKeyboardButton("📦 إدارة المخزن", callback_data="admin_stock_menu"), InlineKeyboardButton("🎯 إدارة الآيديات", callback_data="admin_tasks_menu")],
+        [InlineKeyboardButton("📦 إدارة المخزن", callback_data="admin_stock_menu")],
         [InlineKeyboardButton("🔍 بحث عكسي (كود)", callback_data="admin_reverse_search"), InlineKeyboardButton("📄 بحث بطلب عام", callback_data="admin_search_order")],
         [InlineKeyboardButton("📝 سجلات النظام", callback_data="admin_get_logs"), InlineKeyboardButton("🛠 الصيانة", callback_data="toggle_maintenance")],
         [InlineKeyboardButton("🏠 خروج", callback_data="back_home")]
-    ])
-
-def admin_tasks_keyboard():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("➕ إضافة آيديات جديدة", callback_data="admin_add_ids")],
-        [InlineKeyboardButton("🗑 مسح الآيديات المعلقة", callback_data="admin_clear_pending_ids")],
-        [InlineKeyboardButton("🔙 رجوع للأدمن", callback_data="admin_panel")]
     ])
 
 def admin_users_keyboard():
@@ -213,7 +198,8 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     log_file = io.BytesIO(tb_string.encode('utf-8'))
     log_file.name = f"Crash_Log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
     try:
-        await context.bot.send_document(chat_id=ADMIN_ID, document=log_file, caption=error_msg, parse_mode=ParseMode.MARKDOWN)
+        if update and hasattr(update, 'effective_message') and update.effective_message:
+            await context.bot.send_document(chat_id=ADMIN_ID, document=log_file, caption=error_msg, parse_mode=ParseMode.MARKDOWN)
     except Exception as e:
         logger.error(f"فشل إرسال ملف الخطأ: {e}")
 
@@ -224,7 +210,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     user = await get_user(user_id)
     if user_id == ADMIN_ID and not user:
-        new_admin = {"_id": user_id, "role": "admin", "name": name, "tokens": [], "history": [], "logs": [], "stats": {"api": 0, "stock": 0, "ids_done": 0}}
+        new_admin = {"_id": user_id, "role": "admin", "name": name, "tokens": [], "history": [], "logs": [], "stats": {"api": 0, "stock": 0}}
         await db.users.insert_one(new_admin)
         user = new_admin
 
@@ -249,7 +235,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await log_activity(uid, user["name"], f"🔘 ضغط على زر: {data}")
 
-    if await check_maintenance() and role != "admin": return await query.edit_message_text("⚠️ **الصيانة جارية...**")
+    is_maint = await check_maintenance()
+    if is_maint and role != "admin" and data != "toggle_maintenance": return await query.edit_message_text("⚠️ **الصيانة جارية...**")
     
     if data == "back_home":
         context.user_data.clear()
@@ -257,8 +244,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "my_profile":
         t_count = len(user.get("tokens", []))
-        st = user.get("stats", {"api": 0, "stock": 0, "ids_done": 0})
-        msg = f"💳 **حسابك:**\n👤 الاسم: {user.get('name')}\n🎖 الرتبة: {role}\n🔑 توكنات نشطة: {t_count}\n\n🛒 **السحوبات والمهام:**\n🎮 أكواد مسحوبة: {st.get('stock',0)}\n🚀 حسابات API: {st.get('api',0)}\n✅ آيديات تم تقفيلها: {st.get('ids_done',0)}"
+        st = user.get("stats", {"api": 0, "stock": 0})
+        msg = f"💳 **حسابك:**\n👤 الاسم: {user.get('name')}\n🎖 الرتبة: {role}\n🔑 توكنات نشطة: {t_count}\n\n🛒 **السحوبات:**\n🎮 أكواد مسحوبة: {st.get('stock',0)}\n🚀 حسابات API: {st.get('api',0)}"
         return await query.edit_message_text(msg, reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
 
     if data == "view_my_tokens":
@@ -300,22 +287,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["state"] = "waiting_order_id"
         return await query.edit_message_text("🔍 **أرسل رقم الطلب المراد كشفه:**", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 العودة للأرشيف", callback_data="my_history")]]), parse_mode=ParseMode.MARKDOWN)
 
-    if data == "pull_ids_task" and role in ["admin", "employee"]:
-        pending = await db.player_ids.count_documents({"status": "pending"})
-        if pending == 0: return await query.edit_message_text("📭 لا يوجد آيديات معلقة للعمل حالياً.", reply_markup=back_btn())
-        current_tasks = await db.player_ids.count_documents({"status": "processing", "assigned_to": uid})
-        if current_tasks > 0:
-            return await query.edit_message_text(f"⚠️ لديك {current_tasks} آيديات قيد العمل!\nيرجى تقفيلهم أولاً من القائمة الرئيسية.", reply_markup=back_btn())
-        context.user_data["state"] = "waiting_pull_ids_count"
-        return await query.edit_message_text(f"🎯 **سحب مهام شحن**\nالآيديات المتاحة: {pending}\n\n🔢 **أرسل عدد الآيديات التي تريد سحبها للعمل عليها الآن:**", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
-
-    if data == "finish_ids_task" and role in ["admin", "employee"]:
-        tasks = await db.player_ids.find({"status": "processing", "assigned_to": uid}).to_list(length=None)
-        if not tasks: return await query.edit_message_text("✅ ليس لديك أي آيديات معلقة للتقفيل.", reply_markup=back_btn())
-        await db.player_ids.update_many({"status": "processing", "assigned_to": uid}, {"$set": {"status": "done", "done_at": datetime.now()}})
-        await db.users.update_one({"_id": uid}, {"$inc": {"stats.ids_done": len(tasks)}})
-        return await query.edit_message_text(f"✅ **عاش!** تم تقفيل {len(tasks)} آيديات وإضافتهم لإحصائياتك.", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
-
     if data == "return_order" and role in ["admin", "employee"]:
         context.user_data["state"] = "waiting_return_order_id"
         return await query.edit_message_text("↩️ **نظام المرتجعات السريع**\n\nأرسل **رقم الطلب (Order ID)** الذي تريد إرجاعه:\n*(ملاحظة: الإرجاع متاح لأكواد ببجي فقط، وخلال 15 دقيقة من السحب)*", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
@@ -342,22 +313,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ====== ⚙️ لوحة الأدمن ======
     if data == "admin_panel" and role == "admin":
         st = await db.stock.count_documents({})
-        pending_ids = await db.player_ids.count_documents({"status": "pending"})
-        return await query.edit_message_text(f"🛠 **الأدمن**\n📦 المخزن: {st}\n🎯 آيديات معلقة: {pending_ids}", reply_markup=await admin_keyboard(), parse_mode=ParseMode.MARKDOWN)
+        return await query.edit_message_text(f"🛠 **الأدمن**\n📦 المخزن: {st}", reply_markup=await admin_keyboard(), parse_mode=ParseMode.MARKDOWN)
     
-    if data == "admin_tasks_menu" and role == "admin":
-        pending = await db.player_ids.count_documents({"status": "pending"})
-        done = await db.player_ids.count_documents({"status": "done"})
-        return await query.edit_message_text(f"🎯 **إدارة الآيديات**\n⏳ معلق: {pending}\n✅ تم الانتهاء: {done}", reply_markup=admin_tasks_keyboard(), parse_mode=ParseMode.MARKDOWN)
-        
-    if data == "admin_add_ids" and role == "admin":
-        context.user_data["state"] = "waiting_admin_add_ids"
-        return await query.edit_message_text("✍️ **أرسل الآيديات (كل آيدي في سطر):**", reply_markup=admin_back_btn(), parse_mode=ParseMode.MARKDOWN)
-
-    if data == "admin_clear_pending_ids" and role == "admin":
-        await db.player_ids.delete_many({"status": "pending"})
-        return await query.edit_message_text("🗑 **تم مسح جميع الآيديات المعلقة.**", reply_markup=admin_back_btn(), parse_mode=ParseMode.MARKDOWN)
-
     if data == "admin_stock_menu" and role == "admin": return await query.edit_message_text("📦 **المخزن:**", reply_markup=stock_manage_keyboard())
     if data == "admin_choose_cat_manual" and role == "admin": return await query.edit_message_text("🔢 **اختر الفئة:**", reply_markup=await categories_keyboard("admin_add_manual"))
     if data == "admin_choose_cat_file" and role == "admin": return await query.edit_message_text("📂 **اختر الفئة لرفع الملف:**", reply_markup=await categories_keyboard("admin_add_file"))
@@ -444,7 +401,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         new_uid = context.user_data.get("new_user_id")
         if not new_uid: return
         r = "employee" if data == "set_role_employee" else "user"
-        await db.users.insert_one({"_id": new_uid, "role": r, "name": "User", "tokens": [], "history": [], "logs": [], "token_logs": [], "stats": {"api":0,"stock":0,"ids_done":0}})
+        await db.users.insert_one({"_id": new_uid, "role": r, "name": "User", "tokens": [], "history": [], "logs": [], "token_logs": [], "stats": {"api":0,"stock":0}})
         context.user_data.clear()
         return await query.edit_message_text(f"✅ تم إضافة الحساب كرتبة **{r}**.", reply_markup=admin_users_back_btn(), parse_mode=ParseMode.MARKDOWN)
 
@@ -527,31 +484,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         context.user_data.clear()
         return await update.message.reply_text(f"✅ **تم إرجاع الطلب #{txt} للمخزن بنجاح!**", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
-
-    elif state == "waiting_pull_ids_count" and user["role"] in ["admin", "employee"]:
-        if not txt.isdigit() or int(txt) <= 0: return await update.message.reply_text("❌ رقم غير صحيح.", reply_markup=back_btn())
-        qty = int(txt)
-        pulled_ids = []
-        for _ in range(qty):
-            task = await db.player_ids.find_one_and_update({"status": "pending"}, {"$set": {"status": "processing", "assigned_to": uid, "pulled_at": datetime.now()}})
-            if task: pulled_ids.append(task["_id"])
-            else: break
-            
-        context.user_data.clear()
-        if not pulled_ids: return await update.message.reply_text("❌ لا يوجد آيديات متاحة.", reply_markup=back_btn())
-        
-        ids_text = "\n".join([f"🎯 `{pid}`" for pid in pulled_ids])
-        msg = f"✅ **تم الاستلام!**\nاشحن الآيديات التالية:\n\n{ids_text}\n\n⚠️ *اضغط 'تقفيل' بعد الانتهاء!*"
-        return await update.message.reply_text(msg, reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
-
-    elif state == "waiting_admin_add_ids" and user["role"] == "admin":
-        lines = [c.strip() for c in txt.splitlines() if c.strip()]
-        if lines:
-            docs = [{"_id": pid, "status": "pending", "assigned_to": None} for pid in lines]
-            try: await db.player_ids.insert_many(docs, ordered=False)
-            except: pass
-        context.user_data.clear()
-        return await update.message.reply_text(f"✅ تم إضافة {len(lines)} آيدي للمهام.", reply_markup=admin_back_btn())
 
     elif state == "waiting_stock_count":
         if not txt.isdigit() or int(txt) <= 0: return await update.message.reply_text("❌ أرسل رقم صحيح.", reply_markup=back_btn())
@@ -681,7 +613,6 @@ async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ====== 🏁 التشغيل ======
 def main():
-    threading.Thread(target=run_flask).start()
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     
     app.add_handler(CommandHandler("start", start))
@@ -691,8 +622,16 @@ def main():
     
     app.add_error_handler(error_handler)
     
-    logger.info("🚀 Bot Started Successfully with Advanced Logs & Error Handling!")
-    app.run_polling(drop_pending_updates=True)
+    if WEBHOOK_URL:
+        logger.info(f"🚀 Bot Started with Webhook on {WEBHOOK_URL}")
+        app.run_webhook(
+            listen="0.0.0.0",
+            port=PORT,
+            webhook_url=WEBHOOK_URL
+        )
+    else:
+        logger.info("🚀 Bot Started with Polling (Local Mode)")
+        app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
     main()
