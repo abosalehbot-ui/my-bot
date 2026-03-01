@@ -4,7 +4,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import motor.motor_asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 
 app = FastAPI(title="Saleh Zone Dashboard")
 
@@ -24,7 +24,6 @@ def check_auth(request: Request):
     return request.cookies.get("admin_session") == SECRET_TOKEN
 
 async def web_log(action, details=""):
-    """تسجيل العمليات التي تتم من لوحة التحكم لتظهر في السجلات"""
     await db.system_logs.insert_one({
         "user_id": "WEB_ADMIN", "name": "Admin Dashboard", "action": action,
         "details": details, "time": datetime.now().strftime('%Y-%m-%d %H:%M'), "timestamp": datetime.now()
@@ -52,32 +51,68 @@ async def logout():
 async def dashboard(request: Request):
     if not check_auth(request): return RedirectResponse(url="/login")
     
+    # 1. التواريخ للحسابات
+    now = datetime.now()
+    today_str = now.strftime("%Y-%m-%d")
+    start_of_month_str = now.strftime("%Y-%m-01")
+    start_of_week_str = (now - timedelta(days=now.weekday())).strftime("%Y-%m-%d")
+
+    # 2. إحصائيات عامة
     users_count = await db.users.count_documents({})
     stock_count = await db.stock.count_documents({})
-    orders_count = await db.orders.count_documents({})
     cached_count = await db.cached_accounts.count_documents({})
-    
     logs = await db.system_logs.find().sort("timestamp", -1).to_list(length=100)
     all_users = await db.users.find().sort("_id", -1).to_list(length=50)
     
+    # 3. حساب السحوبات (لليوم، الاسبوع، الشهر)
+    month_orders = await db.orders.find({"type": "API Pull", "date": {"$gte": start_of_month_str}}).to_list(None)
+    
+    user_pull_stats = {}
+    global_today = 0
+    global_month = 0
+    
+    for o in month_orders:
+        uid = o.get("user_id")
+        count = len(o.get("items", []))
+        
+        if uid not in user_pull_stats:
+            user_pull_stats[uid] = {"today": 0, "week": 0, "month": 0}
+            
+        global_month += count
+        user_pull_stats[uid]["month"] += count
+        
+        if o.get("date", "").startswith(today_str):
+            global_today += count
+            user_pull_stats[uid]["today"] += count
+            
+        if o.get("date", "") >= start_of_week_str:
+            user_pull_stats[uid]["week"] += count
+
+    # 4. حساب إجمالي التوكنات
+    total_user_tokens = sum(len(u.get("tokens", [])) for u in all_users)
+    shared_doc = await db.settings.find_one({"_id": "shared_tokens"})
+    shared_tokens_count = len(shared_doc.get("tokens", [])) if shared_doc else 0
+    total_system_tokens = total_user_tokens + shared_tokens_count
+
+    # ربط إحصائيات السحب بكل مستخدم
+    for u in all_users:
+        u["pull_stats"] = user_pull_stats.get(u["_id"], {"today": 0, "week": 0, "month": 0})
+
     categories = ["60", "325", "660", "1800", "3850", "8100"]
     stock_details = {cat: await db.stock.count_documents({"category": cat}) for cat in categories}
         
     settings = await db.settings.find_one({"_id": "config"})
     maintenance = settings.get("maintenance", False) if settings else False
 
-    shared_doc = await db.settings.find_one({"_id": "shared_tokens"})
-    shared_tokens_count = len(shared_doc.get("tokens", [])) if shared_doc else 0
-
     return templates.TemplateResponse("index.html", {
         "request": request, "users_count": users_count, "stock_count": stock_count,
-        "orders_count": orders_count, "cached_count": cached_count,
-        "logs": logs, "all_users": all_users, "stock_details": stock_details,
-        "maintenance": maintenance, "shared_tokens_count": shared_tokens_count
+        "cached_count": cached_count, "logs": logs, "all_users": all_users,
+        "stock_details": stock_details, "maintenance": maintenance,
+        "shared_tokens_count": shared_tokens_count, "total_system_tokens": total_system_tokens,
+        "global_today": global_today, "global_month": global_month
     })
 
-# ----------------- APIs للميزات المتكاملة -----------------
-
+# --- APIs للتحكم المتكامل ---
 @app.post("/api/toggle_maintenance")
 async def toggle_maint(request: Request):
     if not check_auth(request): return {"status": "error"}
@@ -133,20 +168,23 @@ async def api_add_user(request: Request, user_id: int = Form(...), name: str = F
     if not check_auth(request): return RedirectResponse("/login")
     if not await db.users.find_one({"_id": user_id}):
         await db.users.insert_one({"_id": user_id, "role": role, "name": name, "tokens": [], "history": [], "logs": [], "token_logs": [], "stats": {"api": 0, "stock": 0}})
+        await web_log(f"تمت إضافة المستخدم {name} ({user_id}) برتبة {role}")
     return RedirectResponse(url="/?tab=users", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/user_action")
 async def api_user_action(request: Request, user_id: int = Form(...), action: str = Form(...)):
     if not check_auth(request): return RedirectResponse("/login")
-    if action == "delete": await db.users.delete_one({"_id": user_id})
-    elif action == "clear_tokens": await db.users.update_one({"_id": user_id}, {"$set": {"tokens": []}})
+    if action == "delete": 
+        await db.users.delete_one({"_id": user_id})
+        await web_log(f"تم حذف المستخدم ID: {user_id}")
+    elif action == "clear_tokens": 
+        await db.users.update_one({"_id": user_id}, {"$set": {"tokens": []}})
+        await web_log(f"تصفير توكنات المستخدم {user_id}")
     elif action == "toggle_role":
         u = await db.users.find_one({"_id": user_id})
         nr = "employee" if u.get("role") == "user" else "user"
         await db.users.update_one({"_id": user_id}, {"$set": {"role": nr}})
         await web_log(f"تعديل رتبة المستخدم {user_id} إلى {nr}")
-    elif action == "clear_logs":
-        await db.users.update_one({"_id": user_id}, {"$set": {"logs": [], "history": [], "token_logs": []}})
     return RedirectResponse(url="/?tab=users", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/tracked_users")
@@ -176,39 +214,26 @@ async def api_search(request: Request):
     query = form.get("query", "").strip()
     if not query: return JSONResponse({"result": "❌ أرسل نصاً للبحث"})
     
-    # 1. إذا كان البحث عبارة عن أرقام (قد يكون رقم طلب أو آيدي مستخدم)
     if query.isdigit():
-        # البحث عن رقم الطلب أولاً
         order = await db.orders.find_one({"_id": int(query)})
         if order: 
-            # جلب الأكواد وتنسيقها
             items_str = "\n".join([f"  - {item}" for item in order.get('items', [])])
-            res_msg = (
-                f"📄 تقرير الطلب #{query}\n"
-                f"👤 المستلم: {order.get('user', 'غير معروف')} | ID: {order.get('user_id', 'غير معروف')}\n"
-                f"📅 التاريخ: {order.get('date', 'غير متوفر')}\n"
-                f"📦 النوع: {order.get('type', 'غير محدد')}\n\n"
-                f"⬇️ العناصر المسحوبة ({len(order.get('items', []))}):\n{items_str}"
-            )
+            res_msg = (f"📄 تقرير الطلب #{query}\n👤 المستلم: {order.get('user', 'غير معروف')} | ID: {order.get('user_id', 'غير معروف')}\n"
+                       f"📅 التاريخ: {order.get('date', 'غير متوفر')}\n📦 النوع: {order.get('type', 'غير محدد')}\n\n"
+                       f"⬇️ العناصر المسحوبة ({len(order.get('items', []))}):\n{items_str}")
             return JSONResponse({"result": res_msg})
-        
-        # إذا لم يكن رقم طلب، نبحث عن المستخدم
         user = await db.users.find_one({"_id": int(query)})
         if user: 
             return JSONResponse({"result": f"👤 {user.get('name')}\n🆔 الآيدي: {user.get('_id')}\n🎖 الرتبة: {user.get('role')}\n🔑 التوكنات: {len(user.get('tokens',[]))}"})
 
-    # 2. البحث بنص الكود أو الحساب (البحث الشامل في السجلات والمخزن)
     records = await db.codes_map.find({"$or": [{"_id": query}, {"code": query}]}).to_list(length=10)
     in_stock = await db.stock.count_documents({"$or": [{"_id": query}, {"code": query}]})
     
-    res_str = f"🔍 نتيجة البحث عن: {query}\n"
-    res_str += f"📦 متوفر بالمخزن حالياً: {in_stock} مرات\n"
-    
+    res_str = f"🔍 نتيجة البحث عن: {query}\n📦 متوفر بالمخزن حالياً: {in_stock} مرات\n"
     if records:
         res_str += f"\n🛒 تم سحبه {len(records)} مرات:\n"
         for i, r in enumerate(records, 1):
             res_str += f" {i}. بواسطة: {r.get('name', 'مجهول')} | الوقت: {r.get('time', '')} | رقم الطلب: #{r.get('order_id', 'غير معروف')}\n"
     elif in_stock == 0:
         res_str += "\n❌ لا يوجد بيانات! (لم يتم العثور على طلب، مستخدم، أو كود بهذا النص)."
-        
     return JSONResponse({"result": res_str})
