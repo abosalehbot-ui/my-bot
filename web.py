@@ -176,15 +176,39 @@ async def api_search(request: Request):
     query = form.get("query", "").strip()
     if not query: return JSONResponse({"result": "❌ أرسل نصاً للبحث"})
     
+    # 1. إذا كان البحث عبارة عن أرقام (قد يكون رقم طلب أو آيدي مستخدم)
     if query.isdigit():
+        # البحث عن رقم الطلب أولاً
         order = await db.orders.find_one({"_id": int(query)})
-        if order: return JSONResponse({"result": f"📄 طلب #{query} | المستلم: {order['user']} | الأكواد: {len(order['items'])}"})
+        if order: 
+            # جلب الأكواد وتنسيقها
+            items_str = "\n".join([f"  - {item}" for item in order.get('items', [])])
+            res_msg = (
+                f"📄 تقرير الطلب #{query}\n"
+                f"👤 المستلم: {order.get('user', 'غير معروف')} | ID: {order.get('user_id', 'غير معروف')}\n"
+                f"📅 التاريخ: {order.get('date', 'غير متوفر')}\n"
+                f"📦 النوع: {order.get('type', 'غير محدد')}\n\n"
+                f"⬇️ العناصر المسحوبة ({len(order.get('items', []))}):\n{items_str}"
+            )
+            return JSONResponse({"result": res_msg})
+        
+        # إذا لم يكن رقم طلب، نبحث عن المستخدم
         user = await db.users.find_one({"_id": int(query)})
-        if user: return JSONResponse({"result": f"👤 {user.get('name')} | الرتبة: {user.get('role')} | التوكنات: {len(user.get('tokens',[]))}"})
+        if user: 
+            return JSONResponse({"result": f"👤 {user.get('name')}\n🆔 الآيدي: {user.get('_id')}\n🎖 الرتبة: {user.get('role')}\n🔑 التوكنات: {len(user.get('tokens',[]))}"})
 
-    records = await db.codes_map.find({"$or": [{"_id": query}, {"code": query}]}).to_list(length=5)
+    # 2. البحث بنص الكود أو الحساب (البحث الشامل في السجلات والمخزن)
+    records = await db.codes_map.find({"$or": [{"_id": query}, {"code": query}]}).to_list(length=10)
     in_stock = await db.stock.count_documents({"$or": [{"_id": query}, {"code": query}]})
-    res_str = f"🔍 الكود: {query}\n📦 متوفر بالمخزن: {in_stock}\n"
+    
+    res_str = f"🔍 نتيجة البحث عن: {query}\n"
+    res_str += f"📦 متوفر بالمخزن حالياً: {in_stock} مرات\n"
+    
     if records:
-        res_str += f"🛒 تم سحبه {len(records)} مرات (بواسطة: {', '.join([r['name'] for r in records])})"
+        res_str += f"\n🛒 تم سحبه {len(records)} مرات:\n"
+        for i, r in enumerate(records, 1):
+            res_str += f" {i}. بواسطة: {r.get('name', 'مجهول')} | الوقت: {r.get('time', '')} | رقم الطلب: #{r.get('order_id', 'غير معروف')}\n"
+    elif in_stock == 0:
+        res_str += "\n❌ لا يوجد بيانات! (لم يتم العثور على طلب، مستخدم، أو كود بهذا النص)."
+        
     return JSONResponse({"result": res_str})
