@@ -94,12 +94,12 @@
                         <hr class="border-gray-800 my-6">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="font-bold text-white uppercase text-sm text-szcyan"><i class="fas fa-users mr-2"></i> Shared Tokens</h3>
-                            <form action="/api/clear_shared_tokens" method="POST"><button class="text-red-500 text-xs hover:underline"><i class="fas fa-trash"></i> Clear</button></form>
+                            <form action="/api/clear_shared_tokens" method="POST" onsubmit="return confirm('Clear all shared tokens?');"><button class="text-red-500 text-xs hover:underline"><i class="fas fa-trash"></i> Clear</button></form>
                         </div>
-                        <p class="text-xs text-gray-500 mb-4">Available for Employees. (Count: {{ shared_tokens_count }})</p>
+                        <p class="text-xs text-gray-500 mb-4">Smart Paste (Raw text from Store). (Count: {{ shared_tokens_count }})</p>
                         <form action="/api/add_shared_tokens" method="POST">
-                            <textarea name="tokens" rows="3" class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg mb-3 text-xs font-mono focus:border-szcyan outline-none" placeholder="Paste shared tokens..."></textarea>
-                            <button class="w-full bg-szcyan text-black font-bold py-2 rounded-lg">Add to Shared Pool</button>
+                            <textarea name="tokens" rows="3" class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg mb-3 text-xs font-mono focus:border-szcyan outline-none" placeholder="Paste full store text here..."></textarea>
+                            <button class="w-full bg-szcyan text-black font-bold py-2 rounded-lg">Extract & Add Tokens</button>
                         </form>
                     </div>
                     
@@ -107,7 +107,7 @@
                         <div class="px-6 py-4 border-b border-gray-800"><h3 class="font-bold text-white uppercase text-sm">User Management & Stats</h3></div>
                         <div class="overflow-x-auto flex-1 p-2">
                             <table class="w-full text-left text-sm whitespace-nowrap">
-                                <thead class="bg-[#151515] text-gray-500"><tr><th class="px-4 py-3">User</th><th class="px-4 py-3">Pulls (T/W/M)</th><th class="px-4 py-3">Add Tokens</th><th class="px-4 py-3">Actions</th></tr></thead>
+                                <thead class="bg-[#151515] text-gray-500"><tr><th class="px-4 py-3">User</th><th class="px-4 py-3">Pulls (T/W/M)</th><th class="px-4 py-3">Smart Tokens</th><th class="px-4 py-3">Actions</th></tr></thead>
                                 <tbody class="divide-y divide-gray-900">
                                     {% for u in all_users %}
                                     <tr class="hover:bg-gray-900/50">
@@ -119,13 +119,14 @@
                                         <td class="px-4 py-3">
                                             <form action="/api/add_user_tokens" method="POST" class="flex gap-2">
                                                 <input type="hidden" name="user_id" value="{{ u._id }}">
-                                                <input type="text" name="tokens" placeholder="Tokens..." required class="w-24 lg:w-32 bg-black border border-gray-700 text-white px-2 py-1 rounded text-xs focus:border-szgreen outline-none">
-                                                <button class="bg-gray-800 text-white px-2 py-1 rounded hover:bg-szgreen hover:text-black transition">+</button>
+                                                <input type="text" name="tokens" placeholder="Paste..." required class="w-24 lg:w-32 bg-black border border-gray-700 text-white px-2 py-1 rounded text-xs focus:border-szgreen outline-none">
+                                                <button class="bg-gray-800 text-white px-2 py-1 rounded hover:bg-szgreen hover:text-black transition" title="Extract Tokens">+</button>
                                             </form>
                                         </td>
                                         <td class="px-4 py-3 flex gap-2">
                                             <form action="/api/user_action" method="POST" title="Toggle Role"><input type="hidden" name="user_id" value="{{ u._id }}"><input type="hidden" name="action" value="toggle_role"><button class="text-gray-400 hover:text-white p-1"><i class="fas fa-user-cog"></i></button></form>
                                             <form action="/api/user_action" method="POST" title="Clear Tokens" onsubmit="return confirm('Clear tokens?');"><input type="hidden" name="user_id" value="{{ u._id }}"><input type="hidden" name="action" value="clear_tokens"><button class="text-yellow-500 hover:text-yellow-400 p-1"><i class="fas fa-eraser"></i></button></form>
+                                            <form action="/api/user_action" method="POST" title="Clear Logs" onsubmit="return confirm('Clear logs?');"><input type="hidden" name="user_id" value="{{ u._id }}"><input type="hidden" name="action" value="clear_logs"><button class="text-purple-500 hover:text-purple-400 p-1"><i class="fas fa-history"></i></button></form>
                                             <form action="/api/user_action" method="POST" title="Delete User" onsubmit="return confirm('DELETE this user?');"><input type="hidden" name="user_id" value="{{ u._id }}"><input type="hidden" name="action" value="delete"><button class="text-red-600 hover:text-red-400 p-1"><i class="fas fa-trash"></i></button></form>
                                         </td>
                                     </tr>
@@ -139,6 +140,7 @@
 
             <div id="tab-tools" class="tab-content hidden">
                 <h2 class="text-2xl font-bold text-white mb-6">Advanced <span class="text-szgreen">Tools</span></h2>
+                
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="bg-panelbg border border-gray-800 p-6 rounded-xl">
                         <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-search text-szgreen mr-2"></i> Global Search</h3>
@@ -148,6 +150,7 @@
                         </div>
                         <div id="search-result" class="bg-black border border-gray-800 rounded-lg p-4 text-sm font-mono text-szcyan whitespace-pre-wrap hidden h-48 overflow-y-auto leading-relaxed"></div>
                     </div>
+                    
                     <div class="space-y-6">
                         <div class="bg-panelbg border border-gray-800 p-6 rounded-xl flex flex-col items-center text-center">
                             <i class="fas fa-hammer text-4xl mb-4 {% if maintenance %}text-red-500{% else %}text-gray-600{% endif %}"></i>
@@ -162,6 +165,35 @@
                             </form>
                         </div>
                     </div>
+
+                    <div class="bg-panelbg border border-gray-800 p-6 rounded-xl md:col-span-2">
+                        <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-robot text-purple-500 mr-2"></i> Auto-Cache System (Tracked Users)</h3>
+                        <p class="text-xs text-gray-500 mb-4">Users in this list will have their successfully pulled accounts automatically saved to the local cache database (24h).</p>
+                        
+                        <div class="flex gap-4">
+                            <form action="/api/tracked_users" method="POST" class="flex-1 flex gap-2">
+                                <input type="hidden" name="action" value="add">
+                                <input type="number" name="user_id" placeholder="Add Telegram ID" required class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg text-sm focus:border-purple-500 outline-none">
+                                <button class="bg-purple-600 text-white font-bold px-6 rounded-lg hover:bg-purple-500">Add ID</button>
+                            </form>
+                            <form action="/api/tracked_users" method="POST" class="flex-1 flex gap-2">
+                                <input type="hidden" name="action" value="remove">
+                                <input type="number" name="user_id" placeholder="Remove Telegram ID" required class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg text-sm focus:border-red-500 outline-none">
+                                <button class="bg-gray-800 text-red-500 font-bold px-6 rounded-lg hover:bg-red-900 border border-gray-700 hover:border-red-500 transition">Remove ID</button>
+                            </form>
+                        </div>
+                        
+                        <div class="mt-4 p-4 bg-black border border-gray-800 rounded-lg">
+                            <h4 class="text-xs text-gray-400 mb-2 uppercase">Currently Tracked IDs:</h4>
+                            <div class="flex flex-wrap gap-2">
+                                {% for tid in tracked_users %}
+                                <span class="bg-gray-800 text-white px-3 py-1 rounded-full text-xs font-mono border border-gray-700"><i class="fas fa-id-badge mr-1 text-purple-400"></i> {{ tid }}</span>
+                                {% else %}
+                                <span class="text-xs text-gray-600">No tracked users found.</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -172,7 +204,6 @@
                     <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center relative group overflow-hidden">
                         <div class="text-xl font-black text-white mb-1">{{ cat }}</div>
                         <div class="text-xs text-gray-500 uppercase">Count: <span class="text-szgreen font-bold">{{ count }}</span></div>
-                        
                         <div class="absolute top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
                             <button onclick="openStockModal('{{ cat }}')" class="text-szcyan bg-szcyan/10 p-2 rounded hover:bg-szcyan hover:text-black transition" title="View Codes"><i class="fas fa-eye"></i></button>
                             <form action="/api/clear_stock" method="POST" onsubmit="return confirm('Clear ALL {{ cat }} UC stock?');">
@@ -219,24 +250,19 @@
     <div id="report-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
         <div class="bg-panelbg border border-gray-800 w-full max-w-md rounded-xl shadow-2xl overflow-hidden transform scale-95 transition-transform" id="report-modal-content">
             <div class="p-6 text-center border-b border-gray-800">
-                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-szgreen/20 text-szgreen mb-4">
-                    <i class="fas fa-check-circle text-3xl"></i>
-                </div>
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-szgreen/20 text-szgreen mb-4"><i class="fas fa-check-circle text-3xl"></i></div>
                 <h3 class="text-xl font-bold text-white">Upload Complete</h3>
             </div>
             <div class="p-6 space-y-4">
                 <div class="flex justify-between text-sm"><span class="text-gray-400">Total Processed:</span> <span class="font-bold text-white" id="rep-total">0</span></div>
                 <div class="flex justify-between text-sm"><span class="text-gray-400">Successfully Added:</span> <span class="font-bold text-szgreen" id="rep-added">0</span></div>
                 <div class="flex justify-between text-sm"><span class="text-gray-400">Duplicates Rejected:</span> <span class="font-bold text-red-500" id="rep-dupes">0</span></div>
-                
                 <div id="dupes-container" class="hidden mt-4 pt-4 border-t border-gray-800">
                     <p class="text-xs text-red-400 mb-2">Rejected Codes:</p>
                     <textarea id="rep-dupes-list" class="w-full h-24 bg-[#0a0a0a] border border-red-900/50 text-red-500 p-2 rounded-lg text-xs font-mono" readonly></textarea>
                 </div>
             </div>
-            <div class="p-4 bg-gray-900/50 text-center">
-                <button onclick="closeReportModal()" class="bg-szgreen text-black font-bold px-8 py-2 rounded-lg">Done</button>
-            </div>
+            <div class="p-4 bg-gray-900/50 text-center"><button onclick="closeReportModal()" class="bg-szgreen text-black font-bold px-8 py-2 rounded-lg">Done</button></div>
         </div>
     </div>
 
@@ -276,7 +302,6 @@
             resBox.innerText = data.result;
         }
 
-        // ====== مودال عرض الأكواد ======
         async function openStockModal(cat) {
             document.getElementById('stock-modal').classList.remove('hidden');
             document.getElementById('modal-title').innerText = cat + " UC - Current Stock";
@@ -295,26 +320,20 @@
             alert("Codes Copied!");
         }
 
-        // ====== الرفع الذكي (Smart Upload) ======
         async function submitSmartStock(e) {
             e.preventDefault();
             const btn = document.getElementById('smart-btn');
             const cat = document.getElementById('smart-cat').value;
             const codes = document.getElementById('smart-codes').value;
-            
             if(!codes.trim()) return alert("Please enter codes!");
             
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scanning...';
             btn.disabled = true;
-
-            const fd = new FormData();
-            fd.append("category", cat);
-            fd.append("codes", codes);
+            const fd = new FormData(); fd.append("category", cat); fd.append("codes", codes);
 
             try {
                 const res = await fetch('/api/add_stock_smart', {method: 'POST', body: fd});
                 const data = await res.json();
-                
                 document.getElementById('rep-total').innerText = data.total;
                 document.getElementById('rep-added').innerText = data.added;
                 document.getElementById('rep-dupes').innerText = data.dupes;
@@ -322,25 +341,17 @@
                 if(data.dupes > 0) {
                     document.getElementById('dupes-container').classList.remove('hidden');
                     document.getElementById('rep-dupes-list').value = data.dupes_list.join('\n');
-                } else {
-                    document.getElementById('dupes-container').classList.add('hidden');
-                }
+                } else { document.getElementById('dupes-container').classList.add('hidden'); }
                 
                 document.getElementById('report-modal').classList.remove('hidden');
                 setTimeout(() => document.getElementById('report-modal-content').classList.remove('scale-95'), 50);
-                
-                document.getElementById('smart-codes').value = ""; // تفريغ الخانة
-            } catch(err) {
-                alert("Error connecting to server.");
-            }
+                document.getElementById('smart-codes').value = ""; 
+            } catch(err) { alert("Error connecting to server."); }
             btn.innerHTML = '<span>Scan & Add Codes</span> <i class="fas fa-upload"></i>';
             btn.disabled = false;
         }
 
-        function closeReportModal() {
-            closeModal('report-modal');
-            location.reload(); // تحديث الصفحة لتحديث العدادات
-        }
+        function closeReportModal() { closeModal('report-modal'); location.reload(); }
     </script>
 </body>
 </html>
