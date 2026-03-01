@@ -1,36 +1,24 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from config import UC_CATEGORIES
-from database import db
 
 def get_main_keyboard(role):
     buttons = []
     if role in ["employee", "admin"]:
-        buttons.append([
-            InlineKeyboardButton("🎮 سحب كود (UC)", callback_data="pull_stock_menu")
-        ])
+        buttons.append([InlineKeyboardButton("🎮 سحب كود (UC)", callback_data="pull_stock_menu")])
     
     buttons.append([InlineKeyboardButton("🚀 سحب حسابات (API)", callback_data="pull_api")])
     buttons.append([InlineKeyboardButton("📋 توكناتي", callback_data="view_my_tokens")])
-    
-    buttons.append([
-        InlineKeyboardButton("💳 حسابي وإحصائياتي", callback_data="my_profile")
-    ])
+    buttons.append([InlineKeyboardButton("💳 حسابي وإحصائياتي", callback_data="my_profile")])
     
     if role == "admin": 
-        buttons.append([
-            InlineKeyboardButton("♻️ سحب من المخزن (24س)", callback_data="pull_cached_api")
-        ])
+        buttons.append([InlineKeyboardButton("♻️ سحب من المخزن (24س)", callback_data="pull_cached_api")])
         buttons.append([InlineKeyboardButton("⚙️ لوحة الأدمن", callback_data="admin_panel")])
     return InlineKeyboardMarkup(buttons)
 
-# 🆕 كيبورد جديد خاص بصفحة الإحصائيات
 def profile_keyboard(role):
-    buttons = [
-        [InlineKeyboardButton("📂 أرشيفي", callback_data="my_history")]
-    ]
+    buttons = [[InlineKeyboardButton("📂 أرشيفي", callback_data="my_history")]]
     if role in ["employee", "admin"]:
         buttons.append([InlineKeyboardButton("↩️ إرجاع طلب (15د)", callback_data="return_order")])
-    
     buttons.append([InlineKeyboardButton("🔙 رجوع", callback_data="back_home")])
     return InlineKeyboardMarkup(buttons)
 
@@ -38,17 +26,24 @@ async def admin_keyboard():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("👥 إدارة الموظفين والمستخدمين", callback_data="admin_users_menu")],
         [InlineKeyboardButton("📦 إدارة المخزن", callback_data="admin_stock_menu")],
-        [InlineKeyboardButton("♻️ إعدادات التخزين التلقائي", callback_data="admin_auto_cache_menu")], 
-        [InlineKeyboardButton("🔍 بحث عكسي (كود)", callback_data="admin_reverse_search"), InlineKeyboardButton("📄 بحث بطلب عام", callback_data="admin_search_order")],
-        [InlineKeyboardButton("📝 سجلات النظام", callback_data="admin_get_logs"), InlineKeyboardButton("🛠 الصيانة", callback_data="toggle_maintenance")],
+        # 🆕 دمج السجلات والبحث والتخزين وإزالة الصيانة
+        [InlineKeyboardButton("📜 السجلات والتخزين", callback_data="admin_logs_hub")],
         [InlineKeyboardButton("🏠 خروج", callback_data="back_home")]
+    ])
+
+# 🆕 قائمة السجلات والتخزين المدمجة
+def admin_logs_keyboard():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔍 البحث العكسي (كود)", callback_data="admin_reverse_search"), InlineKeyboardButton("📄 بحث برقم الطلب", callback_data="admin_search_order")],
+        [InlineKeyboardButton("📝 سجلات النظام (Logs)", callback_data="admin_get_logs"), InlineKeyboardButton("♻️ التخزين التلقائي", callback_data="admin_auto_cache_menu")],
+        [InlineKeyboardButton("🔙 رجوع للأدمن", callback_data="admin_panel")]
     ])
 
 def auto_cache_keyboard():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("➕ إضافة آيدي للمراقبة", callback_data="add_tracked_user"), InlineKeyboardButton("🗑 إزالة آيدي", callback_data="remove_tracked_user")],
         [InlineKeyboardButton("📋 عرض القائمة", callback_data="list_tracked_users")],
-        [InlineKeyboardButton("🔙 رجوع للأدمن", callback_data="admin_panel")]
+        [InlineKeyboardButton("🔙 رجوع للسجلات", callback_data="admin_logs_hub")]
     ])
 
 def admin_users_keyboard():
@@ -66,7 +61,7 @@ def stock_manage_keyboard():
         [InlineKeyboardButton("🔙 رجوع للأدمن", callback_data="admin_panel")]
     ])
 
-async def categories_keyboard(action_prefix):
+async def categories_keyboard(action_prefix, db):
     buttons = []
     row = []
     for cat in UC_CATEGORIES:
@@ -83,10 +78,18 @@ async def categories_keyboard(action_prefix):
 
 def success_pull_keyboard(callback_data):
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔄 طلب آخر", callback_data=callback_data)],
+        [InlineKeyboardButton("🔄 سحب فئة أخرى", callback_data="pull_stock_menu"), InlineKeyboardButton("🔄 نفس الفئة مرة أخرى", callback_data=callback_data)],
         [InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="back_home")]
+    ])
+
+# 🆕 زر الإعادة العام للاستخدام في البحث والإضافة
+def retry_keyboard(callback_data, back_to="back_home"):
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 مرة أخرى", callback_data=callback_data)],
+        [InlineKeyboardButton("🔙 رجوع", callback_data=back_to)]
     ])
 
 def back_btn(): return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="back_home")]])
 def admin_back_btn(): return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع للأدمن", callback_data="admin_panel")]])
+def admin_logs_back_btn(): return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع للسجلات", callback_data="admin_logs_hub")]])
 def admin_users_back_btn(): return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع للمستخدمين", callback_data="admin_users_menu")]])
