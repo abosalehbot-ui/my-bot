@@ -6,8 +6,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import motor.motor_asyncio
 from datetime import datetime, timedelta
+from store_routes import router as store_router
+
 
 app = FastAPI(title="Saleh Zone Dashboard")
+app.include_router(store_router)
 
 os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
