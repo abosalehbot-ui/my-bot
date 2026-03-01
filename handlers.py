@@ -8,9 +8,10 @@ from telegram.ext import ContextTypes
 
 from config import ADMIN_ID, API_BASE_URL, PRODUCT_ID, logger
 from database import db, get_user, log_activity, check_maintenance, get_tracked_users, get_next_order_id, analyze_codes
+# 🆕 تم إضافة profile_keyboard هنا
 from keyboards import (get_main_keyboard, admin_keyboard, auto_cache_keyboard, 
                        admin_users_keyboard, stock_manage_keyboard, categories_keyboard, 
-                       success_pull_keyboard, back_btn, admin_back_btn, admin_users_back_btn)
+                       success_pull_keyboard, back_btn, admin_back_btn, admin_users_back_btn, profile_keyboard)
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.error("❌ حدث خطأ برمجي:", exc_info=context.error)
@@ -139,12 +140,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["state"] = "waiting_remove_tracked"
         return await query.edit_message_text("🗑 **أرسل الآيدي المراد إزالته من القائمة:**", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="admin_auto_cache_menu")]]), parse_mode=ParseMode.MARKDOWN)
 
+    # 🆕 تعديل زر الإحصائيات ليعرض الكيبورد الجديد بدلاً من زر الرجوع العادي
     if data == "my_profile":
         await query.answer()
         t_count = len(user.get("tokens", []))
         st = user.get("stats", {"api": 0, "stock": 0})
         msg = f"💳 **حسابك:**\n👤 الاسم: {user.get('name')}\n🎖 الرتبة: {role}\n🔑 توكنات نشطة: {t_count}\n\n🛒 **السحوبات:**\n🎮 أكواد مسحوبة: {st.get('stock',0)}\n🚀 حسابات API: {st.get('api',0)}"
-        return await query.edit_message_text(msg, reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
+        return await query.edit_message_text(msg, reply_markup=profile_keyboard(role), parse_mode=ParseMode.MARKDOWN)
 
     if data == "view_my_tokens":
         await query.answer()
@@ -177,7 +179,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         hist = user.get("history", [])
         txt = "\n".join(hist[-10:]) if hist else "📂 أرشيفك فارغ."
-        btns = [[InlineKeyboardButton("🔍 بحث برقم الطلب (Order ID)", callback_data="check_order_id")], [InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="back_home")]]
+        btns = [[InlineKeyboardButton("🔍 بحث برقم الطلب (Order ID)", callback_data="check_order_id")], [InlineKeyboardButton("🔙 رجوع", callback_data="my_profile")]]
         return await query.edit_message_text(f"📂 **آخر 10 عمليات:**\n\n{txt}", reply_markup=InlineKeyboardMarkup(btns), parse_mode=ParseMode.MARKDOWN)
 
     if data == "check_order_id":
@@ -188,7 +190,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "return_order" and role in ["admin", "employee"]:
         await query.answer()
         context.user_data["state"] = "waiting_return_order_id"
-        return await query.edit_message_text("↩️ **نظام المرتجعات السريع**\n\nأرسل **رقم الطلب (Order ID)** الذي تريد إرجاعه:\n*(ملاحظة: الإرجاع متاح لأكواد ببجي فقط، وخلال 15 دقيقة من السحب)*", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
+        return await query.edit_message_text("↩️ **نظام المرتجعات السريع**\n\nأرسل **رقم الطلب (Order ID)** الذي تريد إرجاعه:\n*(ملاحظة: الإرجاع متاح لأكواد ببجي فقط، وخلال 15 دقيقة من السحب)*", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="my_profile")]]), parse_mode=ParseMode.MARKDOWN)
 
     if data == "pull_stock_menu" and role in ["admin", "employee"]: 
         await query.answer()
@@ -268,7 +270,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.clear()
         return await query.edit_message_text(f"✅ تم إضافة الأكواد بنجاح.", reply_markup=admin_back_btn())
         
-    # 🆕 التعديل الخاص بعرض الأكواد المكررة في رسالة بدل الـ Alert
     if data == "show_dupes_list" and role == "admin":
         pending = context.user_data.get("pending_stock")
         if not pending or not pending.get("dupes"):
@@ -278,7 +279,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         txt = "\n".join(dupes_list[:50])
         if len(dupes_list) > 50: txt += f"\n... و {len(dupes_list)-50} أكواد أخرى."
         
-        await query.answer() # نغلق علامة التحميل للزرار
+        await query.answer() 
         msg = f"⚠️ **الأكواد المكررة ({len(dupes_list)} كود):**\n\n`{txt}`"
         return await query.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
 
@@ -378,6 +379,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     user = await get_user(uid)
     if not user: return
+    
     await log_activity(uid, user["name"], f"📝 أرسل نص: {txt[:30]}")
     
     if not state: return await update.message.reply_text("💡 يرجى اختيار عملية من القائمة أولاً.", reply_markup=back_btn())
@@ -397,13 +399,15 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text(f"🗑 تم إزالة `{target_id}` من قائمة التخزين التلقائي.", parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="admin_auto_cache_menu")]]))
 
     elif state == "waiting_cached_api_count" and user["role"] == "admin":
-        if not txt.isdigit() or int(txt) <= 0: return await update.message.reply_text("❌ أرسل رقم صحيح.", reply_markup=back_btn())
+        if not txt.isdigit() or int(txt) <= 0: 
+            return await update.message.reply_text("❌ أرسل رقم صحيح.", reply_markup=back_btn())
         qty = int(txt)
         context.user_data.clear()
         await db.cached_accounts.delete_many({"added_at": {"$lt": datetime.now() - timedelta(hours=24)}})
         
         available = await db.cached_accounts.count_documents({})
-        if qty > available: return await update.message.reply_text(f"⚠️ الكمية غير كافية! المتاح: {available}", reply_markup=back_btn())
+        if qty > available:
+            return await update.message.reply_text(f"⚠️ الكمية غير كافية! المتاح: {available}", reply_markup=back_btn())
             
         pulled_accs = []
         for _ in range(qty):
@@ -428,7 +432,11 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             res_msg = f"📄 **الطلب #{txt}**\n📅 {order['date']}\n⬇️ العناصر:\n{items_str}"
         else:
             res_msg = "❌ الطلب غير موجود أو يخص شخصاً آخر."
-        btns = [[InlineKeyboardButton("🔍 بحث عن طلب آخر", callback_data="check_order_id")], [InlineKeyboardButton("📂 العودة للأرشيف", callback_data="my_history")]]
+        
+        btns = [
+            [InlineKeyboardButton("🔍 بحث عن طلب آخر", callback_data="check_order_id")],
+            [InlineKeyboardButton("📂 العودة للأرشيف", callback_data="my_history")]
+        ]
         context.user_data.clear()
         return await update.message.reply_text(f"{res_msg}\n\n❓ **ماذا تريد أن تفعل الآن؟**", reply_markup=InlineKeyboardMarkup(btns), parse_mode=ParseMode.MARKDOWN)
 
@@ -436,13 +444,17 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not txt.isdigit(): return await update.message.reply_text("❌ أرسل رقم صحيح.", reply_markup=back_btn())
         order = await db.orders.find_one({"_id": int(txt)})
         
-        if not order or (order["user_id"] != uid and user["role"] != "admin"): return await update.message.reply_text("❌ الطلب غير موجود أو لا تملك صلاحية.", reply_markup=back_btn())
-        if "PUBG Stock" not in order["type"]: return await update.message.reply_text("❌ لا يمكن إرجاع هذا النوع من الطلبات.", reply_markup=back_btn())
+        if not order or (order["user_id"] != uid and user["role"] != "admin"):
+            return await update.message.reply_text("❌ الطلب غير موجود أو لا تملك صلاحية.", reply_markup=back_btn())
+        if "PUBG Stock" not in order["type"]:
+            return await update.message.reply_text("❌ لا يمكن إرجاع هذا النوع من الطلبات.", reply_markup=back_btn())
             
         order_time = datetime.strptime(order['date'], "%Y-%m-%d %H:%M:%S")
-        if (datetime.now() - order_time).total_seconds() > 900 and user["role"] != "admin": return await update.message.reply_text("⏳ **انتهت مهلة الإرجاع (15 دقيقة).**", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
+        if (datetime.now() - order_time).total_seconds() > 900 and user["role"] != "admin":
+            return await update.message.reply_text("⏳ **انتهت مهلة الإرجاع (15 دقيقة).**", reply_markup=back_btn(), parse_mode=ParseMode.MARKDOWN)
             
         cat = order["type"].split("(")[1].split(" ")[0]
+        # حذف بناءً على رقم الطلب والكود معاً لعدم مسح تاريخ السحبات الأخرى
         codes_to_return = [{"code": code, "category": cat, "added_at": datetime.now()} for code in order["items"]]
         
         await db.stock.insert_many(codes_to_return, ordered=False) 
@@ -459,7 +471,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         cat = context.user_data.get("target_pull_cat")
         context.user_data.clear() 
         
-        if await db.stock.count_documents({"category": cat}) < count: return await update.message.reply_text("⚠️ الكمية غير كافية!", reply_markup=back_btn())
+        if await db.stock.count_documents({"category": cat}) < count:
+            return await update.message.reply_text("⚠️ الكمية غير كافية!", reply_markup=back_btn())
 
         order_id = await get_next_order_id()
         pulled_codes = []
@@ -468,7 +481,14 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if c:
                 code_str = str(c.get("code") or c["_id"])
                 pulled_codes.append(code_str)
-                await db.codes_map.insert_one({"code": code_str, "name": user["name"], "user_id": uid, "time": datetime.now().strftime("%Y-%m-%d %H:%M"), "order_id": order_id})
+                # تسجيل جديد بدون التقيد بـ _id للسماح بسحب الكود المكرر في طلبات مختلفة
+                await db.codes_map.insert_one({
+                    "code": code_str, 
+                    "name": user["name"], 
+                    "user_id": uid, 
+                    "time": datetime.now().strftime("%Y-%m-%d %H:%M"), 
+                    "order_id": order_id
+                })
 
         if pulled_codes:
             await db.orders.insert_one({"_id": order_id, "type": f"PUBG Stock ({cat} UC)", "user": user["name"], "user_id": uid, "items": pulled_codes, "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
@@ -477,7 +497,10 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             individual = "\n".join([f"🎮 <code>{c}</code>" for c in pulled_codes])
             bulk = "\n".join(pulled_codes)
             
-            msg = f"✅ **تم سحب {cat} UC بنجاح!** (طلب #{order_id})\n\n🎯 **نسخ كود بكود:**\n{individual}\n\n📋 **نسخ الكل دفعة واحدة:**\n<code>{bulk}</code>"
+            msg = f"✅ **تم سحب {cat} UC بنجاح!** (طلب #{order_id})\n\n"
+            msg += f"🎯 **نسخ كود بكود:**\n{individual}\n\n"
+            msg += f"📋 **نسخ الكل دفعة واحدة:**\n<code>{bulk}</code>"
+            
             return await update.message.reply_text(msg, parse_mode=ParseMode.HTML, reply_markup=success_pull_keyboard(f"pull_cat_{cat}"))
 
     elif state == "waiting_api_count":
@@ -485,6 +508,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         qty = int(txt)
         context.user_data.clear()
         context.user_data["last_api_count"] = qty
+        
         await process_api_pull(uid, update.message.reply_text, user, qty, context)
         return
 
@@ -543,6 +567,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("❌ غير موجود.", reply_markup=admin_back_btn())
         context.user_data.clear()
 
+    # 🆕 نظام البحث العكسي المتطور للكشف عن تاريخ الكود بالكامل
     elif state == "waiting_reverse_code" and uid == ADMIN_ID:
         records = await db.codes_map.find({"$or": [{"_id": txt}, {"code": txt}]}).to_list(None)
         in_stock = await db.stock.count_documents({"$or": [{"_id": txt}, {"code": txt}]})
@@ -551,15 +576,23 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ الكود غير موجود في النظام نهائياً.", reply_markup=admin_back_btn())
         else:
             msg = f"🔍 **نتيجة البحث عن الكود:**\n`{txt}`\n\n"
-            if in_stock > 0: msg += f"📦 **موجود حالياً في المخزن** (عدد المرات: {in_stock})\n\n"
+            if in_stock > 0:
+                msg += f"📦 **موجود حالياً في المخزن** (عدد المرات: {in_stock})\n\n"
+            
             if records:
                 msg += f"🛒 **سجل السحوبات ({len(records)} مرات سحب):**\n"
                 for i, r in enumerate(records, 1):
-                    msg += f"--- السحبة #{i} ---\n👤 بواسطة: {r['name']}\n📅 الوقت: {r['time']}\n📦 رقم الطلب: #{r.get('order_id')}\n\n"
-            else: msg += "لم يتم سحبه حتى الآن.\n"
+                    msg += f"--- السحبة #{i} ---\n"
+                    msg += f"👤 بواسطة: {r['name']}\n"
+                    msg += f"📅 الوقت: {r['time']}\n"
+                    msg += f"📦 رقم الطلب: #{r.get('order_id')}\n\n"
+            else:
+                msg += "لم يتم سحبه حتى الآن.\n"
+                
             await update.message.reply_text(msg, reply_markup=admin_back_btn())
         context.user_data.clear()
 
+    # 🆕 إضافة الأكواد بشكل يدوي مع الفلترة الذكية
     elif state == "adding_stock_manual" and uid == ADMIN_ID:
         lines = [c.strip() for c in txt.splitlines() if c.strip()]
         cat = context.user_data.get("target_cat")
@@ -569,11 +602,20 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             context.user_data["pending_stock"] = {"all": all_codes, "new": new_codes, "dupes": dupes, "cat": cat} 
             
-            btns = [[InlineKeyboardButton("✅ إضافة الكل (حتى المكرر)", callback_data="confirm_add_all")], [InlineKeyboardButton("✨ إضافة الجديد فقط", callback_data="confirm_add_new")]]
-            if dupes: btns.append([InlineKeyboardButton("👁️ عرض الأكواد المكررة", callback_data="show_dupes_list")])
+            btns = [
+                [InlineKeyboardButton("✅ إضافة الكل (حتى المكرر)", callback_data="confirm_add_all")],
+                [InlineKeyboardButton("✨ إضافة الجديد فقط", callback_data="confirm_add_new")]
+            ]
+            if dupes:
+                btns.append([InlineKeyboardButton("👁️ عرض الأكواد المكررة", callback_data="show_dupes_list")])
             btns.append([InlineKeyboardButton("❌ إلغاء", callback_data="cancel_add_stock")])
             
-            msg = f"📊 **تقرير الأكواد المدخلة:**\n\nإجمالي الأكواد: {len(all_codes)}\n✅ أكواد جديدة: {len(new_codes)}\n⚠️ أكواد مكررة/مسحوبة: {len(dupes)}\n\n❓ ماذا تريد أن تفعل؟"
+            msg = f"📊 **تقرير الأكواد المدخلة:**\n\n"
+            msg += f"إجمالي الأكواد: {len(all_codes)}\n"
+            msg += f"✅ أكواد جديدة: {len(new_codes)}\n"
+            msg += f"⚠️ أكواد مكررة/مسحوبة: {len(dupes)}\n\n"
+            msg += "❓ ماذا تريد أن تفعل؟"
+            
             return await waiting_msg.edit_text(msg, reply_markup=InlineKeyboardMarkup(btns))
 
 async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -584,9 +626,11 @@ async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if uid == ADMIN_ID and state == "admin_uploading_file":
         doc = update.message.document
         if not doc.file_name.endswith(".txt"): return
+        
         await log_activity(uid, user["name"], f"رفع ملف أكواد: {doc.file_name}")
         
         waiting_msg = await update.message.reply_text("⏳ **جاري تحميل وفحص الملف...**", parse_mode=ParseMode.MARKDOWN)
+        
         file = await doc.get_file()
         content = await file.download_as_bytearray()
         lines = [c.strip() for c in content.decode("utf-8", errors="ignore").splitlines() if c.strip()]
@@ -594,11 +638,21 @@ async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if cat and lines:
             new_codes, dupes, all_codes = await analyze_codes(lines)
+            
             context.user_data["pending_stock"] = {"all": all_codes, "new": new_codes, "dupes": dupes, "cat": cat} 
             
-            btns = [[InlineKeyboardButton("✅ استيراد الكل (حتى المكرر)", callback_data="confirm_add_all")], [InlineKeyboardButton("✨ استيراد الجديد فقط", callback_data="confirm_add_new")]]
-            if dupes: btns.append([InlineKeyboardButton("👁️ عرض الأكواد المكررة", callback_data="show_dupes_list")])
+            btns = [
+                [InlineKeyboardButton("✅ استيراد الكل (حتى المكرر)", callback_data="confirm_add_all")],
+                [InlineKeyboardButton("✨ استيراد الجديد فقط", callback_data="confirm_add_new")]
+            ]
+            if dupes:
+                btns.append([InlineKeyboardButton("👁️ عرض الأكواد المكررة", callback_data="show_dupes_list")])
             btns.append([InlineKeyboardButton("❌ إلغاء", callback_data="cancel_add_stock")])
             
-            msg = f"📂 **تقرير ملف الأكواد:**\n\nإجمالي الأكواد: {len(all_codes)}\n✅ أكواد جديدة: {len(new_codes)}\n⚠️ أكواد مكررة/مسحوبة: {len(dupes)}\n\n❓ ماذا تريد أن تفعل؟"
+            msg = f"📂 **تقرير ملف الأكواد:**\n\n"
+            msg += f"إجمالي الأكواد: {len(all_codes)}\n"
+            msg += f"✅ أكواد جديدة: {len(new_codes)}\n"
+            msg += f"⚠️ أكواد مكررة/مسحوبة: {len(dupes)}\n\n"
+            msg += "❓ ماذا تريد أن تفعل؟"
+            
             await waiting_msg.edit_text(msg, reply_markup=InlineKeyboardMarkup(btns))
