@@ -1,4 +1,5 @@
 import os
+import re
 from fastapi import FastAPI, Request, Form, Response, status
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -8,12 +9,10 @@ from datetime import datetime, timedelta
 
 app = FastAPI(title="Saleh Zone Dashboard")
 
-# إعداد المجلدات الثابتة والقوالب
 os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-# الاتصال بقاعدة البيانات
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb+srv://abosalehlt_db_user:7_RvkParzvUeC_v@abosaleh.yhuwfdt.mongodb.net/?appName=abosaleh")
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
 db = client["salehzon_db"]
@@ -31,15 +30,13 @@ async def web_log(action, details=""):
         "details": details, "time": datetime.now().strftime('%Y-%m-%d %H:%M'), "timestamp": datetime.now()
     })
 
-# 🧠 الفلتر الذكي لاستخراج التوكنات (نفس الموجود في التليجرام)
 def clean_and_extract_tokens(raw_text):
     valid_tokens = []
     for line in raw_text.splitlines():
         line = line.strip()
-        if not line or "===" in line or "↓↓" in line or "Заказ" in line: 
-            continue
-        token = line.split(";")[0].strip()
-        if len(token) > 15 and "http" not in token and " " not in token:
+        if not line: continue
+        token = re.split(r'[;:\s\|]', line)[0].strip()
+        if len(token) > 15 and re.match(r'^[A-Za-z0-9\-_]+$', token):
             valid_tokens.append(token)
     return valid_tokens
 
@@ -121,8 +118,6 @@ async def dashboard(request: Request):
         "tracked_users": tracked_users
     })
 
-# --- APIs للتحكم المتقدم (جميع ميزات التليجرام) ---
-
 @app.post("/api/toggle_maintenance")
 async def toggle_maint(request: Request):
     if not check_auth(request): return {"status": "error"}
@@ -135,7 +130,6 @@ async def toggle_maint(request: Request):
 @app.post("/api/add_stock_smart")
 async def api_add_stock_smart(request: Request, category: str = Form(...), codes: str = Form(...)):
     if not check_auth(request): return JSONResponse({"error": "unauth"}, status_code=401)
-    
     lines = [c.strip() for c in codes.splitlines() if c.strip()]
     if not lines: return JSONResponse({"error": "لا توجد أكواد للرفع"})
 
@@ -148,7 +142,6 @@ async def api_add_stock_smart(request: Request, category: str = Form(...), codes
             
     in_stock = await db.stock.find({"$or": [{"_id": {"$in": unique_input}}, {"code": {"$in": unique_input}}]}).to_list(None)
     in_map = await db.codes_map.find({"$or": [{"_id": {"$in": unique_input}}, {"code": {"$in": unique_input}}]}).to_list(None)
-    
     db_dupes = set([str(x.get("code") or x.get("_id")) for x in in_stock + in_map])
     
     new_codes, db_dupes_list = [], []
@@ -157,19 +150,12 @@ async def api_add_stock_smart(request: Request, category: str = Form(...), codes
         else: new_codes.append(c)
             
     all_dupes = dupes_in_input + db_dupes_list
-    
     if new_codes:
         docs = [{"code": c, "category": category, "added_at": datetime.now()} for c in new_codes]
         await db.stock.insert_many(docs, ordered=False)
         await web_log(f"إضافة ذكية للمخزن ({category} UC)", f"تم إضافة {len(new_codes)} كود جديد.")
 
-    return JSONResponse({
-        "success": True,
-        "total": len(lines),
-        "added": len(new_codes),
-        "dupes": len(all_dupes),
-        "dupes_list": all_dupes
-    })
+    return JSONResponse({"success": True, "total": len(lines), "added": len(new_codes), "dupes": len(all_dupes), "dupes_list": all_dupes})
 
 @app.get("/api/view_stock/{category}")
 async def api_view_stock(category: str, request: Request):
@@ -177,6 +163,14 @@ async def api_view_stock(category: str, request: Request):
     codes_docs = await db.stock.find({"category": category}).to_list(None)
     codes_list = [str(c.get("code") or c.get("_id")) for c in codes_docs]
     return JSONResponse({"category": category, "codes": codes_list})
+
+# 👁️ جلب التوكنات المشتركة للعرض في الويب
+@app.get("/api/view_shared_tokens")
+async def api_view_shared_tokens(request: Request):
+    if not check_auth(request): return JSONResponse({"error": "unauth"}, status_code=401)
+    shared_doc = await db.settings.find_one({"_id": "shared_tokens"})
+    tokens = shared_doc.get("tokens", []) if shared_doc else []
+    return JSONResponse({"tokens": tokens})
 
 @app.post("/api/clear_stock")
 async def api_clear_stock(request: Request, category: str = Form(...)):
@@ -188,10 +182,10 @@ async def api_clear_stock(request: Request, category: str = Form(...)):
 @app.post("/api/add_shared_tokens")
 async def api_add_shared(request: Request, tokens: str = Form(...)):
     if not check_auth(request): return RedirectResponse("/login")
-    extracted_tokens = clean_and_extract_tokens(tokens) # استخدام الفلتر الذكي
+    extracted_tokens = clean_and_extract_tokens(tokens)
     if extracted_tokens: 
         await db.settings.update_one({"_id": "shared_tokens"}, {"$push": {"tokens": {"$each": extracted_tokens}}}, upsert=True)
-        await web_log(f"تمت إضافة {len(extracted_tokens)} توكنات مشتركة")
+        await web_log(f"إضافة ذكية: تم إضافة {len(extracted_tokens)} توكن مشترك")
     return RedirectResponse(url="/?tab=users", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/clear_shared_tokens")
@@ -204,10 +198,10 @@ async def api_clear_shared(request: Request):
 @app.post("/api/add_user_tokens")
 async def api_add_user_tokens(request: Request, user_id: int = Form(...), tokens: str = Form(...)):
     if not check_auth(request): return RedirectResponse("/login")
-    extracted_tokens = clean_and_extract_tokens(tokens) # استخدام الفلتر الذكي
+    extracted_tokens = clean_and_extract_tokens(tokens)
     if extracted_tokens: 
         await db.users.update_one({"_id": user_id}, {"$push": {"tokens": {"$each": extracted_tokens}}})
-        await web_log(f"إضافة {len(extracted_tokens)} توكن للمستخدم {user_id}")
+        await web_log(f"إضافة ذكية: تم إضافة {len(extracted_tokens)} توكن للمستخدم {user_id}")
     return RedirectResponse(url="/?tab=users", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/add_user")
