@@ -1,190 +1,203 @@
-import os
-from fastapi import FastAPI, Request, Form, Response, status
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-import motor.motor_asyncio
-from datetime import datetime
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saleh Zone - Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>tailwind.config={theme:{extend:{colors:{szgreen:'#7dfc89',szcyan:'#5eead4',darkbg:'#050505',panelbg:'#111'}}}}</script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #050505; } ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+        .nav-active { background: linear-gradient(90deg, rgba(125,252,137,0.1) 0%, transparent 100%); border-left: 3px solid #7dfc89; color: #7dfc89; }
+    </style>
+</head>
+<body class="bg-darkbg text-gray-300 font-sans flex h-screen overflow-hidden selection:bg-szgreen selection:text-black">
 
-app = FastAPI(title="Saleh Zone Dashboard")
+    <aside class="w-64 bg-panelbg border-r border-gray-900 flex flex-col justify-between hidden md:flex">
+        <div>
+            <div class="h-20 flex items-center px-6 border-b border-gray-900">
+                <img src="/static/logo.png" alt="9S" class="h-10 mr-3 drop-shadow-[0_0_8px_rgba(125,252,137,0.5)]">
+                <span class="text-xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan">SALEH ZONE</span>
+            </div>
+            <nav class="mt-6 flex flex-col gap-1 px-3">
+                <button onclick="switchTab('overview')" id="btn-overview" class="nav-active text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-chart-pie w-6"></i> Overview & Logs</button>
+                <button onclick="switchTab('stock')" id="btn-stock" class="text-gray-500 text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-box-open w-6"></i> Stock Manage</button>
+                <button onclick="switchTab('users')" id="btn-users" class="text-gray-500 text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-users w-6"></i> Users & Tokens</button>
+                <button onclick="switchTab('tools')" id="btn-tools" class="text-gray-500 text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-tools w-6"></i> Advanced Tools</button>
+            </nav>
+        </div>
+        <div class="p-4 border-t border-gray-900">
+            <a href="/logout" class="block text-center bg-gray-900 hover:bg-red-900/50 hover:text-red-400 text-gray-500 py-2 rounded-lg text-sm font-bold transition border border-gray-800"><i class="fas fa-power-off mr-2"></i> LOGOUT</a>
+        </div>
+    </aside>
 
-os.makedirs("static", exist_ok=True)
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
-
-MONGO_URI = os.environ.get("MONGO_URI", "mongodb+srv://abosalehlt_db_user:7_RvkParzvUeC_v@abosaleh.yhuwfdt.mongodb.net/?appName=abosaleh")
-client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
-db = client["salehzon_db"]
-
-ADMIN_USERNAME = os.environ.get("ADMIN_USER", "admin")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASS", "123456")
-SECRET_TOKEN = "salehzon_secure_2026"
-
-def check_auth(request: Request):
-    return request.cookies.get("admin_session") == SECRET_TOKEN
-
-async def web_log(action, details=""):
-    """تسجيل العمليات التي تتم من لوحة التحكم لتظهر في السجلات"""
-    await db.system_logs.insert_one({
-        "user_id": "WEB_ADMIN", "name": "Admin Dashboard", "action": action,
-        "details": details, "time": datetime.now().strftime('%Y-%m-%d %H:%M'), "timestamp": datetime.now()
-    })
-
-@app.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request, "error": None})
-
-@app.post("/login")
-async def do_login(response: Response, username: str = Form(...), password: str = Form(...)):
-    if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-        resp = RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
-        resp.set_cookie(key="admin_session", value=SECRET_TOKEN, httponly=True)
-        return resp
-    return RedirectResponse(url="/login?error=1", status_code=status.HTTP_302_FOUND)
-
-@app.get("/logout")
-async def logout():
-    resp = RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
-    resp.delete_cookie("admin_session")
-    return resp
-
-@app.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request):
-    if not check_auth(request): return RedirectResponse(url="/login")
-    
-    users_count = await db.users.count_documents({})
-    stock_count = await db.stock.count_documents({})
-    orders_count = await db.orders.count_documents({})
-    cached_count = await db.cached_accounts.count_documents({})
-    
-    logs = await db.system_logs.find().sort("timestamp", -1).to_list(length=100)
-    all_users = await db.users.find().sort("_id", -1).to_list(length=50)
-    
-    categories = ["60", "325", "660", "1800", "3850", "8100"]
-    stock_details = {cat: await db.stock.count_documents({"category": cat}) for cat in categories}
+    <main class="flex-1 flex flex-col h-screen overflow-y-auto p-6 md:p-10">
         
-    settings = await db.settings.find_one({"_id": "config"})
-    maintenance = settings.get("maintenance", False) if settings else False
+        <div id="tab-overview" class="tab-content block">
+            <h2 class="text-2xl font-bold text-white mb-6">System <span class="text-szgreen">Overview</span></h2>
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div class="bg-panelbg border border-gray-800 p-5 rounded-xl"><div class="text-gray-500 text-xs font-bold uppercase">Total Users</div><div class="text-3xl font-black text-white">{{ users_count }}</div></div>
+                <div class="bg-panelbg border border-gray-800 p-5 rounded-xl"><div class="text-szgreen text-xs font-bold uppercase">UC Stock</div><div class="text-3xl font-black text-white">{{ stock_count }}</div></div>
+                <div class="bg-panelbg border border-gray-800 p-5 rounded-xl"><div class="text-szcyan text-xs font-bold uppercase">Shared Tokens</div><div class="text-3xl font-black text-white">{{ shared_tokens_count }}</div></div>
+                <div class="bg-panelbg border border-gray-800 p-5 rounded-xl"><div class="text-gray-500 text-xs font-bold uppercase">Orders Processed</div><div class="text-3xl font-black text-white">{{ orders_count }}</div></div>
+            </div>
+            
+            <div class="bg-black border border-gray-800 rounded-xl p-6 relative overflow-hidden">
+                <h3 class="text-white font-bold mb-4 uppercase text-xs tracking-widest text-szcyan"><i class="fas fa-terminal mr-2"></i> Live System Logs</h3>
+                <div class="h-64 overflow-y-auto font-mono text-xs space-y-2 pb-10">
+                    {% for log in logs %}
+                    <div class="border-l-2 border-szgreen pl-3 py-1 bg-white/5">
+                        <span class="text-gray-500">[{{ log.time }}]</span> <span class="text-szcyan">{{ log.name }}:</span> <span class="text-gray-300">{{ log.action }}</span>
+                    </div>
+                    {% else %}
+                    <p class="text-gray-500">Waiting for system activity...</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
 
-    shared_doc = await db.settings.find_one({"_id": "shared_tokens"})
-    shared_tokens_count = len(shared_doc.get("tokens", [])) if shared_doc else 0
+        <div id="tab-users" class="tab-content hidden">
+            <h2 class="text-2xl font-bold text-white mb-6">Users & <span class="text-szcyan">Tokens Pool</span></h2>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                <div class="bg-panelbg border border-gray-800 p-6 rounded-xl lg:col-span-1">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-white uppercase text-sm text-szcyan"><i class="fas fa-users mr-2"></i> Shared Tokens</h3>
+                        <form action="/api/clear_shared_tokens" method="POST"><button class="text-red-500 text-xs"><i class="fas fa-trash"></i> Clear</button></form>
+                    </div>
+                    <p class="text-xs text-gray-500 mb-4">Available for Employees automatically when personal tokens run out. (Count: {{ shared_tokens_count }})</p>
+                    <form action="/api/add_shared_tokens" method="POST">
+                        <textarea name="tokens" rows="4" class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg mb-3 text-xs font-mono" placeholder="Paste shared tokens..."></textarea>
+                        <button class="w-full bg-szcyan text-black font-bold py-2 rounded-lg">Add to Shared Pool</button>
+                    </form>
+                </div>
+                
+                <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden lg:col-span-2">
+                    <div class="px-6 py-4 border-b border-gray-800"><h3 class="font-bold text-white uppercase text-sm">User Personal Tokens</h3></div>
+                    <div class="overflow-x-auto h-80 overflow-y-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-[#151515] text-gray-500 sticky top-0"><tr><th class="px-4 py-3">ID / Name</th><th class="px-4 py-3">Role</th><th class="px-4 py-3">Add Tokens</th></tr></thead>
+                            <tbody class="divide-y divide-gray-900">
+                                {% for u in all_users %}
+                                <tr class="hover:bg-gray-900/50">
+                                    <td class="px-4 py-3">
+                                        <div class="font-bold text-white">{{ u.name }}</div>
+                                        <div class="text-xs text-gray-500">{{ u._id }} | Tokens: {{ u.tokens|length }}</div>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <form action="/api/user_action" method="POST">
+                                            <input type="hidden" name="user_id" value="{{ u._id }}">
+                                            <input type="hidden" name="action" value="toggle_role">
+                                            <button class="px-2 py-1 rounded text-xs {% if u.role == 'admin' %}bg-red-900 text-red-300{% elif u.role == 'employee' %}bg-szcyan/20 text-szcyan{% else %}bg-gray-800 text-gray-400{% endif %} hover:opacity-75">{{ u.role }}</button>
+                                        </form>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <form action="/api/add_user_tokens" method="POST" class="flex gap-2">
+                                            <input type="hidden" name="user_id" value="{{ u._id }}">
+                                            <input type="text" name="tokens" placeholder="Token..." required class="w-full bg-black border border-gray-700 text-white px-2 py-1 rounded text-xs focus:border-szgreen outline-none">
+                                            <button class="bg-gray-800 text-white px-3 py-1 rounded hover:bg-szgreen hover:text-black transition">+</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    return templates.TemplateResponse("index.html", {
-        "request": request, "users_count": users_count, "stock_count": stock_count,
-        "orders_count": orders_count, "cached_count": cached_count,
-        "logs": logs, "all_users": all_users, "stock_details": stock_details,
-        "maintenance": maintenance, "shared_tokens_count": shared_tokens_count
-    })
+        <div id="tab-tools" class="tab-content hidden">
+            <h2 class="text-2xl font-bold text-white mb-6">Advanced <span class="text-szgreen">Tools</span></h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-panelbg border border-gray-800 p-6 rounded-xl">
+                    <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-search text-szgreen mr-2"></i> Global Search</h3>
+                    <div class="flex gap-2 mb-4">
+                        <input type="text" id="search-input" placeholder="Order ID, User ID, or UC Code..." class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-szgreen">
+                        <button onclick="performSearch()" class="bg-szgreen text-black font-bold px-6 rounded-lg hover:bg-white"><i class="fas fa-search"></i></button>
+                    </div>
+                    <div id="search-result" class="bg-black border border-gray-800 rounded-lg p-4 text-sm font-mono text-szcyan whitespace-pre-wrap hidden"></div>
+                </div>
 
-# ----------------- APIs للميزات المتكاملة -----------------
+                <div class="bg-panelbg border border-gray-800 p-6 rounded-xl flex flex-col justify-center items-center text-center">
+                    <i class="fas fa-hammer text-4xl mb-4 {% if maintenance %}text-red-500{% else %}text-gray-600{% endif %}"></i>
+                    <h3 class="font-bold text-white uppercase text-lg mb-2">Bot Maintenance</h3>
+                    <p class="text-sm text-gray-500 mb-6">Lock the bot for all users except admins.</p>
+                    <button onclick="toggleMaintenance()" class="py-3 px-8 rounded-lg font-bold transition {% if maintenance %}bg-red-900 text-red-300 border border-red-900{% else %}bg-gray-800 text-white hover:bg-szgreen hover:text-black{% endif %}">
+                        {% if maintenance %}TURN MAINTENANCE OFF{% else %}TURN MAINTENANCE ON{% endif %}
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="tab-stock" class="tab-content hidden">
+            <h2 class="text-2xl font-bold text-white mb-6">Stock <span class="text-szcyan">Management</span></h2>
+            <div class="grid grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
+                {% for cat, count in stock_details.items() %}
+                <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center">
+                    <div class="text-xl font-black text-white mb-1">{{ cat }}</div>
+                    <div class="text-xs text-gray-500 uppercase">Count: <span class="text-szgreen">{{ count }}</span></div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="bg-panelbg border border-gray-800 rounded-xl p-6 max-w-2xl">
+                <form action="/api/add_stock" method="POST">
+                    <select name="category" class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-szcyan mb-4">
+                        <option value="60">60 UC</option><option value="325">325 UC</option>
+                        <option value="660">660 UC</option><option value="1800">1800 UC</option>
+                        <option value="3850">3850 UC</option><option value="8100">8100 UC</option>
+                    </select>
+                    <textarea name="codes" rows="5" class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-szcyan font-mono text-sm mb-4" placeholder="Paste codes here..."></textarea>
+                    <button class="bg-szgreen text-black font-bold py-2 px-6 rounded-lg w-full">Add Stock</button>
+                </form>
+            </div>
+        </div>
 
-@app.post("/api/toggle_maintenance")
-async def toggle_maint(request: Request):
-    if not check_auth(request): return {"status": "error"}
-    current = await db.settings.find_one({"_id": "config"})
-    new_state = not current.get("maintenance", False) if current else True
-    await db.settings.update_one({"_id": "config"}, {"$set": {"maintenance": new_state}}, upsert=True)
-    await web_log(f"تغيير وضع الصيانة إلى: {'تشغيل' if new_state else 'إيقاف'}")
-    return {"status": "success"}
+    </main>
 
-@app.post("/api/add_stock")
-async def api_add_stock(request: Request, category: str = Form(...), codes: str = Form(...)):
-    if not check_auth(request): return RedirectResponse("/login")
-    lines = [c.strip() for c in codes.splitlines() if c.strip()]
-    docs = [{"code": c, "category": category, "added_at": datetime.now()} for c in lines]
-    if docs: 
-        await db.stock.insert_many(docs, ordered=False)
-        await web_log(f"إضافة مخزن: {len(docs)} كود لفئة {category}")
-    return RedirectResponse(url="/?tab=stock", status_code=status.HTTP_302_FOUND)
+    <script>
+      
+        function switchTab(tabId) {
+            
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+            
+          
+            document.querySelectorAll('[id^="btn-"]').forEach(el => { 
+                el.classList.remove('nav-active', 'text-white'); 
+                el.classList.add('text-gray-500'); 
+            });
+            document.getElementById('btn-' + tabId).classList.add('nav-active', 'text-white');
+            document.getElementById('btn-' + tabId).classList.remove('text-gray-500');
 
-@app.post("/api/clear_stock")
-async def api_clear_stock(request: Request, category: str = Form(...)):
-    if not check_auth(request): return RedirectResponse("/login")
-    await db.stock.delete_many({"category": category})
-    return RedirectResponse(url="/?tab=stock", status_code=status.HTTP_302_FOUND)
+            
+            window.history.pushState({}, '', '/?tab=' + tabId);
+        }
+        
+        document.addEventListener("DOMContentLoaded", () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const tab = urlParams.get('tab') || 'overview';
+            switchTab(tab);
+        });
 
-@app.post("/api/add_shared_tokens")
-async def api_add_shared(request: Request, tokens: str = Form(...)):
-    if not check_auth(request): return RedirectResponse("/login")
-    lines = [t.strip() for t in tokens.splitlines() if t.strip()]
-    if lines: 
-        await db.settings.update_one({"_id": "shared_tokens"}, {"$push": {"tokens": {"$each": lines}}}, upsert=True)
-        await web_log(f"تمت إضافة {len(lines)} توكنات مشتركة")
-    return RedirectResponse(url="/?tab=users", status_code=status.HTTP_302_FOUND)
+        async function toggleMaintenance() {
+            await fetch('/api/toggle_maintenance', {method: 'POST'});
+            location.reload();
+        }
 
-@app.post("/api/clear_shared_tokens")
-async def api_clear_shared(request: Request):
-    if not check_auth(request): return RedirectResponse("/login")
-    await db.settings.update_one({"_id": "shared_tokens"}, {"$set": {"tokens": []}}, upsert=True)
-    await web_log("تصفير جميع التوكنات المشتركة")
-    return RedirectResponse(url="/?tab=users", status_code=status.HTTP_302_FOUND)
-
-@app.post("/api/add_user_tokens")
-async def api_add_user_tokens(request: Request, user_id: int = Form(...), tokens: str = Form(...)):
-    if not check_auth(request): return RedirectResponse("/login")
-    lines = [t.strip() for t in tokens.splitlines() if t.strip()]
-    if lines: 
-        await db.users.update_one({"_id": user_id}, {"$push": {"tokens": {"$each": lines}}})
-        await web_log(f"إضافة {len(lines)} توكن شخصي للمستخدم {user_id}")
-    return RedirectResponse(url="/?tab=users", status_code=status.HTTP_302_FOUND)
-
-@app.post("/api/add_user")
-async def api_add_user(request: Request, user_id: int = Form(...), name: str = Form(...), role: str = Form(...)):
-    if not check_auth(request): return RedirectResponse("/login")
-    if not await db.users.find_one({"_id": user_id}):
-        await db.users.insert_one({"_id": user_id, "role": role, "name": name, "tokens": [], "history": [], "logs": [], "token_logs": [], "stats": {"api": 0, "stock": 0}})
-    return RedirectResponse(url="/?tab=users", status_code=status.HTTP_302_FOUND)
-
-@app.post("/api/user_action")
-async def api_user_action(request: Request, user_id: int = Form(...), action: str = Form(...)):
-    if not check_auth(request): return RedirectResponse("/login")
-    if action == "delete": await db.users.delete_one({"_id": user_id})
-    elif action == "clear_tokens": await db.users.update_one({"_id": user_id}, {"$set": {"tokens": []}})
-    elif action == "toggle_role":
-        u = await db.users.find_one({"_id": user_id})
-        nr = "employee" if u.get("role") == "user" else "user"
-        await db.users.update_one({"_id": user_id}, {"$set": {"role": nr}})
-        await web_log(f"تعديل رتبة المستخدم {user_id} إلى {nr}")
-    elif action == "clear_logs":
-        await db.users.update_one({"_id": user_id}, {"$set": {"logs": [], "history": [], "token_logs": []}})
-    return RedirectResponse(url="/?tab=users", status_code=status.HTTP_302_FOUND)
-
-@app.post("/api/tracked_users")
-async def api_tracked_users(request: Request, user_id: int = Form(...), action: str = Form(...)):
-    if not check_auth(request): return RedirectResponse("/login")
-    if action == "add": await db.settings.update_one({"_id": "cache_config"}, {"$addToSet": {"tracked_users": user_id}}, upsert=True)
-    elif action == "remove": await db.settings.update_one({"_id": "cache_config"}, {"$pull": {"tracked_users": user_id}}, upsert=True)
-    return RedirectResponse(url="/?tab=tools", status_code=status.HTTP_302_FOUND)
-
-@app.post("/api/return_order")
-async def api_return_order(request: Request, order_id: int = Form(...)):
-    if not check_auth(request): return RedirectResponse("/login")
-    order = await db.orders.find_one({"_id": order_id})
-    if order and "PUBG Stock" in order.get("type", ""):
-        cat = order["type"].split("(")[1].split(" ")[0]
-        codes_to_return = [{"code": c, "category": cat, "added_at": datetime.now()} for c in order["items"]]
-        await db.stock.insert_many(codes_to_return, ordered=False)
-        await db.codes_map.delete_many({"$or": [{"_id": {"$in": order["items"]}}, {"code": {"$in": order["items"]}}], "order_id": order_id})
-        await db.orders.delete_one({"_id": order_id})
-        await db.users.update_one({"_id": order["user_id"]}, {"$inc": {"stats.stock": -len(order["items"])}})
-    return RedirectResponse(url="/?tab=tools", status_code=status.HTTP_302_FOUND)
-
-@app.post("/api/search")
-async def api_search(request: Request):
-    if not check_auth(request): return JSONResponse({"error": "unauth"})
-    form = await request.form()
-    query = form.get("query", "").strip()
-    if not query: return JSONResponse({"result": "❌ أرسل نصاً للبحث"})
-    
-    if query.isdigit():
-        order = await db.orders.find_one({"_id": int(query)})
-        if order: return JSONResponse({"result": f"📄 طلب #{query} | المستلم: {order['user']} | الأكواد: {len(order['items'])}"})
-        user = await db.users.find_one({"_id": int(query)})
-        if user: return JSONResponse({"result": f"👤 {user.get('name')} | الرتبة: {user.get('role')} | التوكنات: {len(user.get('tokens',[]))}"})
-
-    records = await db.codes_map.find({"$or": [{"_id": query}, {"code": query}]}).to_list(length=5)
-    in_stock = await db.stock.count_documents({"$or": [{"_id": query}, {"code": query}]})
-    res_str = f"🔍 الكود: {query}\n📦 متوفر بالمخزن: {in_stock}\n"
-    if records:
-        res_str += f"🛒 تم سحبه {len(records)} مرات (بواسطة: {', '.join([r['name'] for r in records])})"
-    return JSONResponse({"result": res_str})
+        async function performSearch() {
+            const query = document.getElementById('search-input').value;
+            if(!query) return;
+            const resBox = document.getElementById('search-result');
+            const fd = new FormData(); fd.append("query", query);
+            const res = await fetch('/api/search', {method: 'POST', body: fd});
+            const data = await res.json();
+            resBox.classList.remove('hidden');
+            resBox.innerText = data.result;
+        }
+    </script>
+</body>
+</html>
