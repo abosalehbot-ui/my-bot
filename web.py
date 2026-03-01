@@ -1,88 +1,155 @@
 import os
-from fastapi import FastAPI, Depends, Request, Form, Response, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, Request, Form, Response, status
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import motor.motor_asyncio
 from datetime import datetime
 
-app = FastAPI(title="SalehZone Dashboard")
+app = FastAPI(title="Saleh Zone Dashboard")
 
-# تفعيل مجلد الملفات الثابتة (للصور واللوجو)
 os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
 templates = Jinja2Templates(directory="templates")
 
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb+srv://abosalehlt_db_user:7_RvkParzvUeC_v@abosaleh.yhuwfdt.mongodb.net/?appName=abosaleh")
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
 db = client["salehzon_db"]
 
-ADMIN_USERNAME = os.environ.get("ADMIN_USER")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASS")
-SECRET_TOKEN = "salehzon_secure_cookie_2026"
+ADMIN_USERNAME = os.environ.get("ADMIN_USER", "admin")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASS", "123456")
+SECRET_TOKEN = "salehzon_secure_2026"
 
 def check_auth(request: Request):
     return request.cookies.get("admin_session") == SECRET_TOKEN
+
+async def web_log(action, details=""):
+    """تسجيل العمليات التي تتم من لوحة التحكم لتظهر في السجلات"""
+    await db.system_logs.insert_one({
+        "user_id": "WEB_ADMIN", "name": "Admin Dashboard", "action": action,
+        "details": details, "time": datetime.now().strftime('%Y-%m-%d %H:%M'), "timestamp": datetime.now()
+    })
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request, "error": None})
 
-@app.post("/login", response_class=HTMLResponse)
-async def do_login(request: Request, response: Response, username: str = Form(...), password: str = Form(...)):
+@app.post("/login")
+async def do_login(response: Response, username: str = Form(...), password: str = Form(...)):
     if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-        redirect_resp = RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
-        redirect_resp.set_cookie(key="admin_session", value=SECRET_TOKEN, httponly=True)
-        return redirect_resp
-    return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid credentials!"})
+        resp = RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+        resp.set_cookie(key="admin_session", value=SECRET_TOKEN, httponly=True)
+        return resp
+    return RedirectResponse(url="/login?error=1", status_code=status.HTTP_302_FOUND)
 
 @app.get("/logout")
 async def logout():
-    redirect_resp = RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
-    redirect_resp.delete_cookie("admin_session")
-    return redirect_resp
+    resp = RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+    resp.delete_cookie("admin_session")
+    return resp
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
-    if not check_auth(request):
-        return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+    if not check_auth(request): return RedirectResponse(url="/login")
     
     users_count = await db.users.count_documents({})
     stock_count = await db.stock.count_documents({})
     orders_count = await db.orders.count_documents({})
     cached_count = await db.cached_accounts.count_documents({})
     
-    recent_orders = await db.orders.find().sort("date", -1).limit(10).to_list(10)
-    all_users = await db.users.find().sort("_id", -1).limit(50).to_list(50)
+    logs = await db.system_logs.find().sort("timestamp", -1).to_list(length=100)
+    all_users = await db.users.find().sort("_id", -1).to_list(length=50)
     
-    # جلب إحصائيات الفئات
     categories = ["60", "325", "660", "1800", "3850", "8100"]
-    stock_details = {}
-    for cat in categories:
-        stock_details[cat] = await db.stock.count_documents({"category": cat})
-    
+    stock_details = {cat: await db.stock.count_documents({"category": cat}) for cat in categories}
+        
+    settings = await db.settings.find_one({"_id": "config"})
+    maintenance = settings.get("maintenance", False) if settings else False
+
+    shared_doc = await db.settings.find_one({"_id": "shared_tokens"})
+    shared_tokens_count = len(shared_doc.get("tokens", [])) if shared_doc else 0
+
     return templates.TemplateResponse("index.html", {
-        "request": request,
-        "users_count": users_count, "stock_count": stock_count,
+        "request": request, "users_count": users_count, "stock_count": stock_count,
         "orders_count": orders_count, "cached_count": cached_count,
-        "recent_orders": recent_orders, "all_users": all_users,
-        "stock_details": stock_details
+        "logs": logs, "all_users": all_users, "stock_details": stock_details,
+        "maintenance": maintenance, "shared_tokens_count": shared_tokens_count
     })
 
-# --- API Endpoints for Dashboard Buttons ---
+# --- APIs للتحكم المتكامل ---
+@app.post("/api/toggle_maintenance")
+async def toggle_maint(request: Request):
+    if not check_auth(request): return {"status": "error"}
+    current = await db.settings.find_one({"_id": "config"})
+    new_state = not current.get("maintenance", False) if current else True
+    await db.settings.update_one({"_id": "config"}, {"$set": {"maintenance": new_state}}, upsert=True)
+    await web_log(f"تغيير وضع الصيانة إلى: {'تشغيل' if new_state else 'إيقاف'}")
+    return {"status": "success"}
+
 @app.post("/api/add_stock")
 async def api_add_stock(request: Request, category: str = Form(...), codes: str = Form(...)):
     if not check_auth(request): return RedirectResponse("/login")
     lines = [c.strip() for c in codes.splitlines() if c.strip()]
     docs = [{"code": c, "category": category, "added_at": datetime.now()} for c in lines]
-    if docs:
+    if docs: 
         await db.stock.insert_many(docs, ordered=False)
-    return RedirectResponse(url="/?msg=Stock+Added", status_code=status.HTTP_302_FOUND)
+        await web_log(f"إضافة مخزن: {len(docs)} كود لفئة {category}")
+    return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
 
-@app.post("/api/add_user")
-async def api_add_user(request: Request, user_id: int = Form(...), name: str = Form(...), role: str = Form(...)):
+@app.post("/api/add_shared_tokens")
+async def api_add_shared(request: Request, tokens: str = Form(...)):
     if not check_auth(request): return RedirectResponse("/login")
-    if not await db.users.find_one({"_id": user_id}):
-        await db.users.insert_one({"_id": user_id, "role": role, "name": name, "tokens": [], "history": [], "logs": [], "stats": {"api": 0, "stock": 0}})
-    return RedirectResponse(url="/?msg=User+Added", status_code=status.HTTP_302_FOUND)
+    lines = [t.strip() for t in tokens.splitlines() if t.strip()]
+    if lines: 
+        await db.settings.update_one({"_id": "shared_tokens"}, {"$push": {"tokens": {"$each": lines}}}, upsert=True)
+        await web_log(f"تمت إضافة {len(lines)} توكنات مشتركة (للموظفين والأدمن)")
+    return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+
+@app.post("/api/clear_shared_tokens")
+async def api_clear_shared(request: Request):
+    if not check_auth(request): return RedirectResponse("/login")
+    await db.settings.update_one({"_id": "shared_tokens"}, {"$set": {"tokens": []}}, upsert=True)
+    await web_log("تصفير جميع التوكنات المشتركة")
+    return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+
+@app.post("/api/add_user_tokens")
+async def api_add_user_tokens(request: Request, user_id: int = Form(...), tokens: str = Form(...)):
+    if not check_auth(request): return RedirectResponse("/login")
+    lines = [t.strip() for t in tokens.splitlines() if t.strip()]
+    if lines: 
+        await db.users.update_one({"_id": user_id}, {"$push": {"tokens": {"$each": lines}}})
+        await web_log(f"إضافة {len(lines)} توكن شخصي للمستخدم {user_id}")
+    return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+
+@app.post("/api/user_action")
+async def api_user_action(request: Request, user_id: int = Form(...), action: str = Form(...)):
+    if not check_auth(request): return RedirectResponse("/login")
+    if action == "toggle_role":
+        u = await db.users.find_one({"_id": user_id})
+        nr = "employee" if u.get("role") == "user" else "user"
+        await db.users.update_one({"_id": user_id}, {"$set": {"role": nr}})
+        await web_log(f"تعديل رتبة المستخدم {user_id} إلى {nr}")
+    elif action == "clear_tokens":
+        await db.users.update_one({"_id": user_id}, {"$set": {"tokens": []}})
+        await web_log(f"تصفير توكنات المستخدم {user_id}")
+    return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+
+@app.post("/api/search")
+async def api_search(request: Request):
+    if not check_auth(request): return JSONResponse({"error": "unauth"})
+    form = await request.form()
+    query = form.get("query", "").strip()
+    if not query: return JSONResponse({"result": "❌ أرسل نصاً للبحث"})
+    
+    if query.isdigit():
+        order = await db.orders.find_one({"_id": int(query)})
+        if order: return JSONResponse({"result": f"📄 طلب #{query} | المستلم: {order['user']} | الأكواد: {len(order['items'])}"})
+        user = await db.users.find_one({"_id": int(query)})
+        if user: return JSONResponse({"result": f"👤 {user.get('name')} | الرتبة: {user.get('role')} | التوكنات: {len(user.get('tokens',[]))}"})
+
+    records = await db.codes_map.find({"$or": [{"_id": query}, {"code": query}]}).to_list(length=5)
+    in_stock = await db.stock.count_documents({"$or": [{"_id": query}, {"code": query}]})
+    res_str = f"🔍 الكود: {query}\n📦 متوفر بالمخزن: {in_stock}\n"
+    if records:
+        res_str += f"🛒 تم سحبه {len(records)} مرات (بواسطة: {', '.join([r['name'] for r in records])})"
+    return JSONResponse({"result": res_str})
