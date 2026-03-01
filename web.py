@@ -18,8 +18,8 @@ MONGO_URI = os.environ.get("MONGO_URI", "mongodb+srv://abosalehlt_db_user:7_RvkP
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
 db = client["salehzon_db"]
 
-ADMIN_USERNAME = os.environ.get("ADMIN_USER", "admin")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASS", "123456")
+ADMIN_USERNAME = os.environ.get("ADMIN_USER")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASS")
 SECRET_TOKEN = "salehzon_secure_cookie_2026"
 
 def check_auth(request: Request):
