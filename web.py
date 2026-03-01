@@ -8,10 +8,12 @@ from datetime import datetime, timedelta
 
 app = FastAPI(title="Saleh Zone Dashboard")
 
+# إعداد المجلدات الثابتة والقوالب
 os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
+# الاتصال بقاعدة البيانات
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb+srv://abosalehlt_db_user:7_RvkParzvUeC_v@abosaleh.yhuwfdt.mongodb.net/?appName=abosaleh")
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
 db = client["salehzon_db"]
@@ -29,7 +31,7 @@ async def web_log(action, details=""):
         "details": details, "time": datetime.now().strftime('%Y-%m-%d %H:%M'), "timestamp": datetime.now()
     })
 
-# دالة الفلترة الذكية للتوكنات
+# 🧠 الفلتر الذكي لاستخراج التوكنات (نفس الموجود في التليجرام)
 def clean_and_extract_tokens(raw_text):
     valid_tokens = []
     for line in raw_text.splitlines():
@@ -106,16 +108,21 @@ async def dashboard(request: Request):
         
     settings = await db.settings.find_one({"_id": "config"})
     maintenance = settings.get("maintenance", False) if settings else False
+    
+    cache_config = await db.settings.find_one({"_id": "cache_config"})
+    tracked_users = cache_config.get("tracked_users", []) if cache_config else []
 
     return templates.TemplateResponse("index.html", {
         "request": request, "users_count": users_count, "stock_count": stock_count,
         "cached_count": cached_count, "logs": logs, "all_users": all_users,
         "stock_details": stock_details, "maintenance": maintenance,
         "shared_tokens_count": shared_tokens_count, "total_system_tokens": total_system_tokens,
-        "global_today": global_today, "global_month": global_month
+        "global_today": global_today, "global_month": global_month,
+        "tracked_users": tracked_users
     })
 
-# --- APIs للتحكم المتقدم ---
+# --- APIs للتحكم المتقدم (جميع ميزات التليجرام) ---
+
 @app.post("/api/toggle_maintenance")
 async def toggle_maint(request: Request):
     if not check_auth(request): return {"status": "error"}
@@ -181,10 +188,10 @@ async def api_clear_stock(request: Request, category: str = Form(...)):
 @app.post("/api/add_shared_tokens")
 async def api_add_shared(request: Request, tokens: str = Form(...)):
     if not check_auth(request): return RedirectResponse("/login")
-    extracted_tokens = clean_and_extract_tokens(tokens)
+    extracted_tokens = clean_and_extract_tokens(tokens) # استخدام الفلتر الذكي
     if extracted_tokens: 
         await db.settings.update_one({"_id": "shared_tokens"}, {"$push": {"tokens": {"$each": extracted_tokens}}}, upsert=True)
-        await web_log(f"إضافة ذكية: تم إضافة {len(extracted_tokens)} توكن مشترك")
+        await web_log(f"تمت إضافة {len(extracted_tokens)} توكنات مشتركة")
     return RedirectResponse(url="/?tab=users", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/clear_shared_tokens")
@@ -197,10 +204,10 @@ async def api_clear_shared(request: Request):
 @app.post("/api/add_user_tokens")
 async def api_add_user_tokens(request: Request, user_id: int = Form(...), tokens: str = Form(...)):
     if not check_auth(request): return RedirectResponse("/login")
-    extracted_tokens = clean_and_extract_tokens(tokens)
+    extracted_tokens = clean_and_extract_tokens(tokens) # استخدام الفلتر الذكي
     if extracted_tokens: 
         await db.users.update_one({"_id": user_id}, {"$push": {"tokens": {"$each": extracted_tokens}}})
-        await web_log(f"إضافة ذكية: تم إضافة {len(extracted_tokens)} توكن للمستخدم {user_id}")
+        await web_log(f"إضافة {len(extracted_tokens)} توكن للمستخدم {user_id}")
     return RedirectResponse(url="/?tab=users", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/add_user")
@@ -208,7 +215,7 @@ async def api_add_user(request: Request, user_id: int = Form(...), name: str = F
     if not check_auth(request): return RedirectResponse("/login")
     if not await db.users.find_one({"_id": user_id}):
         await db.users.insert_one({"_id": user_id, "role": role, "name": name, "tokens": [], "history": [], "logs": [], "token_logs": [], "stats": {"api": 0, "stock": 0}})
-        await web_log("إضافة مستخدم جديد", f"الاسم: {name} | الآيدي: {user_id} | الرتبة: {role}")
+        await web_log(f"إضافة مستخدم جديد", f"الاسم: {name} | الآيدي: {user_id} | الرتبة: {role}")
     return RedirectResponse(url="/?tab=users", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/user_action")
@@ -225,7 +232,21 @@ async def api_user_action(request: Request, user_id: int = Form(...), action: st
         nr = "employee" if u.get("role") == "user" else "user"
         await db.users.update_one({"_id": user_id}, {"$set": {"role": nr}})
         await web_log(f"تعديل رتبة المستخدم {user_id} إلى {nr}")
+    elif action == "clear_logs":
+        await db.users.update_one({"_id": user_id}, {"$set": {"logs": [], "history": [], "token_logs": []}})
+        await web_log(f"مسح سجلات المستخدم {user_id}")
     return RedirectResponse(url="/?tab=users", status_code=status.HTTP_302_FOUND)
+
+@app.post("/api/tracked_users")
+async def api_tracked_users(request: Request, user_id: int = Form(...), action: str = Form(...)):
+    if not check_auth(request): return RedirectResponse("/login")
+    if action == "add": 
+        await db.settings.update_one({"_id": "cache_config"}, {"$addToSet": {"tracked_users": user_id}}, upsert=True)
+        await web_log(f"إضافة الآيدي {user_id} لقائمة التخزين التلقائي")
+    elif action == "remove": 
+        await db.settings.update_one({"_id": "cache_config"}, {"$pull": {"tracked_users": user_id}}, upsert=True)
+        await web_log(f"إزالة الآيدي {user_id} من قائمة التخزين التلقائي")
+    return RedirectResponse(url="/?tab=tools", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/return_order")
 async def api_return_order(request: Request, order_id: int = Form(...)):
