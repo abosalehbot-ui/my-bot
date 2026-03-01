@@ -51,50 +51,41 @@ async def logout():
 async def dashboard(request: Request):
     if not check_auth(request): return RedirectResponse(url="/login")
     
-    # 1. التواريخ للحسابات
     now = datetime.now()
     today_str = now.strftime("%Y-%m-%d")
     start_of_month_str = now.strftime("%Y-%m-01")
     start_of_week_str = (now - timedelta(days=now.weekday())).strftime("%Y-%m-%d")
 
-    # 2. إحصائيات عامة
     users_count = await db.users.count_documents({})
     stock_count = await db.stock.count_documents({})
     cached_count = await db.cached_accounts.count_documents({})
     logs = await db.system_logs.find().sort("timestamp", -1).to_list(length=100)
     all_users = await db.users.find().sort("_id", -1).to_list(length=50)
     
-    # 3. حساب السحوبات (لليوم، الاسبوع، الشهر)
-    month_orders = await db.orders.find({"type": "API Pull", "date": {"$gte": start_of_month_str}}).to_list(None)
+    month_orders = await db.orders.find({"type": {"$regex": "API Pull|PUBG Stock"}, "date": {"$gte": start_of_month_str}}).to_list(None)
     
     user_pull_stats = {}
-    global_today = 0
-    global_month = 0
+    global_today, global_month = 0, 0
     
     for o in month_orders:
         uid = o.get("user_id")
         count = len(o.get("items", []))
-        
         if uid not in user_pull_stats:
             user_pull_stats[uid] = {"today": 0, "week": 0, "month": 0}
             
         global_month += count
         user_pull_stats[uid]["month"] += count
-        
         if o.get("date", "").startswith(today_str):
             global_today += count
             user_pull_stats[uid]["today"] += count
-            
         if o.get("date", "") >= start_of_week_str:
             user_pull_stats[uid]["week"] += count
 
-    # 4. حساب إجمالي التوكنات
     total_user_tokens = sum(len(u.get("tokens", [])) for u in all_users)
     shared_doc = await db.settings.find_one({"_id": "shared_tokens"})
     shared_tokens_count = len(shared_doc.get("tokens", [])) if shared_doc else 0
     total_system_tokens = total_user_tokens + shared_tokens_count
 
-    # ربط إحصائيات السحب بكل مستخدم
     for u in all_users:
         u["pull_stats"] = user_pull_stats.get(u["_id"], {"today": 0, "week": 0, "month": 0})
 
@@ -112,7 +103,8 @@ async def dashboard(request: Request):
         "global_today": global_today, "global_month": global_month
     })
 
-# --- APIs للتحكم المتكامل ---
+# --- APIs للميزات الجديدة ---
+
 @app.post("/api/toggle_maintenance")
 async def toggle_maint(request: Request):
     if not check_auth(request): return {"status": "error"}
@@ -122,20 +114,60 @@ async def toggle_maint(request: Request):
     await web_log(f"تغيير وضع الصيانة إلى: {'تشغيل' if new_state else 'إيقاف'}")
     return {"status": "success"}
 
-@app.post("/api/add_stock")
-async def api_add_stock(request: Request, category: str = Form(...), codes: str = Form(...)):
-    if not check_auth(request): return RedirectResponse("/login")
+# 🚀 نظام الرفع الذكي من الويب (يفحص التكرار ويرجع تقرير)
+@app.post("/api/add_stock_smart")
+async def api_add_stock_smart(request: Request, category: str = Form(...), codes: str = Form(...)):
+    if not check_auth(request): return JSONResponse({"error": "unauth"}, status_code=401)
+    
     lines = [c.strip() for c in codes.splitlines() if c.strip()]
-    docs = [{"code": c, "category": category, "added_at": datetime.now()} for c in lines]
-    if docs: 
+    if not lines: return JSONResponse({"error": "لا توجد أكواد للرفع"})
+
+    unique_input, dupes_in_input, seen = [], [], set()
+    for c in lines:
+        if c in seen: dupes_in_input.append(c)
+        else:
+            seen.add(c)
+            unique_input.append(c)
+            
+    # فحص قاعدة البيانات للمكرر
+    in_stock = await db.stock.find({"$or": [{"_id": {"$in": unique_input}}, {"code": {"$in": unique_input}}]}).to_list(None)
+    in_map = await db.codes_map.find({"$or": [{"_id": {"$in": unique_input}}, {"code": {"$in": unique_input}}]}).to_list(None)
+    
+    db_dupes = set([str(x.get("code") or x.get("_id")) for x in in_stock + in_map])
+    
+    new_codes, db_dupes_list = [], []
+    for c in unique_input:
+        if c in db_dupes: db_dupes_list.append(c)
+        else: new_codes.append(c)
+            
+    all_dupes = dupes_in_input + db_dupes_list
+    
+    if new_codes:
+        docs = [{"code": c, "category": category, "added_at": datetime.now()} for c in new_codes]
         await db.stock.insert_many(docs, ordered=False)
-        await web_log(f"إضافة مخزن: {len(docs)} كود لفئة {category}")
-    return RedirectResponse(url="/?tab=stock", status_code=status.HTTP_302_FOUND)
+        await web_log(f"إضافة ذكية للمخزن ({category} UC)", f"تم إضافة {len(new_codes)} كود جديد.")
+
+    return JSONResponse({
+        "success": True,
+        "total": len(lines),
+        "added": len(new_codes),
+        "dupes": len(all_dupes),
+        "dupes_list": all_dupes
+    })
+
+# 👁️ جلب الأكواد الحالية للمشاهدة
+@app.get("/api/view_stock/{category}")
+async def api_view_stock(category: str, request: Request):
+    if not check_auth(request): return JSONResponse({"error": "unauth"}, status_code=401)
+    codes_docs = await db.stock.find({"category": category}).to_list(None)
+    codes_list = [str(c.get("code") or c.get("_id")) for c in codes_docs]
+    return JSONResponse({"category": category, "codes": codes_list})
 
 @app.post("/api/clear_stock")
 async def api_clear_stock(request: Request, category: str = Form(...)):
     if not check_auth(request): return RedirectResponse("/login")
     await db.stock.delete_many({"category": category})
+    await web_log(f"تصفير فئة {category} بالكامل من المخزن")
     return RedirectResponse(url="/?tab=stock", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/add_shared_tokens")
@@ -168,7 +200,7 @@ async def api_add_user(request: Request, user_id: int = Form(...), name: str = F
     if not check_auth(request): return RedirectResponse("/login")
     if not await db.users.find_one({"_id": user_id}):
         await db.users.insert_one({"_id": user_id, "role": role, "name": name, "tokens": [], "history": [], "logs": [], "token_logs": [], "stats": {"api": 0, "stock": 0}})
-        await web_log(f"تمت إضافة المستخدم {name} ({user_id}) برتبة {role}")
+        await web_log(f"إضافة مستخدم جديد", f"الاسم: {name} | الآيدي: {user_id} | الرتبة: {role}")
     return RedirectResponse(url="/?tab=users", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/user_action")
@@ -176,7 +208,7 @@ async def api_user_action(request: Request, user_id: int = Form(...), action: st
     if not check_auth(request): return RedirectResponse("/login")
     if action == "delete": 
         await db.users.delete_one({"_id": user_id})
-        await web_log(f"تم حذف المستخدم ID: {user_id}")
+        await web_log(f"حذف المستخدم ID: {user_id}")
     elif action == "clear_tokens": 
         await db.users.update_one({"_id": user_id}, {"$set": {"tokens": []}})
         await web_log(f"تصفير توكنات المستخدم {user_id}")
@@ -186,13 +218,6 @@ async def api_user_action(request: Request, user_id: int = Form(...), action: st
         await db.users.update_one({"_id": user_id}, {"$set": {"role": nr}})
         await web_log(f"تعديل رتبة المستخدم {user_id} إلى {nr}")
     return RedirectResponse(url="/?tab=users", status_code=status.HTTP_302_FOUND)
-
-@app.post("/api/tracked_users")
-async def api_tracked_users(request: Request, user_id: int = Form(...), action: str = Form(...)):
-    if not check_auth(request): return RedirectResponse("/login")
-    if action == "add": await db.settings.update_one({"_id": "cache_config"}, {"$addToSet": {"tracked_users": user_id}}, upsert=True)
-    elif action == "remove": await db.settings.update_one({"_id": "cache_config"}, {"$pull": {"tracked_users": user_id}}, upsert=True)
-    return RedirectResponse(url="/?tab=tools", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/return_order")
 async def api_return_order(request: Request, order_id: int = Form(...)):
@@ -205,6 +230,7 @@ async def api_return_order(request: Request, order_id: int = Form(...)):
         await db.codes_map.delete_many({"$or": [{"_id": {"$in": order["items"]}}, {"code": {"$in": order["items"]}}], "order_id": order_id})
         await db.orders.delete_one({"_id": order_id})
         await db.users.update_one({"_id": order["user_id"]}, {"$inc": {"stats.stock": -len(order["items"])}})
+        await web_log(f"إرجاع الطلب #{order_id} للمخزن", f"الفئة: {cat} | العدد: {len(order['items'])}")
     return RedirectResponse(url="/?tab=tools", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/search")
@@ -233,7 +259,7 @@ async def api_search(request: Request):
     if records:
         res_str += f"\n🛒 تم سحبه {len(records)} مرات:\n"
         for i, r in enumerate(records, 1):
-            res_str += f" {i}. بواسطة: {r.get('name', 'مجهول')} | الوقت: {r.get('time', '')} | رقم الطلب: #{r.get('order_id', 'غير معروف')}\n"
+            res_str += f" {i}. بواسطة: {r.get('name', 'مجهول')} | الوقت: {r.get('time', '')} | طلب: #{r.get('order_id', '؟')}\n"
     elif in_stock == 0:
-        res_str += "\n❌ لا يوجد بيانات! (لم يتم العثور على طلب، مستخدم، أو كود بهذا النص)."
+        res_str += "\n❌ لا يوجد بيانات! (لم يتم العثور على طلب، مستخدم، أو كود)."
     return JSONResponse({"result": res_str})
