@@ -52,7 +52,8 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", () => {
-            if(localStorage.getItem('store_email')) { window.location.href = '/shop'; }
+            // لو هو مسجل دخول، رجعه للصفحة الرئيسية (المتجر)
+            if(localStorage.getItem('store_email')) { window.location.href = '/'; }
         });
 
         async function handleGoogleResponse(response) {
@@ -71,7 +72,8 @@
                     localStorage.setItem('store_email', data.email);
                     localStorage.setItem('store_name', data.name);
                     localStorage.setItem('store_balance', data.balance);
-                    window.location.href = '/shop';
+                    // بعد نجاح التسجيل، يحوله للصفحة الرئيسية للمتجر
+                    window.location.href = '/';
                 } else { 
                     statusDiv.innerHTML = `<span class="text-red-500">${data.msg}</span>`;
                 }
