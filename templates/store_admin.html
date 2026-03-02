@@ -7,7 +7,50 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script>tailwind.config={theme:{extend:{colors:{szgreen:'#7dfc89',szcyan:'#5eead4',darkbg:'#050505',panelbg:'#111'}}}}</script>
-    <style>::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #050505; } ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }</style>
+    <style>
+        /* الخطوط والخلفية الأساسية */
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
+        body { font-family: 'Cairo', sans-serif; background-color: #050505; color: #d1d5db; scroll-behavior: smooth; }
+        
+        /* شريط التمرير (Scrollbar) المضيء */
+        ::-webkit-scrollbar { width: 6px; } 
+        ::-webkit-scrollbar-track { background: #050505; } 
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; transition: 0.3s; }
+        ::-webkit-scrollbar-thumb:hover { background: #7dfc89; box-shadow: 0 0 10px #7dfc89; }
+
+        /* 1. تأثير الدخول الناعم (Fade In) */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        .fade-in-delayed { animation: fadeIn 0.5s ease-out 0.2s forwards; opacity: 0; }
+
+        /* 2. تأثير الطيران (Floating) لصور الشدات واللوجو */
+        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-8px); } 100% { transform: translateY(0px); } }
+        .floating { animation: float 3s ease-in-out infinite; }
+
+        /* 3. تأثير النبض المضيء (Pulse Glow) للزراير */
+        @keyframes pulseGlow { 
+            0% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } 
+            50% { box-shadow: 0 0 25px rgba(125,252,137,0.6); transform: scale(1.02); } 
+            100% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } 
+        }
+        .btn-glow { transition: all 0.3s ease; }
+        .btn-glow:hover { animation: pulseGlow 1.5s infinite; border-color: #7dfc89; }
+
+        /* 4. تأثير حركة الألوان في النصوص (Gradient Flow) */
+        @keyframes gradientX { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        .text-gradient-animate { background-size: 200% 200%; animation: gradientX 3s ease infinite; }
+
+        /* 5. تصميم الكروت الزجاجية (Glass & Hover Cards) */
+        .glass-panel { background: rgba(17, 17, 17, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
+        .uc-card { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .uc-card:hover { transform: translateY(-8px); box-shadow: 0 15px 35px rgba(94, 234, 212, 0.15); border-color: #5eead4; }
+
+        /* 6. توهج عند الكتابة في الخانات (Input Focus) */
+        input:focus, select:focus, textarea:focus { box-shadow: 0 0 15px rgba(125,252,137,0.15); transition: box-shadow 0.3s ease; }
+        
+        /* تأثيرات القائمة الجانبية للأدمن */
+        .nav-active { background: linear-gradient(90deg, rgba(125,252,137,0.15) 0%, transparent 100%); border-left: 3px solid #7dfc89; color: #7dfc89; text-shadow: 0 0 10px rgba(125,252,137,0.3); }
+    </style>
 </head>
 <body class="bg-darkbg text-gray-300 font-sans flex h-screen overflow-hidden selection:bg-yellow-500 selection:text-black">
     
