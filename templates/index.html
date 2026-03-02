@@ -111,7 +111,7 @@
                                 <form action="/api/clear_shared_tokens" method="POST" onsubmit="return confirm('Clear all shared tokens?');"><button class="text-red-500 text-xs hover:text-white transition"><i class="fas fa-trash"></i> Clear</button></form>
                             </div>
                         </div>
-                        <p class="text-xs text-gray-500 mb-4">Smart Paste (Raw text from Store). (Count: {{ shared_tokens_count }})</p>
+                        <p class="text-xs text-gray-500 mb-4">Smart Paste (Count: {{ shared_tokens_count }})</p>
                         <form action="/api/add_shared_tokens" method="POST">
                             <textarea name="tokens" rows="3" class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg mb-3 text-xs font-mono focus:border-szcyan outline-none" placeholder="Paste full store text here..."></textarea>
                             <button class="w-full bg-szcyan text-black font-bold py-2 rounded-lg shadow-lg shadow-szcyan/20">Extract & Add Tokens</button>
@@ -130,7 +130,6 @@
                                             <div class="font-bold text-white flex items-center gap-2">{{ u.name }} <span class="px-2 py-0.5 rounded text-[10px] {% if u.role == 'admin' %}bg-red-900 text-red-300{% elif u.role == 'employee' %}bg-szcyan/20 text-szcyan{% else %}bg-gray-800 text-gray-400{% endif %} uppercase tracking-wider">{{ u.role }}</span></div>
                                             <div class="text-[10px] text-gray-500 font-mono mt-1">{{ u._id }} | 🔑 Tokens: <span class="text-white">{{ u.tokens|length }}</span></div>
                                         </td>
-                                        
                                         <td class="px-4 py-3 text-xs font-mono">
                                             <div class="mb-1 bg-black px-2 py-1 rounded inline-block border border-gray-800">
                                                 <span class="text-[9px] text-gray-500 uppercase mr-1">API:</span>
@@ -141,7 +140,6 @@
                                                 <span class="text-szcyan font-bold" title="Codes Today">{{ u.stats_details.stock_today }}</span> / <span class="text-gray-500" title="Codes Month">{{ u.stats_details.stock_month }}</span>
                                             </div>
                                         </td>
-
                                         <td class="px-4 py-3">
                                             <form action="/api/add_user_tokens" method="POST" class="flex gap-2">
                                                 <input type="hidden" name="user_id" value="{{ u._id }}">
@@ -293,7 +291,8 @@
             
             if(tabId !== 'store') { document.getElementById('btn-' + tabId).classList.add('nav-active', 'text-white'); } 
             
-            window.history.replaceState({}, '', '/?tab=' + tabId);
+            // تم تعديل التوجيه ليصبح /admin بدلاً من /
+            window.history.replaceState({}, '', '/admin?tab=' + tabId);
             const sidebar = document.getElementById('sidebar');
             if(window.innerWidth < 768 && !sidebar.classList.contains('-translate-x-full')) toggleSidebar();
         }
