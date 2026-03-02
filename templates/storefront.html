@@ -10,9 +10,7 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
         body { font-family: 'Cairo', sans-serif; background-color: #050505; color: #d1d5db; }
-        ::-webkit-scrollbar { width: 6px; } 
-        ::-webkit-scrollbar-track { background: #050505; } 
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #050505; } ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
         .glass-nav { background: rgba(17, 17, 17, 0.85); backdrop-filter: blur(12px); border-bottom: 1px solid #1f2937; }
         .uc-card { transition: all 0.3s ease; }
         .uc-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(94, 234, 212, 0.1); border-color: #5eead4; }
@@ -29,9 +27,9 @@
                 </div>
                 
                 <div id="auth-section">
-                    <button onclick="openModal('login-modal')" class="border border-szgreen text-szgreen px-6 py-2 rounded-lg font-bold hover:bg-szgreen hover:text-black transition flex items-center gap-2">
-                        تسجيل الدخول <i class="fas fa-sign-in-alt"></i>
-                    </button>
+                    <a href="/store-login" class="border border-szgreen text-szgreen px-6 py-2 rounded-lg font-bold hover:bg-szgreen hover:text-black transition flex items-center gap-2">
+                        تسجيل الدخول <i class="fab fa-google"></i>
+                    </a>
                 </div>
                 
                 <div id="user-section" class="hidden flex items-center gap-4">
@@ -39,9 +37,7 @@
                         <div class="text-xs text-gray-500 font-bold" id="ui-name">مرحباً بك</div>
                         <div class="font-black text-szcyan tracking-wide">رصيدك: <span id="ui-balance" class="text-white">0</span> EGP</div>
                     </div>
-                    <button onclick="logout()" class="text-red-500 bg-red-500/10 p-2 rounded-lg hover:bg-red-500 hover:text-white transition border border-red-500/20" title="تسجيل الخروج">
-                        <i class="fas fa-power-off"></i>
-                    </button>
+                    <button onclick="logout()" class="text-red-500 bg-red-500/10 p-2 rounded-lg hover:bg-red-500 hover:text-white transition border border-red-500/20" title="تسجيل الخروج"><i class="fas fa-power-off"></i></button>
                 </div>
             </div>
         </div>
@@ -49,22 +45,21 @@
 
     <div class="pt-32 pb-12 text-center px-4">
         <h1 class="text-4xl md:text-5xl font-black mb-4 text-white">متجر شحن <span class="text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan">ببجي موبايل</span></h1>
-        <p class="text-gray-400 max-w-xl mx-auto mb-8 text-sm">استلم كود الشحن الخاص بك فوراً بعد الدفع! نظام آلي متكامل لخدمتك على مدار الساعة.</p>
+        <p class="text-gray-400 max-w-xl mx-auto mb-8 text-sm">استلم كود الشحن الخاص بك فوراً بعد الدفع! نظام آلي متكامل لخدمتك.</p>
     </div>
 
     <div class="max-w-7xl mx-auto px-4 pb-20">
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4 md:gap-6">
             {% for cat in ['60', '325', '660', '1800', '3850', '8100'] %}
             <div class="uc-card bg-panelbg border border-gray-800 rounded-2xl p-6 flex flex-col items-center text-center relative overflow-hidden">
-                
                 {% if stock.get(cat, 0) > 0 %}
                 <div class="absolute top-3 right-3 bg-szgreen/20 text-szgreen text-[10px] font-bold px-2 py-1 rounded border border-szgreen/30">متوفر</div>
                 {% else %}
                 <div class="absolute top-3 right-3 bg-red-900/50 text-red-400 text-[10px] font-bold px-2 py-1 rounded border border-red-900/50">نفذت الكمية</div>
                 {% endif %}
 
-                <div class="w-20 h-20 md:w-24 md:h-24 bg-black rounded-full flex items-center justify-center mb-4 border border-gray-800 shadow-[0_0_15px_rgba(94,234,212,0.1)]">
-                    <img src="https://i.imgur.com/uC58qC4.png" alt="UC" class="w-12 md:w-16 drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]">
+                <div class="w-24 h-24 mb-4 flex items-center justify-center">
+                    <img src="/static/uc-gold.jpg" alt="UC" class="w-full h-full object-contain rounded-lg drop-shadow-[0_0_10px_rgba(255,215,0,0.3)]" onerror="this.style.display='none'">
                 </div>
                 
                 <h3 class="text-2xl font-black text-white mb-1" dir="ltr">{{ cat }} UC</h3>
@@ -89,32 +84,14 @@
         </div>
     </div>
 
-    <div id="login-modal" class="fixed inset-0 bg-black/80 z-[60] hidden flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-panelbg border border-gray-800 w-full max-w-md rounded-2xl p-8 relative shadow-2xl">
-            <button onclick="closeModal('login-modal')" class="absolute top-4 right-4 text-gray-500 hover:text-red-500 transition"><i class="fas fa-times text-xl"></i></button>
-            <div class="text-center mb-6">
-                <div class="inline-block bg-szcyan/10 p-4 rounded-full text-szcyan mb-3"><i class="fas fa-user-lock text-3xl"></i></div>
-                <h2 class="text-2xl font-bold text-white">تسجيل الدخول</h2>
-                <p class="text-xs text-gray-400 mt-2">أدخل رقم الهاتف المسجل للوصول لمحفظتك.</p>
-            </div>
-            <form onsubmit="doLogin(event)">
-                <input type="tel" id="login-phone" placeholder="رقم الهاتف (مثال: 010...)" required class="w-full bg-[#0a0a0a] border border-gray-800 text-white text-center p-4 rounded-xl mb-4 outline-none focus:border-szcyan transition" dir="ltr">
-                <button type="submit" id="btn-login" class="w-full bg-szcyan text-black font-bold py-4 rounded-xl hover:bg-white transition">دخول للحساب</button>
-            </form>
-        </div>
-    </div>
-
     <div id="success-modal" class="fixed inset-0 bg-black/90 z-[60] hidden flex items-center justify-center p-4 backdrop-blur-sm">
         <div class="bg-panelbg border border-szgreen w-full max-w-md rounded-2xl p-8 text-center relative overflow-hidden shadow-[0_0_40px_rgba(125,252,137,0.15)]">
             <div class="inline-block bg-szgreen/20 text-szgreen p-4 rounded-full mb-4"><i class="fas fa-check-circle text-4xl"></i></div>
             <h2 class="text-2xl font-bold text-white mb-2">تم الشراء بنجاح!</h2>
             <p class="text-xs text-gray-400 mb-6">تم خصم المبلغ من رصيدك. إليك كود الشحن الخاص بك:</p>
-            
             <div class="bg-[#050505] border border-gray-800 p-4 rounded-xl mb-6 relative group">
                 <p id="purchased-code" class="text-lg font-mono text-szgreen tracking-wider select-all" dir="ltr">LOADING...</p>
-                <div class="text-[10px] text-gray-600 mt-2"><i class="fas fa-info-circle"></i> اضغط على الكود لنسخه أو استخدم الزر بالأسفل</div>
             </div>
-
             <button onclick="copyPurchasedCode()" class="w-full bg-gray-800 text-white font-bold py-3 rounded-xl mb-3 hover:bg-szcyan hover:text-black transition flex justify-center items-center gap-2">
                 <span>نسخ الكود</span> <i class="fas fa-copy"></i>
             </button>
@@ -123,12 +100,11 @@
     </div>
 
     <script>
-        // Check Login State on Load
         document.addEventListener("DOMContentLoaded", () => {
-            const phone = localStorage.getItem('store_phone');
+            const email = localStorage.getItem('store_email');
             const name = localStorage.getItem('store_name');
             const balance = localStorage.getItem('store_balance');
-            if(phone && name) { updateUI(name, balance); }
+            if(email && name) { updateUI(name, balance); }
         });
 
         function updateUI(name, balance) {
@@ -139,39 +115,14 @@
             localStorage.setItem('store_balance', balance);
         }
 
-        function logout() {
-            localStorage.clear();
-            location.reload();
-        }
-
+        function logout() { localStorage.clear(); location.reload(); }
         function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
-        // Login API Call
-        async function doLogin(e) {
-            e.preventDefault();
-            const btn = document.getElementById('btn-login');
-            const phone = document.getElementById('login-phone').value;
-            btn.innerText = "جاري التحقق..."; btn.disabled = true;
-
-            const fd = new FormData(); fd.append('phone', phone);
-            try {
-                const res = await fetch('/api/store/login', {method: 'POST', body: fd});
-                const data = await res.json();
-                if(data.success) {
-                    localStorage.setItem('store_phone', data.phone);
-                    localStorage.setItem('store_name', data.name);
-                    updateUI(data.name, data.balance);
-                    closeModal('login-modal');
-                } else { alert(data.msg); }
-            } catch(err) { alert("حدث خطأ في الاتصال بالسيرفر."); }
-            btn.innerText = "دخول للحساب"; btn.disabled = false;
-        }
-
-        // Buy API Call
         async function buyUC(cat, price) {
-            const phone = localStorage.getItem('store_phone');
-            if(!phone) { return openModal('login-modal'); }
+            const email = localStorage.getItem('store_email');
+            // لو مش مسجل دخول يحوله فوراً لصفحة اللوجن
+            if(!email) { window.location.href = '/store-login'; return; }
 
             if(!confirm(`هل أنت متأكد من شراء ${cat} شدة بسعر ${price} ج.م؟`)) return;
 
@@ -180,9 +131,7 @@
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري التنفيذ...';
             btn.disabled = true;
 
-            const fd = new FormData();
-            fd.append('phone', phone);
-            fd.append('category', cat);
+            const fd = new FormData(); fd.append('email', email); fd.append('category', cat);
 
             try {
                 const res = await fetch('/api/store/buy', {method: 'POST', body: fd});
@@ -194,18 +143,14 @@
                     openModal('success-modal');
                 } else { 
                     alert(data.msg); 
-                    // إذا كان الرصيد غير كافٍ أو الكمية نفذت، نعيد تحديث الصفحة لتحديث البيانات
                     if(data.msg.includes("رصيدك") || data.msg.includes("نفذت")) location.reload();
                 }
             } catch(err) { alert("حدث خطأ أثناء إتمام الشراء!"); }
-            
-            btn.innerHTML = originalHtml;
-            btn.disabled = false;
+            btn.innerHTML = originalHtml; btn.disabled = false;
         }
 
         function copyPurchasedCode() {
-            const code = document.getElementById('purchased-code').innerText;
-            navigator.clipboard.writeText(code);
+            navigator.clipboard.writeText(document.getElementById('purchased-code').innerText);
             alert("تم النسخ بنجاح!");
         }
     </script>
