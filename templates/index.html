@@ -202,9 +202,9 @@
                     <div class="bg-panelbg border border-gray-800 p-6 rounded-xl h-fit">
                         <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-user-plus text-szgreen mr-2"></i> Add Staff</h3>
                         <form action="/api/add_user" method="POST">
-                            <input type="number" name="user_id" placeholder="Telegram ID" required class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg mb-3 text-sm outline-none">
-                            <input type="text" name="name" placeholder="Name" required class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg mb-3 text-sm outline-none">
-                            <select name="role" class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg mb-4 text-sm outline-none">
+                            <input type="number" name="user_id" placeholder="Telegram ID" required class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg mb-3 text-sm outline-none focus:border-szgreen">
+                            <input type="text" name="name" placeholder="Name" required class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg mb-3 text-sm outline-none focus:border-szgreen">
+                            <select name="role" class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg mb-4 text-sm outline-none focus:border-szgreen">
                                 <option value="user">Regular User</option><option value="employee">Employee / Staff</option>
                             </select>
                             <button type="submit" class="w-full bg-szgreen text-black font-bold py-2 rounded-lg btn-glow">Create User</button>
@@ -221,7 +221,7 @@
                         </div>
                         <p class="text-xs text-gray-500 mb-4">Smart Paste (Count: {{ shared_tokens_count }})</p>
                         <form action="/api/add_shared_tokens" method="POST">
-                            <textarea name="tokens" rows="3" class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg mb-3 text-xs font-mono outline-none" placeholder="Paste full store text here..."></textarea>
+                            <textarea name="tokens" rows="3" class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg mb-3 text-xs font-mono outline-none focus:border-szcyan" placeholder="Paste full store text here..."></textarea>
                             <button class="w-full bg-szcyan text-black font-bold py-2 rounded-lg btn-glow">Extract & Add Tokens</button>
                         </form>
                     </div>
@@ -249,7 +249,7 @@
                                         <td class="px-4 py-3">
                                             <form action="/api/add_user_tokens" method="POST" class="flex gap-2">
                                                 <input type="hidden" name="user_id" value="{{ u._id }}">
-                                                <input type="text" name="tokens" placeholder="Paste..." required class="w-24 lg:w-32 bg-black border border-gray-700 text-white px-2 py-1 rounded text-xs outline-none">
+                                                <input type="text" name="tokens" placeholder="Paste..." required class="w-24 lg:w-32 bg-black border border-gray-700 text-white px-2 py-1 rounded text-xs outline-none focus:border-szgreen">
                                                 <button class="bg-gray-800 text-white px-2 py-1 rounded hover:bg-szgreen hover:text-black transition" title="Extract Tokens">+</button>
                                             </form>
                                         </td>
@@ -271,10 +271,11 @@
             <div id="tab-tools" class="tab-content hidden">
                 <h2 class="text-2xl font-bold text-white mb-6">Advanced <span class="text-szgreen">Tools</span></h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    
                     <div class="bg-panelbg border border-gray-800 p-6 rounded-xl">
                         <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-search text-szgreen mr-2"></i> Unified Search (Bot & Web)</h3>
                         <div class="flex gap-2 mb-4">
-                            <input type="text" id="search-input" placeholder="Order ID (1005 or 1005S), User ID, or Code..." class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none transition">
+                            <input type="text" id="search-input" placeholder="Order ID (1005 or 1005S), User ID, or Code..." class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-szgreen transition">
                             <button onclick="performSearch()" class="bg-szgreen text-black font-bold px-6 rounded-lg btn-glow"><i class="fas fa-search"></i></button>
                         </div>
                         <div id="search-result" class="bg-black border border-gray-800 rounded-lg p-4 text-sm font-mono text-szcyan whitespace-pre-wrap hidden h-48 overflow-y-auto leading-relaxed fade-in"></div>
@@ -289,7 +290,7 @@
                         <div class="bg-panelbg border border-gray-800 p-6 rounded-xl">
                             <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-undo text-yellow-500 mr-2"></i> Return Order (Bot or Web)</h3>
                             <form action="/api/return_order" method="POST" class="flex gap-2" onsubmit="return confirm('Are you sure you want to return this order to stock?');">
-                                <input type="text" name="order_id" placeholder="Order ID (1001 or 1001S)" required class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none">
+                                <input type="text" name="order_id" placeholder="Order ID (1001 or 1001S)" required class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-yellow-500">
                                 <button class="bg-yellow-500 text-black font-bold px-6 rounded-lg hover:bg-white transition">Return</button>
                             </form>
                         </div>
@@ -299,10 +300,10 @@
                         <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-robot text-purple-500 mr-2"></i> Auto-Cache System</h3>
                         <div class="flex gap-4">
                             <form action="/api/tracked_users" method="POST" class="flex-1 flex gap-2">
-                                <input type="hidden" name="action" value="add"><input type="number" name="user_id" placeholder="Telegram ID" required class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg text-sm outline-none"><button class="bg-purple-600 text-white font-bold px-6 rounded-lg hover:bg-purple-500 transition">Add ID</button>
+                                <input type="hidden" name="action" value="add"><input type="number" name="user_id" placeholder="Telegram ID" required class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg text-sm outline-none focus:border-purple-500"><button class="bg-purple-600 text-white font-bold px-6 rounded-lg hover:bg-purple-500 transition">Add ID</button>
                             </form>
                             <form action="/api/tracked_users" method="POST" class="flex-1 flex gap-2">
-                                <input type="hidden" name="action" value="remove"><input type="number" name="user_id" placeholder="Telegram ID" required class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg text-sm outline-none"><button class="bg-gray-800 text-red-500 font-bold px-6 rounded-lg hover:bg-red-900 border border-gray-700 transition">Remove</button>
+                                <input type="hidden" name="action" value="remove"><input type="number" name="user_id" placeholder="Telegram ID" required class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg text-sm outline-none focus:border-red-500"><button class="bg-gray-800 text-red-500 font-bold px-6 rounded-lg hover:bg-red-900 border border-gray-700 transition">Remove</button>
                             </form>
                         </div>
                         <div class="mt-4 p-4 bg-black border border-gray-800 rounded-lg">
@@ -326,8 +327,8 @@
             <h3 class="text-xl font-bold text-white mb-4 border-b border-gray-800 pb-2">Edit Category</h3>
             <form onsubmit="submitAjax(event, '/api/catalog/category/edit', 'catalog')" class="space-y-4">
                 <input type="hidden" id="edit-cat-id" name="cat_id">
-                <div><label class="text-xs text-gray-500 mb-1 block">Display Name</label><input type="text" id="edit-cat-name" name="name" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none"></div>
-                <div><label class="text-xs text-gray-500 mb-1 block">Icon (FontAwesome)</label><input type="text" id="edit-cat-icon" name="icon" class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none font-mono text-sm"></div>
+                <div><label class="text-xs text-gray-500 mb-1 block">Display Name</label><input type="text" id="edit-cat-name" name="name" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500"></div>
+                <div><label class="text-xs text-gray-500 mb-1 block">Icon (FontAwesome)</label><input type="text" id="edit-cat-icon" name="icon" class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500 font-mono text-sm"></div>
                 <button type="submit" class="w-full bg-yellow-500 text-black font-bold py-3 rounded-lg mt-2 btn-glow">Save Changes</button>
             </form>
         </div>
@@ -340,10 +341,10 @@
             <form onsubmit="submitAjax(event, '/api/catalog/product/edit', 'catalog')" class="space-y-4">
                 <input type="hidden" id="edit-prod-cat-id" name="cat_id">
                 <input type="hidden" id="edit-prod-key" name="stock_key">
-                <div><label class="text-xs text-gray-500 mb-1 block">Product Name</label><input type="text" id="edit-prod-name" name="name" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none"></div>
+                <div><label class="text-xs text-gray-500 mb-1 block">Product Name</label><input type="text" id="edit-prod-name" name="name" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500"></div>
                 <div class="flex gap-4">
-                    <div class="w-1/2"><label class="text-xs text-yellow-500 mb-1 block">Price (EGP)</label><input type="number" step="0.01" id="edit-prod-egp" name="price_egp" required class="w-full bg-[#050505] border border-gray-800 text-yellow-500 font-bold p-3 rounded-lg outline-none"></div>
-                    <div class="w-1/2"><label class="text-xs text-szcyan mb-1 block">Price (USD)</label><input type="number" step="0.01" id="edit-prod-usd" name="price_usd" required class="w-full bg-[#050505] border border-gray-800 text-szcyan font-bold p-3 rounded-lg outline-none"></div>
+                    <div class="w-1/2"><label class="text-xs text-yellow-500 mb-1 block">Price (EGP)</label><input type="number" step="0.01" id="edit-prod-egp" name="price_egp" required class="w-full bg-[#050505] border border-gray-800 text-yellow-500 font-bold p-3 rounded-lg outline-none focus:border-yellow-500"></div>
+                    <div class="w-1/2"><label class="text-xs text-szcyan mb-1 block">Price (USD)</label><input type="number" step="0.01" id="edit-prod-usd" name="price_usd" required class="w-full bg-[#050505] border border-gray-800 text-szcyan font-bold p-3 rounded-lg outline-none focus:border-szcyan"></div>
                 </div>
                 <button type="submit" class="w-full bg-yellow-500 text-black font-bold py-3 rounded-lg mt-2 btn-glow">Save Pricing</button>
             </form>
@@ -383,7 +384,7 @@
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.getElementById('tab-' + tabId).classList.remove('hidden');
-            document.querySelectorAll('[id^="btn-"]').forEach(el => { el.classList.remove('nav-active', 'text-white'); el.classList.add('text-gray-500'); });
+            document.querySelectorAll('.nav-btn').forEach(el => { el.classList.remove('nav-active', 'text-white'); el.classList.add('text-gray-500'); });
             if(tabId !== 'store') { document.getElementById('btn-' + tabId).classList.add('nav-active', 'text-white'); } 
             window.history.replaceState({}, '', '/admin?tab=' + tabId);
             const sidebar = document.getElementById('sidebar');
