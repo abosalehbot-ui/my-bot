@@ -7,61 +7,26 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script>tailwind.config={theme:{extend:{colors:{szgreen:'#7dfc89',szcyan:'#5eead4',darkbg:'#050505',panelbg:'#111'}}}}</script>
-   <style>
-        /* الخطوط والخلفية الأساسية */
+    <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
         body { font-family: 'Cairo', sans-serif; background-color: #050505; color: #d1d5db; scroll-behavior: smooth; }
-        
-        /* شريط التمرير (Scrollbar) المضيء */
-        ::-webkit-scrollbar { width: 6px; } 
-        ::-webkit-scrollbar-track { background: #050505; } 
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; transition: 0.3s; }
-        ::-webkit-scrollbar-thumb:hover { background: #7dfc89; box-shadow: 0 0 10px #7dfc89; }
-
-        /* 1. تأثير الدخول الناعم (Fade In) */
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
-        .fade-in-delayed { animation: fadeIn 0.5s ease-out 0.2s forwards; opacity: 0; }
-
-        /* 2. تأثير الطيران (Floating) لصور الشدات واللوجو */
-        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-8px); } 100% { transform: translateY(0px); } }
-        .floating { animation: float 3s ease-in-out infinite; }
-
-        /* 3. تأثير النبض المضيء (Pulse Glow) للزراير */
-        @keyframes pulseGlow { 
-            0% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } 
-            50% { box-shadow: 0 0 25px rgba(125,252,137,0.6); transform: scale(1.02); } 
-            100% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } 
-        }
-        .btn-glow { transition: all 0.3s ease; }
-        .btn-glow:hover { animation: pulseGlow 1.5s infinite; border-color: #7dfc89; }
-
-        /* 4. تأثير حركة الألوان في النصوص (Gradient Flow) */
-        @keyframes gradientX { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-        .text-gradient-animate { background-size: 200% 200%; animation: gradientX 3s ease infinite; }
-
-        /* 5. تصميم الكروت الزجاجية (Glass & Hover Cards) */
-        .glass-panel { background: rgba(17, 17, 17, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
-        .uc-card { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        .uc-card:hover { transform: translateY(-8px); box-shadow: 0 15px 35px rgba(94, 234, 212, 0.15); border-color: #5eead4; }
-
-        /* 6. توهج عند الكتابة في الخانات (Input Focus) */
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #050505; } ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; transition: 0.3s; } ::-webkit-scrollbar-thumb:hover { background: #7dfc89; box-shadow: 0 0 10px #7dfc89; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } } .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-8px); } 100% { transform: translateY(0px); } } .floating { animation: float 3s ease-in-out infinite; }
+        @keyframes pulseGlow { 0% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } 50% { box-shadow: 0 0 25px rgba(125,252,137,0.6); transform: scale(1.02); } 100% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } } .btn-glow { transition: all 0.3s ease; } .btn-glow:hover { animation: pulseGlow 1.5s infinite; border-color: #7dfc89; }
+        @keyframes gradientX { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } } .text-gradient-animate { background-size: 200% 200%; animation: gradientX 3s ease infinite; }
         input:focus, select:focus, textarea:focus { box-shadow: 0 0 15px rgba(125,252,137,0.15); transition: box-shadow 0.3s ease; }
-        
-        /* تأثيرات القائمة الجانبية للأدمن */
         .nav-active { background: linear-gradient(90deg, rgba(125,252,137,0.15) 0%, transparent 100%); border-left: 3px solid #7dfc89; color: #7dfc89; text-shadow: 0 0 10px rgba(125,252,137,0.3); }
     </style>
 </head>
-<body class="bg-darkbg text-gray-300 font-sans flex h-screen overflow-hidden selection:bg-szgreen selection:text-black relative">
-
+<body class="bg-darkbg text-gray-300 flex h-screen overflow-hidden selection:bg-szgreen selection:text-black relative">
     <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black/70 z-30 hidden md:hidden transition-opacity"></div>
-
     <aside id="sidebar" class="w-64 bg-panelbg border-r border-gray-900 flex flex-col justify-between fixed md:relative z-40 h-full transition-transform transform -translate-x-full md:translate-x-0 shadow-2xl">
         <div>
             <div class="h-20 flex items-center px-6 border-b border-gray-900 justify-between">
                 <div class="flex items-center">
-                    <img src="/static/logo.png" alt="SZ" class="h-10 mr-3 drop-shadow-[0_0_8px_rgba(125,252,137,0.5)]" onerror="this.style.display='none'">
-                    <span class="text-xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan">SALEH ZONE</span>
+                    <div class="inline-flex items-center justify-center w-8 h-8 bg-black rounded-full border border-szgreen/50 mr-2 shadow-[0_0_10px_rgba(125,252,137,0.2)] font-black text-szgreen text-xs floating">SZ</div>
+                    <span class="text-xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">SALEH ZONE</span>
                 </div>
                 <button onclick="toggleSidebar()" class="md:hidden text-gray-500 hover:text-white"><i class="fas fa-times text-xl"></i></button>
             </div>
@@ -69,11 +34,9 @@
                 <button onclick="switchTab('overview')" id="btn-overview" class="nav-active text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-chart-pie w-6"></i> Overview & Logs</button>
                 <button onclick="switchTab('stock')" id="btn-stock" class="text-gray-500 text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-box-open w-6"></i> Stock Manage</button>
                 <button onclick="switchTab('users')" id="btn-users" class="text-gray-500 text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-user-tie w-6"></i> Staff & Tokens</button>
-                
                 <div class="my-4 border-t border-gray-800"></div>
                 <a href="/store-admin" class="text-yellow-500 text-left px-4 py-3 rounded-lg text-sm font-bold hover:bg-yellow-500 hover:text-black transition border border-yellow-500/30 flex items-center"><i class="fas fa-shopping-cart w-6"></i> B2C Store Admin</a>
                 <div class="my-4 border-t border-gray-800"></div>
-                
                 <button onclick="switchTab('tools')" id="btn-tools" class="text-gray-500 text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-tools w-6"></i> Advanced Tools</button>
             </nav>
         </div>
@@ -85,17 +48,16 @@
     <main class="flex-1 flex flex-col h-screen overflow-y-auto">
         <header class="h-16 bg-panelbg border-b border-gray-900 flex items-center justify-between px-6 md:hidden sticky top-0 z-20 shadow-md">
             <button onclick="toggleSidebar()" class="text-white text-xl"><i class="fas fa-bars"></i></button>
-            <span class="text-lg font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan">SALEH ZONE</span>
+            <span class="text-lg font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">SALEH ZONE</span>
             <div class="w-6"></div>
         </header>
 
-        <div class="p-4 md:p-10">
+        <div class="p-4 md:p-10 fade-in">
             <div id="tab-overview" class="tab-content block">
-                
                 <h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-robot text-szgreen mr-2"></i> Bot Operations (Staff)</h3>
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center"><div class="text-gray-500 text-[10px] font-bold uppercase mb-1">Total Staff/Users</div><div class="text-2xl font-black text-white">{{ users_count }}</div></div>
-                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center relative overflow-hidden"><div class="text-szgreen text-[10px] font-bold uppercase mb-1">UC Stock Available</div><div class="text-2xl font-black text-white">{{ stock_count }}</div><div class="absolute bottom-0 left-0 w-full h-1 bg-szgreen"></div></div>
+                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center hover:border-gray-600 transition"><div class="text-gray-500 text-[10px] font-bold uppercase mb-1">Total Staff/Users</div><div class="text-2xl font-black text-white">{{ users_count }}</div></div>
+                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center relative overflow-hidden hover:border-szgreen transition"><div class="text-szgreen text-[10px] font-bold uppercase mb-1">UC Stock Available</div><div class="text-2xl font-black text-white">{{ stock_count }}</div><div class="absolute bottom-0 left-0 w-full h-1 bg-szgreen"></div></div>
                     <div class="bg-[#0a0a0a] border border-szcyan/30 p-4 rounded-xl text-center"><div class="text-szcyan text-[10px] font-bold uppercase mb-1">Codes Pulled (Today/Month)</div><div class="text-2xl font-black text-szcyan">{{ global_stats.stock_today }} <span class="text-sm text-gray-500">/ {{ global_stats.stock_month }}</span></div></div>
                     <div class="bg-[#0a0a0a] border border-purple-500/30 p-4 rounded-xl text-center"><div class="text-purple-400 text-[10px] font-bold uppercase mb-1">API Pulled (Today/Month)</div><div class="text-2xl font-black text-purple-400">{{ global_stats.api_today }} <span class="text-sm text-gray-500">/ {{ global_stats.api_month }}</span></div></div>
                 </div>
@@ -103,16 +65,16 @@
                 <h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-shopping-cart text-yellow-500 mr-2"></i> Storefront Sales (B2C)</h3>
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                     <div class="bg-panelbg border border-yellow-500/30 p-4 rounded-xl text-center"><div class="text-yellow-500 text-[10px] font-bold uppercase mb-1">Revenue Today</div><div class="text-2xl font-black text-yellow-500">+{{ store_stats.rev_today }} <span class="text-xs">EGP</span></div></div>
-                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center"><div class="text-gray-500 text-[10px] font-bold uppercase mb-1">Revenue Month</div><div class="text-2xl font-black text-white">+{{ store_stats.rev_month }} <span class="text-xs text-gray-600">EGP</span></div></div>
-                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center"><div class="text-gray-500 text-[10px] font-bold uppercase mb-1">Orders Today</div><div class="text-2xl font-black text-white">{{ store_stats.sales_today }}</div></div>
-                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center"><div class="text-gray-500 text-[10px] font-bold uppercase mb-1">Orders Month</div><div class="text-2xl font-black text-white">{{ store_stats.sales_month }}</div></div>
+                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center hover:border-gray-600 transition"><div class="text-gray-500 text-[10px] font-bold uppercase mb-1">Revenue Month</div><div class="text-2xl font-black text-white">+{{ store_stats.rev_month }} <span class="text-xs text-gray-600">EGP</span></div></div>
+                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center hover:border-gray-600 transition"><div class="text-gray-500 text-[10px] font-bold uppercase mb-1">Orders Today</div><div class="text-2xl font-black text-white">{{ store_stats.sales_today }}</div></div>
+                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center hover:border-gray-600 transition"><div class="text-gray-500 text-[10px] font-bold uppercase mb-1">Orders Month</div><div class="text-2xl font-black text-white">{{ store_stats.sales_month }}</div></div>
                 </div>
 
                 <h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-terminal text-gray-500 mr-2"></i> Live Detailed Logs</h3>
                 <div class="bg-black border border-gray-800 rounded-xl p-6 relative overflow-hidden">
                     <div class="h-80 overflow-y-auto space-y-3 pb-10 pr-2">
                         {% for log in logs %}
-                        <div class="border-l-2 border-szgreen pl-4 py-3 bg-white/5 rounded-r">
+                        <div class="border-l-2 border-szgreen pl-4 py-3 bg-white/5 rounded-r hover:bg-white/10 transition">
                             <div class="flex justify-between items-center mb-1">
                                 <span class="text-szcyan font-bold text-sm"><i class="fas fa-user-circle mr-1 text-gray-500"></i> {{ log.name }}</span>
                                 <span class="text-gray-500 text-xs font-mono">{{ log.time }}</span>
@@ -140,7 +102,7 @@
                             <select name="role" class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg mb-4 text-sm focus:border-szgreen outline-none">
                                 <option value="user">Regular User</option><option value="employee">Employee / Staff</option>
                             </select>
-                            <button type="submit" class="w-full bg-szgreen text-black font-bold py-2 rounded-lg">Create User</button>
+                            <button type="submit" class="w-full bg-szgreen text-black font-bold py-2 rounded-lg btn-glow">Create User</button>
                         </form>
                         <hr class="border-gray-800 my-6">
                         
@@ -154,30 +116,28 @@
                         <p class="text-xs text-gray-500 mb-4">Smart Paste (Count: {{ shared_tokens_count }})</p>
                         <form action="/api/add_shared_tokens" method="POST">
                             <textarea name="tokens" rows="3" class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg mb-3 text-xs font-mono focus:border-szcyan outline-none" placeholder="Paste full store text here..."></textarea>
-                            <button class="w-full bg-szcyan text-black font-bold py-2 rounded-lg shadow-lg shadow-szcyan/20">Extract & Add Tokens</button>
+                            <button class="w-full bg-szcyan text-black font-bold py-2 rounded-lg btn-glow">Extract & Add Tokens</button>
                         </form>
                     </div>
                     
                     <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden lg:col-span-2 flex flex-col h-[700px]">
-                        <div class="px-6 py-4 border-b border-gray-800"><h3 class="font-bold text-white uppercase text-sm">Staff Management & Individual Stats</h3></div>
+                        <div class="px-6 py-4 border-b border-gray-800"><h3 class="font-bold text-white uppercase text-sm">Staff Management & Stats</h3></div>
                         <div class="overflow-x-auto flex-1 p-2">
                             <table class="w-full text-left text-sm whitespace-nowrap">
-                                <thead class="bg-[#151515] text-gray-500"><tr><th class="px-4 py-3">User</th><th class="px-4 py-3">Detailed Pulls (T/M)</th><th class="px-4 py-3">Smart Tokens</th><th class="px-4 py-3">Actions</th></tr></thead>
+                                <thead class="bg-[#151515] text-gray-500"><tr><th class="px-4 py-3">User</th><th class="px-4 py-3">Details (T/M)</th><th class="px-4 py-3">Smart Tokens</th><th class="px-4 py-3">Actions</th></tr></thead>
                                 <tbody class="divide-y divide-gray-900">
                                     {% for u in all_users %}
-                                    <tr class="hover:bg-gray-900/50">
+                                    <tr class="hover:bg-gray-900/50 transition">
                                         <td class="px-4 py-3">
                                             <div class="font-bold text-white flex items-center gap-2">{{ u.name }} <span class="px-2 py-0.5 rounded text-[10px] {% if u.role == 'admin' %}bg-red-900 text-red-300{% elif u.role == 'employee' %}bg-szcyan/20 text-szcyan{% else %}bg-gray-800 text-gray-400{% endif %} uppercase tracking-wider">{{ u.role }}</span></div>
                                             <div class="text-[10px] text-gray-500 font-mono mt-1">{{ u._id }} | 🔑 Tokens: <span class="text-white">{{ u.tokens|length }}</span></div>
                                         </td>
                                         <td class="px-4 py-3 text-xs font-mono">
                                             <div class="mb-1 bg-black px-2 py-1 rounded inline-block border border-gray-800">
-                                                <span class="text-[9px] text-gray-500 uppercase mr-1">API:</span>
-                                                <span class="text-purple-400 font-bold" title="API Today">{{ u.stats_details.api_today }}</span> / <span class="text-gray-500" title="API Month">{{ u.stats_details.api_month }}</span>
+                                                <span class="text-[9px] text-gray-500 uppercase mr-1">API:</span><span class="text-purple-400 font-bold">{{ u.stats_details.api_today }}</span> / <span class="text-gray-500">{{ u.stats_details.api_month }}</span>
                                             </div>
                                             <div class="bg-black px-2 py-1 rounded inline-block border border-gray-800">
-                                                <span class="text-[9px] text-gray-500 uppercase mr-1">Codes:</span>
-                                                <span class="text-szcyan font-bold" title="Codes Today">{{ u.stats_details.stock_today }}</span> / <span class="text-gray-500" title="Codes Month">{{ u.stats_details.stock_month }}</span>
+                                                <span class="text-[9px] text-gray-500 uppercase mr-1">Codes:</span><span class="text-szcyan font-bold">{{ u.stats_details.stock_today }}</span> / <span class="text-gray-500">{{ u.stats_details.stock_month }}</span>
                                             </div>
                                         </td>
                                         <td class="px-4 py-3">
@@ -188,10 +148,10 @@
                                             </form>
                                         </td>
                                         <td class="px-4 py-3 flex gap-2 items-center h-full pt-4">
-                                            <form action="/api/user_action" method="POST" title="Toggle Role"><input type="hidden" name="user_id" value="{{ u._id }}"><input type="hidden" name="action" value="toggle_role"><button class="text-gray-400 hover:text-white p-1"><i class="fas fa-user-cog"></i></button></form>
-                                            <form action="/api/user_action" method="POST" title="Clear Tokens" onsubmit="return confirm('Clear tokens?');"><input type="hidden" name="user_id" value="{{ u._id }}"><input type="hidden" name="action" value="clear_tokens"><button class="text-yellow-500 hover:text-yellow-400 p-1"><i class="fas fa-eraser"></i></button></form>
-                                            <form action="/api/user_action" method="POST" title="Clear Logs" onsubmit="return confirm('Clear logs?');"><input type="hidden" name="user_id" value="{{ u._id }}"><input type="hidden" name="action" value="clear_logs"><button class="text-purple-500 hover:text-purple-400 p-1"><i class="fas fa-history"></i></button></form>
-                                            <form action="/api/user_action" method="POST" title="Delete User" onsubmit="return confirm('DELETE this user?');"><input type="hidden" name="user_id" value="{{ u._id }}"><input type="hidden" name="action" value="delete"><button class="text-red-600 hover:text-red-400 p-1"><i class="fas fa-trash"></i></button></form>
+                                            <form action="/api/user_action" method="POST" title="Toggle Role"><input type="hidden" name="user_id" value="{{ u._id }}"><input type="hidden" name="action" value="toggle_role"><button class="text-gray-400 hover:text-white p-1 transition"><i class="fas fa-user-cog"></i></button></form>
+                                            <form action="/api/user_action" method="POST" title="Clear Tokens" onsubmit="return confirm('Clear tokens?');"><input type="hidden" name="user_id" value="{{ u._id }}"><input type="hidden" name="action" value="clear_tokens"><button class="text-yellow-500 hover:text-yellow-400 p-1 transition"><i class="fas fa-eraser"></i></button></form>
+                                            <form action="/api/user_action" method="POST" title="Clear Logs" onsubmit="return confirm('Clear logs?');"><input type="hidden" name="user_id" value="{{ u._id }}"><input type="hidden" name="action" value="clear_logs"><button class="text-purple-500 hover:text-purple-400 p-1 transition"><i class="fas fa-history"></i></button></form>
+                                            <form action="/api/user_action" method="POST" title="Delete User" onsubmit="return confirm('DELETE this user?');"><input type="hidden" name="user_id" value="{{ u._id }}"><input type="hidden" name="action" value="delete"><button class="text-red-600 hover:text-red-400 p-1 transition"><i class="fas fa-trash"></i></button></form>
                                         </td>
                                     </tr>
                                     {% endfor %}
@@ -208,15 +168,15 @@
                     <div class="bg-panelbg border border-gray-800 p-6 rounded-xl">
                         <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-search text-szgreen mr-2"></i> Global Search</h3>
                         <div class="flex gap-2 mb-4">
-                            <input type="text" id="search-input" placeholder="Order ID, User ID, or Code..." class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-szgreen">
-                            <button onclick="performSearch()" class="bg-szgreen text-black font-bold px-6 rounded-lg hover:bg-white"><i class="fas fa-search"></i></button>
+                            <input type="text" id="search-input" placeholder="Order ID, User ID, or Code..." class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-szgreen transition">
+                            <button onclick="performSearch()" class="bg-szgreen text-black font-bold px-6 rounded-lg btn-glow"><i class="fas fa-search"></i></button>
                         </div>
-                        <div id="search-result" class="bg-black border border-gray-800 rounded-lg p-4 text-sm font-mono text-szcyan whitespace-pre-wrap hidden h-48 overflow-y-auto leading-relaxed"></div>
+                        <div id="search-result" class="bg-black border border-gray-800 rounded-lg p-4 text-sm font-mono text-szcyan whitespace-pre-wrap hidden h-48 overflow-y-auto leading-relaxed fade-in"></div>
                     </div>
                     
                     <div class="space-y-6">
                         <div class="bg-panelbg border border-gray-800 p-6 rounded-xl flex flex-col items-center text-center">
-                            <i class="fas fa-hammer text-4xl mb-4 {% if maintenance %}text-red-500{% else %}text-gray-600{% endif %}"></i>
+                            <i class="fas fa-hammer text-4xl mb-4 {% if maintenance %}text-red-500 floating{% else %}text-gray-600{% endif %}"></i>
                             <h3 class="font-bold text-white uppercase text-lg mb-2">Bot Maintenance</h3>
                             <button onclick="toggleMaintenance()" class="py-3 px-8 w-full rounded-lg font-bold transition {% if maintenance %}bg-red-900 text-red-300 border border-red-900{% else %}bg-gray-800 text-white hover:bg-szgreen hover:text-black{% endif %}">{% if maintenance %}TURN MAINTENANCE OFF{% else %}TURN MAINTENANCE ON{% endif %}</button>
                         </div>
@@ -224,7 +184,7 @@
                             <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-undo text-yellow-500 mr-2"></i> Return Order</h3>
                             <form action="/api/return_order" method="POST" class="flex gap-2" onsubmit="return confirm('Return this order?');">
                                 <input type="number" name="order_id" placeholder="Order ID" required class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-yellow-500">
-                                <button class="bg-yellow-500 text-black font-bold px-6 rounded-lg hover:bg-white">Return</button>
+                                <button class="bg-yellow-500 text-black font-bold px-6 rounded-lg hover:bg-white transition">Return</button>
                             </form>
                         </div>
                     </div>
@@ -233,10 +193,10 @@
                         <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-robot text-purple-500 mr-2"></i> Auto-Cache System</h3>
                         <div class="flex gap-4">
                             <form action="/api/tracked_users" method="POST" class="flex-1 flex gap-2">
-                                <input type="hidden" name="action" value="add"><input type="number" name="user_id" placeholder="Add Telegram ID" required class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg text-sm focus:border-purple-500 outline-none"><button class="bg-purple-600 text-white font-bold px-6 rounded-lg hover:bg-purple-500">Add ID</button>
+                                <input type="hidden" name="action" value="add"><input type="number" name="user_id" placeholder="Telegram ID" required class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg text-sm focus:border-purple-500 outline-none"><button class="bg-purple-600 text-white font-bold px-6 rounded-lg hover:bg-purple-500 transition">Add ID</button>
                             </form>
                             <form action="/api/tracked_users" method="POST" class="flex-1 flex gap-2">
-                                <input type="hidden" name="action" value="remove"><input type="number" name="user_id" placeholder="Remove Telegram ID" required class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg text-sm focus:border-red-500 outline-none"><button class="bg-gray-800 text-red-500 font-bold px-6 rounded-lg hover:bg-red-900 border border-gray-700 hover:border-red-500 transition">Remove</button>
+                                <input type="hidden" name="action" value="remove"><input type="number" name="user_id" placeholder="Telegram ID" required class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg text-sm focus:border-red-500 outline-none"><button class="bg-gray-800 text-red-500 font-bold px-6 rounded-lg hover:bg-red-900 border border-gray-700 hover:border-red-500 transition">Remove</button>
                             </form>
                         </div>
                         <div class="mt-4 p-4 bg-black border border-gray-800 rounded-lg">
@@ -271,12 +231,12 @@
                 <div class="bg-panelbg border border-gray-800 rounded-xl p-6 max-w-2xl">
                     <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-magic text-szgreen mr-2"></i> Smart Upload</h3>
                     <form id="smart-stock-form" onsubmit="submitSmartStock(event)">
-                        <select name="category" id="smart-cat" class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-szcyan mb-4">
+                        <select name="category" id="smart-cat" class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-szcyan mb-4 transition">
                             <option value="60">60 UC</option><option value="325">325 UC</option><option value="660">660 UC</option>
                             <option value="1800">1800 UC</option><option value="3850">3850 UC</option><option value="8100">8100 UC</option>
                         </select>
-                        <textarea name="codes" id="smart-codes" rows="6" class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-szcyan font-mono text-sm mb-4" placeholder="Paste your codes here..."></textarea>
-                        <button type="submit" id="smart-btn" class="bg-szgreen text-black font-bold py-3 px-6 rounded-lg w-full text-lg shadow-lg shadow-szgreen/20 hover:opacity-90 flex justify-center items-center gap-2">
+                        <textarea name="codes" id="smart-codes" rows="6" class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-szcyan font-mono text-sm mb-4 transition" placeholder="Paste your codes here..."></textarea>
+                        <button type="submit" id="smart-btn" class="bg-szgreen text-black font-bold py-3 px-6 rounded-lg w-full text-lg btn-glow flex justify-center items-center gap-2">
                             <span>Scan & Add Codes</span> <i class="fas fa-upload"></i>
                         </button>
                     </form>
@@ -286,29 +246,29 @@
     </main>
 
     <div id="stock-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-panelbg border border-gray-800 w-full max-w-lg rounded-xl shadow-2xl flex flex-col max-h-[80vh]">
+        <div class="bg-panelbg border border-gray-800 w-full max-w-lg rounded-xl shadow-2xl flex flex-col max-h-[80vh] fade-in">
             <div class="p-4 border-b border-gray-800 flex justify-between items-center">
                 <h3 class="font-bold text-white" id="modal-title">Category Codes</h3>
-                <button onclick="closeModal('stock-modal')" class="text-gray-500 hover:text-red-500"><i class="fas fa-times text-xl"></i></button>
+                <button onclick="closeModal('stock-modal')" class="text-gray-500 hover:text-red-500 transition"><i class="fas fa-times text-xl"></i></button>
             </div>
             <div class="p-4 flex-1 overflow-hidden flex flex-col"><textarea id="modal-codes-list" class="w-full flex-1 bg-[#0a0a0a] border border-gray-800 text-szgreen p-3 rounded-lg focus:outline-none font-mono text-xs" readonly></textarea></div>
-            <div class="p-4 border-t border-gray-800 flex justify-end"><button onclick="copyModalCodes('modal-codes-list')" class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-szcyan hover:text-black font-bold"><i class="fas fa-copy mr-2"></i>Copy All</button></div>
+            <div class="p-4 border-t border-gray-800 flex justify-end"><button onclick="copyModalCodes('modal-codes-list')" class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-szcyan hover:text-black font-bold transition"><i class="fas fa-copy mr-2"></i>Copy All</button></div>
         </div>
     </div>
 
     <div id="shared-tokens-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-panelbg border border-gray-800 w-full max-w-lg rounded-xl shadow-2xl flex flex-col max-h-[80vh]">
+        <div class="bg-panelbg border border-gray-800 w-full max-w-lg rounded-xl shadow-2xl flex flex-col max-h-[80vh] fade-in">
             <div class="p-4 border-b border-gray-800 flex justify-between items-center">
                 <h3 class="font-bold text-white"><i class="fas fa-users mr-2 text-szcyan"></i>Shared Tokens Pool</h3>
-                <button onclick="closeModal('shared-tokens-modal')" class="text-gray-500 hover:text-red-500"><i class="fas fa-times text-xl"></i></button>
+                <button onclick="closeModal('shared-tokens-modal')" class="text-gray-500 hover:text-red-500 transition"><i class="fas fa-times text-xl"></i></button>
             </div>
             <div class="p-4 flex-1 overflow-hidden flex flex-col"><textarea id="modal-shared-tokens-list" class="w-full flex-1 bg-[#0a0a0a] border border-gray-800 text-szcyan p-3 rounded-lg focus:outline-none font-mono text-xs" readonly></textarea></div>
-            <div class="p-4 border-t border-gray-800 flex justify-end"><button onclick="copyModalCodes('modal-shared-tokens-list')" class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-szcyan hover:text-black font-bold"><i class="fas fa-copy mr-2"></i>Copy All</button></div>
+            <div class="p-4 border-t border-gray-800 flex justify-end"><button onclick="copyModalCodes('modal-shared-tokens-list')" class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-szcyan hover:text-black font-bold transition"><i class="fas fa-copy mr-2"></i>Copy All</button></div>
         </div>
     </div>
 
     <div id="report-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-panelbg border border-gray-800 w-full max-w-md rounded-xl shadow-2xl overflow-hidden transform scale-95 transition-transform" id="report-modal-content">
+        <div class="bg-panelbg border border-gray-800 w-full max-w-md rounded-xl shadow-2xl overflow-hidden fade-in">
             <div class="p-6 text-center border-b border-gray-800">
                 <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-szgreen/20 text-szgreen mb-4"><i class="fas fa-check-circle text-3xl"></i></div>
                 <h3 class="text-xl font-bold text-white">Upload Complete</h3>
@@ -319,7 +279,7 @@
                 <div class="flex justify-between text-sm"><span class="text-gray-400">Duplicates Rejected:</span> <span class="font-bold text-red-500" id="rep-dupes">0</span></div>
                 <div id="dupes-container" class="hidden mt-4 pt-4 border-t border-gray-800"><p class="text-xs text-red-400 mb-2">Rejected Codes:</p><textarea id="rep-dupes-list" class="w-full h-24 bg-[#0a0a0a] border border-red-900/50 text-red-500 p-2 rounded-lg text-xs font-mono" readonly></textarea></div>
             </div>
-            <div class="p-4 bg-gray-900/50 text-center"><button onclick="closeReportModal()" class="bg-szgreen text-black font-bold px-8 py-2 rounded-lg">Done</button></div>
+            <div class="p-4 bg-gray-900/50 text-center"><button onclick="closeReportModal()" class="bg-szgreen text-black font-bold px-8 py-2 rounded-lg transition hover:opacity-90">Done</button></div>
         </div>
     </div>
 
@@ -328,10 +288,7 @@
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.getElementById('tab-' + tabId).classList.remove('hidden');
             document.querySelectorAll('[id^="btn-"]').forEach(el => { el.classList.remove('nav-active', 'text-white'); el.classList.add('text-gray-500'); });
-            
             if(tabId !== 'store') { document.getElementById('btn-' + tabId).classList.add('nav-active', 'text-white'); } 
-            
-            // تم تعديل التوجيه ليصبح /admin بدلاً من /
             window.history.replaceState({}, '', '/admin?tab=' + tabId);
             const sidebar = document.getElementById('sidebar');
             if(window.innerWidth < 768 && !sidebar.classList.contains('-translate-x-full')) toggleSidebar();
@@ -412,7 +369,6 @@
                 } else { document.getElementById('dupes-container').classList.add('hidden'); }
                 
                 document.getElementById('report-modal').classList.remove('hidden');
-                setTimeout(() => document.getElementById('report-modal-content').classList.remove('scale-95'), 50);
                 document.getElementById('smart-codes').value = ""; 
             } catch(err) { alert("Error connecting to server."); }
             btn.innerHTML = '<span>Scan & Add Codes</span> <i class="fas fa-upload"></i>';
@@ -423,4 +379,3 @@
     </script>
 </body>
 </html>
-
