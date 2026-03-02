@@ -141,19 +141,23 @@
                 <form class="space-y-3" onsubmit="doSignupRequest(event)">
                     <div class="text-sm">
                         <label class="block text-gray-400 mb-1 font-bold">Full Name</label>
-                        <input type="text" id="signup-name" required placeholder="John Doe" class="w-full rounded-md border border-gray-700 bg-[#0a0a0a] px-4 py-2.5 text-gray-200 outline-none focus:border-szgreen transition-colors">
+                        <input type="text" id="signup-name" required placeholder="John Doe" class="w-full rounded-md border border-gray-700 bg-[#0a0a0a] px-4 py-2 text-gray-200 outline-none focus:border-szgreen transition-colors">
+                    </div>
+                    <div class="text-sm">
+                        <label class="block text-gray-400 mb-1 font-bold">Username</label>
+                        <input type="text" id="signup-username" required placeholder="saleh_99" class="w-full rounded-md border border-gray-700 bg-[#0a0a0a] px-4 py-2 text-gray-200 outline-none focus:border-szgreen transition-colors">
                     </div>
                     <div class="text-sm">
                         <label class="block text-gray-400 mb-1 font-bold">Email Address</label>
-                        <input type="email" id="signup-email" required placeholder="name@example.com" class="w-full rounded-md border border-gray-700 bg-[#0a0a0a] px-4 py-2.5 text-gray-200 outline-none focus:border-szgreen transition-colors">
+                        <input type="email" id="signup-email" required placeholder="name@example.com" class="w-full rounded-md border border-gray-700 bg-[#0a0a0a] px-4 py-2 text-gray-200 outline-none focus:border-szgreen transition-colors">
                     </div>
                     <div class="text-sm">
-                        <label class="block text-gray-400 mb-1 font-bold">Password</label>
-                        <input type="password" id="signup-password" required placeholder="••••••••" class="w-full rounded-md border border-gray-700 bg-[#0a0a0a] px-4 py-2.5 text-gray-200 outline-none focus:border-szcyan transition-colors">
+                        <label class="block text-gray-400 mb-1 font-bold">Password (Min 8 Chars)</label>
+                        <input type="password" id="signup-password" required minlength="8" placeholder="••••••••" class="w-full rounded-md border border-gray-700 bg-[#0a0a0a] px-4 py-2 text-gray-200 outline-none focus:border-szcyan transition-colors">
                     </div>
                     <div class="text-sm">
                         <label class="block text-gray-400 mb-1 font-bold">Confirm Password</label>
-                        <input type="password" id="signup-confirm" required placeholder="••••••••" class="w-full rounded-md border border-gray-700 bg-[#0a0a0a] px-4 py-2.5 text-gray-200 outline-none focus:border-szcyan transition-colors">
+                        <input type="password" id="signup-confirm" required minlength="8" placeholder="••••••••" class="w-full rounded-md border border-gray-700 bg-[#0a0a0a] px-4 py-2 text-gray-200 outline-none focus:border-szcyan transition-colors">
                     </div>
                     <button type="submit" id="btn-signup" class="w-full bg-gradient-to-r from-szgreen to-szcyan text-black py-3 rounded-md font-bold uppercase tracking-wide btn-glow mt-4">Create Account</button>
                 </form>
@@ -223,7 +227,6 @@
             closeModal('auth-modal');
         }
 
-        // تسجيل الخروج الآمن (بيمسح الكوكي من السيرفر)
         async function logout() { 
             await fetch('/api/store/logout', {method: 'POST'});
             localStorage.clear(); 
@@ -277,15 +280,16 @@
             e.preventDefault();
             const btn = document.getElementById('btn-signup');
             const name = document.getElementById('signup-name').value;
+            const username = document.getElementById('signup-username').value;
             const email = document.getElementById('signup-email').value;
             const pass = document.getElementById('signup-password').value;
             const conf = document.getElementById('signup-confirm').value;
 
             if(pass !== conf) { setStatus("Passwords do not match!", true); return; }
-            if(pass.length < 6) { setStatus("Password must be at least 6 characters.", true); return; }
+            if(pass.length < 8) { setStatus("Password must be at least 8 characters.", true); return; }
 
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending Code...'; btn.disabled = true;
-            const fd = new FormData(); fd.append('name', name); fd.append('email', email); fd.append('password', pass);
+            const fd = new FormData(); fd.append('name', name); fd.append('username', username); fd.append('email', email); fd.append('password', pass);
             
             try {
                 const res = await fetch('/api/store/signup-request', {method: 'POST', body: fd});
@@ -336,7 +340,6 @@
             } catch(err) { setStatus('Connection error!', true); }
         }
 
-        // عملية الشراء الآمنة (مش بنبعت الإيميل من هنا خالص، السيرفر بيقراه من الكوكي المشفّرة)
         async function buyUC(cat, price) {
             const email = localStorage.getItem('store_email');
             if(!email) { openAuthModal('signin'); return; }
@@ -347,7 +350,7 @@
             const originalHtml = btn.innerHTML;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...'; btn.disabled = true;
 
-            const fd = new FormData(); fd.append('category', cat); // الإيميل اتشال من هنا للحماية
+            const fd = new FormData(); fd.append('category', cat);
             try {
                 const res = await fetch('/api/store/buy', {method: 'POST', body: fd});
                 const data = await res.json();
@@ -358,7 +361,7 @@
                     openModal('success-modal');
                 } else { 
                     alert(data.msg); 
-                    if(data.force_logout) { logout(); } // لو الهاكر بيلعب في المتصفح، بيعمله تسجيل خروج فوراً
+                    if(data.force_logout) { logout(); } 
                     else if(data.msg.includes("balance") || data.msg.includes("stock")) location.reload();
                 }
             } catch(err) { alert("An error occurred during purchase!"); }
