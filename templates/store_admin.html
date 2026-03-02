@@ -8,56 +8,23 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script>tailwind.config={theme:{extend:{colors:{szgreen:'#7dfc89',szcyan:'#5eead4',darkbg:'#050505',panelbg:'#111'}}}}</script>
     <style>
-        /* الخطوط والخلفية الأساسية */
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
         body { font-family: 'Cairo', sans-serif; background-color: #050505; color: #d1d5db; scroll-behavior: smooth; }
-        
-        /* شريط التمرير (Scrollbar) المضيء */
-        ::-webkit-scrollbar { width: 6px; } 
-        ::-webkit-scrollbar-track { background: #050505; } 
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; transition: 0.3s; }
-        ::-webkit-scrollbar-thumb:hover { background: #7dfc89; box-shadow: 0 0 10px #7dfc89; }
-
-        /* 1. تأثير الدخول الناعم (Fade In) */
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
-        .fade-in-delayed { animation: fadeIn 0.5s ease-out 0.2s forwards; opacity: 0; }
-
-        /* 2. تأثير الطيران (Floating) لصور الشدات واللوجو */
-        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-8px); } 100% { transform: translateY(0px); } }
-        .floating { animation: float 3s ease-in-out infinite; }
-
-        /* 3. تأثير النبض المضيء (Pulse Glow) للزراير */
-        @keyframes pulseGlow { 
-            0% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } 
-            50% { box-shadow: 0 0 25px rgba(125,252,137,0.6); transform: scale(1.02); } 
-            100% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } 
-        }
-        .btn-glow { transition: all 0.3s ease; }
-        .btn-glow:hover { animation: pulseGlow 1.5s infinite; border-color: #7dfc89; }
-
-        /* 4. تأثير حركة الألوان في النصوص (Gradient Flow) */
-        @keyframes gradientX { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-        .text-gradient-animate { background-size: 200% 200%; animation: gradientX 3s ease infinite; }
-
-        /* 5. تصميم الكروت الزجاجية (Glass & Hover Cards) */
-        .glass-panel { background: rgba(17, 17, 17, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
-        .uc-card { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        .uc-card:hover { transform: translateY(-8px); box-shadow: 0 15px 35px rgba(94, 234, 212, 0.15); border-color: #5eead4; }
-
-        /* 6. توهج عند الكتابة في الخانات (Input Focus) */
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #050505; } ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; transition: 0.3s; } ::-webkit-scrollbar-thumb:hover { background: #7dfc89; box-shadow: 0 0 10px #7dfc89; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } } .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-8px); } 100% { transform: translateY(0px); } } .floating { animation: float 3s ease-in-out infinite; }
+        @keyframes pulseGlow { 0% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } 50% { box-shadow: 0 0 25px rgba(125,252,137,0.6); transform: scale(1.02); } 100% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } } .btn-glow { transition: all 0.3s ease; } .btn-glow:hover { animation: pulseGlow 1.5s infinite; border-color: #7dfc89; }
+        @keyframes gradientX { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } } .text-gradient-animate { background-size: 200% 200%; animation: gradientX 3s ease infinite; }
         input:focus, select:focus, textarea:focus { box-shadow: 0 0 15px rgba(125,252,137,0.15); transition: box-shadow 0.3s ease; }
-        
-        /* تأثيرات القائمة الجانبية للأدمن */
         .nav-active { background: linear-gradient(90deg, rgba(125,252,137,0.15) 0%, transparent 100%); border-left: 3px solid #7dfc89; color: #7dfc89; text-shadow: 0 0 10px rgba(125,252,137,0.3); }
     </style>
 </head>
-<body class="bg-darkbg text-gray-300 font-sans flex h-screen overflow-hidden selection:bg-yellow-500 selection:text-black">
+<body class="bg-darkbg text-gray-300 font-sans flex h-screen overflow-hidden selection:bg-yellow-500 selection:text-black relative">
     
     <aside class="w-64 bg-panelbg border-r border-gray-900 flex flex-col h-full z-10 shadow-2xl relative">
         <div class="h-20 flex items-center px-6 border-b border-gray-900">
-            <div class="bg-yellow-500/10 p-2 rounded-lg text-yellow-500 mr-3"><i class="fas fa-store"></i></div>
-            <span class="text-xl font-black tracking-wider text-yellow-500">STORE ERP</span>
+            <div class="bg-yellow-500/10 p-2 rounded-lg text-yellow-500 mr-3 floating"><i class="fas fa-store"></i></div>
+            <span class="text-xl font-black tracking-wider text-yellow-500 text-gradient-animate">STORE ERP</span>
         </div>
         <nav class="mt-6 flex flex-col gap-2 px-3">
             <a href="/admin" class="text-gray-400 hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition flex items-center bg-black border border-gray-800"><i class="fas fa-arrow-left w-6"></i> Back to Master</a>
@@ -70,15 +37,15 @@
     </aside>
 
     <main class="flex-1 p-8 overflow-y-auto bg-[#0a0a0a]">
-        <div class="flex justify-between items-end mb-8">
+        <div class="flex justify-between items-end mb-8 fade-in">
             <div><h2 class="text-3xl font-black text-white">Storefront Management</h2><p class="text-sm text-gray-500 mt-1">Manage B2C operations, sales, and customers in real-time.</p></div>
         </div>
 
-        <div id="tab-dashboard" class="tab-content block">
+        <div id="tab-dashboard" class="tab-content block fade-in">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div class="bg-panelbg border border-gray-800 p-6 rounded-xl relative overflow-hidden"><div class="text-gray-500 text-xs font-bold uppercase mb-2">Total Revenue</div><div class="text-4xl font-black text-yellow-500">{{ stats.revenue }} <span class="text-lg text-gray-600">EGP</span></div></div>
-                <div class="bg-panelbg border border-gray-800 p-6 rounded-xl relative overflow-hidden"><div class="text-gray-500 text-xs font-bold uppercase mb-2">Total Sales (Orders)</div><div class="text-4xl font-black text-white">{{ stats.orders }}</div></div>
-                <div class="bg-panelbg border border-gray-800 p-6 rounded-xl relative overflow-hidden"><div class="text-gray-500 text-xs font-bold uppercase mb-2">Active Customers</div><div class="text-4xl font-black text-szcyan">{{ stats.customers }}</div></div>
+                <div class="bg-panelbg border border-gray-800 p-6 rounded-xl relative overflow-hidden hover:border-gray-600 transition"><div class="text-gray-500 text-xs font-bold uppercase mb-2">Total Revenue</div><div class="text-4xl font-black text-yellow-500">{{ stats.revenue }} <span class="text-lg text-gray-600">EGP</span></div></div>
+                <div class="bg-panelbg border border-gray-800 p-6 rounded-xl relative overflow-hidden hover:border-gray-600 transition"><div class="text-gray-500 text-xs font-bold uppercase mb-2">Total Sales (Orders)</div><div class="text-4xl font-black text-white">{{ stats.orders }}</div></div>
+                <div class="bg-panelbg border border-gray-800 p-6 rounded-xl relative overflow-hidden hover:border-gray-600 transition"><div class="text-gray-500 text-xs font-bold uppercase mb-2">Active Customers</div><div class="text-4xl font-black text-szcyan">{{ stats.customers }}</div></div>
             </div>
             <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden">
                 <div class="p-5 border-b border-gray-800 flex justify-between items-center bg-[#111]"><h3 class="font-bold text-white uppercase text-sm"><i class="fas fa-receipt text-yellow-500 mr-2"></i> Recent Store Transactions</h3></div>
@@ -100,14 +67,14 @@
             </div>
         </div>
 
-        <div id="tab-products" class="tab-content hidden">
+        <div id="tab-products" class="tab-content hidden fade-in">
             <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden">
                 <form action="/api/store/update_prices" method="POST" class="p-6">
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {% for cat in ['60', '325', '660', '1800', '3850', '8100'] %}
                         <div class="bg-[#050505] border border-gray-800 p-5 rounded-xl flex items-center justify-between group hover:border-yellow-500/50 transition">
                             <div class="flex items-center gap-4">
-                                <div class="w-12 h-12 bg-gray-900 rounded-lg flex items-center justify-center border border-gray-800"><img src="/static/uc-gold.jpg" class="w-8 rounded" onerror="this.style.display='none'"></div>
+                                <div class="w-12 h-12 bg-yellow-500/10 rounded-full flex items-center justify-center border border-yellow-500/30 text-yellow-500 font-black text-xs shadow-[0_0_10px_rgba(250,204,21,0.2)]">UC</div>
                                 <div><h4 class="font-bold text-white text-lg">{{ cat }} UC</h4><span class="text-[10px] uppercase font-bold {% if stock.get(cat, 0) > 0 %}text-szgreen{% else %}text-red-500{% endif %}">Stock: {{ stock.get(cat, 0) }}</span></div>
                             </div>
                             <div class="text-right">
@@ -117,20 +84,20 @@
                         </div>
                         {% endfor %}
                     </div>
-                    <div class="mt-8 border-t border-gray-800 pt-6 text-right"><button type="submit" class="bg-yellow-500 text-black font-bold py-3 px-10 rounded-xl hover:bg-white transition shadow-lg shadow-yellow-500/20">Save All Catalog Changes</button></div>
+                    <div class="mt-8 border-t border-gray-800 pt-6 text-right"><button type="submit" class="bg-yellow-500 text-black font-bold py-3 px-10 rounded-xl transition shadow-lg shadow-yellow-500/20 hover:shadow-[0_0_20px_rgba(250,204,21,0.4)]">Save All Catalog Changes</button></div>
                 </form>
             </div>
         </div>
 
-        <div id="tab-customers" class="tab-content hidden">
+        <div id="tab-customers" class="tab-content hidden fade-in">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="bg-panelbg border border-gray-800 p-6 rounded-xl h-fit">
                     <h3 class="font-bold text-white uppercase text-sm mb-4 border-b border-gray-800 pb-3"><i class="fas fa-envelope text-yellow-500 mr-2"></i> Register Customer Email</h3>
                     <form action="/api/store/add_customer" method="POST" class="space-y-4">
-                        <div><label class="text-xs text-gray-500 mb-1 block">Full Name</label><input type="text" name="name" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500"></div>
-                        <div><label class="text-xs text-gray-500 mb-1 block">Gmail Address</label><input type="email" name="email" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500 font-mono"></div>
-                        <div><label class="text-xs text-gray-500 mb-1 block">Initial Wallet Balance (EGP)</label><input type="number" name="balance" value="0" class="w-full bg-[#050505] border border-gray-800 text-yellow-500 font-bold p-3 rounded-lg outline-none focus:border-yellow-500"></div>
-                        <button type="submit" class="w-full bg-yellow-500 text-black font-bold py-3 rounded-lg mt-2 hover:bg-yellow-400">Create Account</button>
+                        <div><label class="text-xs text-gray-500 mb-1 block">Full Name</label><input type="text" name="name" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500 transition"></div>
+                        <div><label class="text-xs text-gray-500 mb-1 block">Gmail Address</label><input type="email" name="email" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500 font-mono transition"></div>
+                        <div><label class="text-xs text-gray-500 mb-1 block">Initial Wallet Balance (EGP)</label><input type="number" name="balance" value="0" class="w-full bg-[#050505] border border-gray-800 text-yellow-500 font-bold p-3 rounded-lg outline-none focus:border-yellow-500 transition"></div>
+                        <button type="submit" class="w-full bg-yellow-500 text-black font-bold py-3 rounded-lg mt-2 transition shadow-lg shadow-yellow-500/20 hover:shadow-[0_0_20px_rgba(250,204,21,0.4)]">Create Account</button>
                     </form>
                 </div>
                 <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden lg:col-span-2 flex flex-col h-[600px]">
@@ -139,14 +106,14 @@
                             <thead class="bg-[#151515] text-gray-500 uppercase text-[10px]"><tr><th class="px-4 py-3">Customer Email</th><th class="px-4 py-3">Current Balance</th><th class="px-4 py-3">Manage Funds</th><th class="px-4 py-3 text-right">Actions</th></tr></thead>
                             <tbody class="divide-y divide-gray-900">
                                 {% for c in store_customers %}
-                                <tr class="hover:bg-gray-900/50">
+                                <tr class="hover:bg-gray-900/50 transition">
                                     <td class="px-4 py-3"><div class="font-bold text-white text-base">{{ c.name }}</div><div class="text-xs text-gray-500 font-mono mt-1"><i class="fas fa-envelope text-[10px] mr-1"></i> {{ c.email }}</div></td>
                                     <td class="px-4 py-3"><span class="text-yellow-500 font-black text-xl">{{ c.balance }}</span> <span class="text-xs text-gray-500">EGP</span></td>
                                     <td class="px-4 py-3">
                                         <form action="/api/store/manage_balance" method="POST" class="flex gap-2">
                                             <input type="hidden" name="email" value="{{ c.email }}">
-                                            <input type="number" name="amount" placeholder="Amount" required class="w-20 bg-black border border-gray-700 text-white px-2 py-1.5 rounded text-xs outline-none focus:border-yellow-500">
-                                            <select name="action" class="bg-black border border-gray-700 text-white rounded text-xs outline-none"><option value="add">Add (+)</option><option value="set">Set (=)</option></select>
+                                            <input type="number" name="amount" placeholder="Amount" required class="w-20 bg-black border border-gray-700 text-white px-2 py-1.5 rounded text-xs outline-none focus:border-yellow-500 transition">
+                                            <select name="action" class="bg-black border border-gray-700 text-white rounded text-xs outline-none focus:border-yellow-500 transition"><option value="add">Add (+)</option><option value="set">Set (=)</option></select>
                                             <button class="bg-gray-800 text-yellow-500 px-3 py-1.5 rounded hover:bg-yellow-500 hover:text-black font-bold transition">Update</button>
                                         </form>
                                     </td>
@@ -172,12 +139,8 @@
             document.getElementById('tab-' + tabId).classList.remove('hidden');
             document.querySelectorAll('.nav-btn').forEach(el => { el.className = 'nav-btn text-gray-500 hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition text-left'; });
             document.getElementById('btn-' + tabId).className = 'nav-btn bg-yellow-500/10 border-l-2 border-yellow-500 text-yellow-500 px-4 py-3 rounded-r-lg text-sm font-bold text-left';
-            
-            // تم التعديل ليصبح التوجيه الصحيح
             window.history.replaceState({}, '', '/store-admin?tab=' + tabId);
         }
-
-        // قراءة التاب المفتوح من الرابط
         document.addEventListener("DOMContentLoaded", () => {
             const urlParams = new URLSearchParams(window.location.search);
             const tab = urlParams.get('tab') || 'dashboard';
