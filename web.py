@@ -85,7 +85,7 @@ async def dashboard(request: Request):
     store_orders = await db.store_orders.find({"date": {"$gte": start_of_month_str}}).to_list(None)
     store_stats = {"sales_today": 0, "sales_month": len(store_orders), "rev_today": 0, "rev_month": 0}
     for so in store_orders:
-        price = float(so.get("price_egp", 0)) # حساب الإيرادات بالجنيه كمؤشر رئيسي
+        price = float(so.get("price_egp", 0))
         store_stats["rev_month"] += price
         if so.get("date", "").startswith(today_str): store_stats["sales_today"] += 1; store_stats["rev_today"] += price
 
@@ -95,7 +95,6 @@ async def dashboard(request: Request):
     total_system_tokens = total_user_tokens + shared_tokens_count
     for u in all_users: u["stats_details"] = user_stats.get(u["_id"], {"api_today": 0, "api_month": 0, "stock_today": 0, "stock_month": 0})
 
-    # استدعاء الكتالوج
     categories = await db.store_categories.find().to_list(100)
     dynamic_stock_keys = []
     stock_details = {}
@@ -118,9 +117,7 @@ async def dashboard(request: Request):
         "store_stats": store_stats, "tracked_users": tracked_users
     })
 
-# ==========================================
-# إدارة الكتالوج والفئات (تم نقلها للماستر للربط مع البوت)
-# ==========================================
+# --- Catalog API ---
 @app.post("/api/catalog/category/add")
 async def api_add_category(request: Request, cat_id: str = Form(...), name: str = Form(...), icon: str = Form("fa-gamepad")):
     if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauth"})
@@ -154,7 +151,6 @@ async def api_add_product(request: Request, cat_id: str = Form(...), stock_key: 
 @app.post("/api/catalog/product/edit")
 async def api_edit_product(request: Request, cat_id: str = Form(...), stock_key: str = Form(...), name: str = Form(...), price_egp: float = Form(...), price_usd: float = Form(...)):
     if not check_auth(request): return JSONResponse({"success": False})
-    # تحديث المنتج داخل المصفوفة
     await db.store_categories.update_one(
         {"_id": cat_id, "products.stock_key": stock_key},
         {"$set": {"products.$.name": name, "products.$.price_egp": price_egp, "products.$.price_usd": price_usd}}
@@ -167,9 +163,7 @@ async def api_delete_product(request: Request, cat_id: str = Form(...), stock_ke
     await db.store_categories.update_one({"_id": cat_id}, {"$pull": {"products": {"stock_key": stock_key}}})
     return JSONResponse({"success": True, "msg": "Product Deleted!"})
 
-# ==========================================
-# المخزن وباقي دوال الماستر
-# ==========================================
+# --- Tools & Stock APIs (Restored fully) ---
 @app.post("/api/toggle_maintenance")
 async def toggle_maint(request: Request):
     if not check_auth(request): return {"status": "error"}
@@ -277,7 +271,7 @@ async def api_return_order(request: Request, order_id: str = Form(...)):
     if not order: order = await db.store_orders.find_one({"_id": order_id})
     
     if order and "items" in order:
-        cat = order["type"].split("(")[1].split(" ")[0]
+        cat = order["type"].split("(")[1].split(")")[0] if "(" in order["type"] else "Unknown"
         codes_to_return = [{"code": c, "category": cat, "added_at": datetime.now()} for c in order["items"]]
         await db.stock.insert_many(codes_to_return, ordered=False)
         await db.codes_map.delete_many({"$or": [{"_id": {"$in": order["items"]}}, {"code": {"$in": order["items"]}}], "order_id": int(order_id)})
@@ -319,4 +313,3 @@ async def api_search(request: Request):
         for i, r in enumerate(records, 1): res_str += f" {i}. By: {r.get('name', 'Unknown')} ({r.get('source', 'Bot')}) | Time: {r.get('time', '')} | Order: #{r.get('order_id', '?')}\n"
     elif in_stock == 0: res_str += "\n❌ Not found in history."
     return JSONResponse({"result": res_str})
-    
