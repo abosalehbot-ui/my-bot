@@ -24,7 +24,8 @@ ADMIN_USERNAME = os.environ.get("ADMIN_USER", "admin")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASS", "123456")
 SECRET_TOKEN = "salehzon_secure_2026"
 
-def check_auth(request: Request): return request.cookies.get("admin_session") == SECRET_TOKEN
+def check_auth(request: Request): 
+    return request.cookies.get("admin_session") == SECRET_TOKEN
 
 async def web_log(action, details=""):
     await db.system_logs.insert_one({
@@ -42,7 +43,8 @@ def clean_and_extract_tokens(raw_text):
     return valid_tokens
 
 @app.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request): return templates.TemplateResponse("login.html", {"request": request, "error": None})
+async def login_page(request: Request): 
+    return templates.TemplateResponse("login.html", {"request": request, "error": None})
 
 @app.post("/login")
 async def do_login(response: Response, username: str = Form(...), password: str = Form(...)):
@@ -61,7 +63,9 @@ async def logout():
 @app.get("/admin", response_class=HTMLResponse)
 async def dashboard(request: Request):
     if not check_auth(request): return RedirectResponse(url="/login")
-    now = datetime.now(); today_str = now.strftime("%Y-%m-%d"); start_of_month_str = now.strftime("%Y-%m-01")
+    now = datetime.now()
+    today_str = now.strftime("%Y-%m-%d")
+    start_of_month_str = now.strftime("%Y-%m-01")
 
     users_count = await db.users.count_documents({})
     stock_count = await db.stock.count_documents({})
@@ -72,29 +76,45 @@ async def dashboard(request: Request):
     month_orders = await db.orders.find({"date": {"$gte": start_of_month_str}}).to_list(None)
     global_stats = {"api_today": 0, "api_month": 0, "stock_today": 0, "stock_month": 0}
     user_stats = {}
+    
     for o in month_orders:
-        uid = o.get("user_id"); count = len(o.get("items", [])); is_today = o.get("date", "").startswith(today_str); is_api = "API" in o.get("type", "")
+        uid = o.get("user_id")
+        count = len(o.get("items", []))
+        is_today = o.get("date", "").startswith(today_str)
+        is_api = "API" in o.get("type", "")
         if uid not in user_stats: user_stats[uid] = {"api_today": 0, "api_month": 0, "stock_today": 0, "stock_month": 0}
+        
         if is_api:
-            global_stats["api_month"] += count; user_stats[uid]["api_month"] += count
-            if is_today: user_stats[uid]["api_today"] += count; global_stats["api_today"] += count
+            global_stats["api_month"] += count
+            user_stats[uid]["api_month"] += count
+            if is_today: 
+                user_stats[uid]["api_today"] += count
+                global_stats["api_today"] += count
         else: 
-            global_stats["stock_month"] += count; user_stats[uid]["stock_month"] += count
-            if is_today: user_stats[uid]["stock_today"] += count; global_stats["stock_today"] += count
+            global_stats["stock_month"] += count
+            user_stats[uid]["stock_month"] += count
+            if is_today: 
+                user_stats[uid]["stock_today"] += count
+                global_stats["stock_today"] += count
 
     store_orders = await db.store_orders.find({"date": {"$gte": start_of_month_str}}).to_list(None)
     store_stats = {"sales_today": 0, "sales_month": len(store_orders), "rev_today": 0, "rev_month": 0}
     for so in store_orders:
-        price = float(so.get("price_egp", 0))
+        price = float(so.get("price", 0))
         store_stats["rev_month"] += price
-        if so.get("date", "").startswith(today_str): store_stats["sales_today"] += 1; store_stats["rev_today"] += price
+        if so.get("date", "").startswith(today_str): 
+            store_stats["sales_today"] += 1
+            store_stats["rev_today"] += price
 
     total_user_tokens = sum(len(u.get("tokens", [])) for u in all_users)
     shared_doc = await db.settings.find_one({"_id": "shared_tokens"})
     shared_tokens_count = len(shared_doc.get("tokens", [])) if shared_doc else 0
     total_system_tokens = total_user_tokens + shared_tokens_count
-    for u in all_users: u["stats_details"] = user_stats.get(u["_id"], {"api_today": 0, "api_month": 0, "stock_today": 0, "stock_month": 0})
+    
+    for u in all_users: 
+        u["stats_details"] = user_stats.get(u["_id"], {"api_today": 0, "api_month": 0, "stock_today": 0, "stock_month": 0})
 
+    # إعدادات الكتالوج الديناميكي
     categories = await db.store_categories.find().to_list(100)
     dynamic_stock_keys = []
     stock_details = {}
@@ -105,6 +125,7 @@ async def dashboard(request: Request):
         
     settings = await db.settings.find_one({"_id": "config"})
     maintenance = settings.get("maintenance", False) if settings else False
+    
     cache_config = await db.settings.find_one({"_id": "cache_config"})
     tracked_users = cache_config.get("tracked_users", []) if cache_config else []
 
@@ -117,7 +138,9 @@ async def dashboard(request: Request):
         "store_stats": store_stats, "tracked_users": tracked_users
     })
 
-# --- Catalog API ---
+# ==========================================
+# مسارات الكتالوج (إضافة الفئات والمنتجات)
+# ==========================================
 @app.post("/api/catalog/category/add")
 async def api_add_category(request: Request, cat_id: str = Form(...), name: str = Form(...), icon: str = Form("fa-gamepad")):
     if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauth"})
@@ -163,7 +186,9 @@ async def api_delete_product(request: Request, cat_id: str = Form(...), stock_ke
     await db.store_categories.update_one({"_id": cat_id}, {"$pull": {"products": {"stock_key": stock_key}}})
     return JSONResponse({"success": True, "msg": "Product Deleted!"})
 
-# --- Tools & Stock APIs (Restored fully) ---
+# ==========================================
+# مسارات الأدوات، التخزين، الموظفين (القديمة كاملة)
+# ==========================================
 @app.post("/api/toggle_maintenance")
 async def toggle_maint(request: Request):
     if not check_auth(request): return {"status": "error"}
@@ -286,7 +311,8 @@ async def api_return_order(request: Request, order_id: str = Form(...)):
 @app.post("/api/search")
 async def api_search(request: Request):
     if not check_auth(request): return JSONResponse({"error": "unauth"})
-    form = await request.form(); query = form.get("query", "").strip()
+    form = await request.form()
+    query = form.get("query", "").strip()
     if not query: return JSONResponse({"result": "❌ Send text to search"})
     
     is_bot = query.isdigit()
