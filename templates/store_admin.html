@@ -15,8 +15,8 @@
         .text-gradient-animate { background-size: 200% 200%; animation: gradientX 3s ease infinite; }
         @keyframes gradientX { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
         
-        /* كلاسات القائمة الجانبية (ثيم أصفر للـ CRM) */
-        .nav-btn { width: 100%; display: flex; align-items: center; padding: 0.75rem; border-radius: 0.5rem; transition: all 0.2s; font-weight: bold; }
+        /* كلاسات القائمة الجانبية (Flowbite Themed - لون أصفر لتمييز ה- CRM) */
+        .nav-btn { width: 100%; display: flex; align-items: center; transition: all 0.2s; font-weight: bold; }
         .nav-inactive { color: #9ca3af; }
         .nav-inactive:hover { background-color: #111827; color: #ffffff; }
         .nav-inactive:hover i { color: #eab308; }
@@ -47,8 +47,17 @@
             </div>
 
             <ul class="space-y-2">
-                <li><button onclick="switchTab('customers')" id="btn-customers" class="nav-btn nav-active"><i class="fas fa-wallet w-6 text-lg transition duration-75"></i><span class="ml-3">Client Balances</span></button></li>
-                <li><button onclick="switchTab('orders')" id="btn-orders" class="nav-btn nav-inactive"><i class="fas fa-receipt w-6 text-lg transition duration-75"></i><span class="ml-3">Sales Log</span></button></li>
+                <li>
+                    <button type="button" onclick="document.getElementById('dropdown-crm').classList.toggle('hidden')" class="flex items-center p-2 w-full text-base font-bold text-gray-400 rounded-lg transition duration-75 hover:bg-gray-900 hover:text-white">
+                        <i class="fas fa-chart-line w-6 text-lg text-gray-500 transition duration-75"></i>
+                        <span class="flex-1 ml-3 text-left whitespace-nowrap">CRM & Sales</span>
+                        <i class="fas fa-chevron-down w-4 text-xs"></i>
+                    </button>
+                    <ul id="dropdown-crm" class="py-2 space-y-1">
+                        <li><button onclick="switchTab('customers')" id="btn-customers" class="nav-btn nav-active p-2 pl-11 rounded-lg text-sm"><i class="fas fa-wallet w-5 mr-2"></i> Client Balances</button></li>
+                        <li><button onclick="switchTab('orders')" id="btn-orders" class="nav-btn nav-inactive p-2 pl-11 rounded-lg text-sm"><i class="fas fa-receipt w-5 mr-2"></i> Sales Log</button></li>
+                    </ul>
+                </li>
             </ul>
 
             <ul class="pt-5 mt-5 space-y-2 border-t border-gray-800">
@@ -65,10 +74,9 @@
             </ul>
         </div>
         
-        <div class="absolute bottom-0 left-0 w-full flex justify-center p-4 bg-[#0a0a0a] z-20 border-t border-r border-gray-800">
-            <a href="/logout" class="flex items-center justify-center w-full p-2 text-sm font-bold text-red-500 rounded hover:bg-red-900/20 hover:text-red-400 transition cursor-pointer">
-                <i class="fas fa-power-off mr-2"></i> LOGOUT
-            </a>
+        <div class="absolute bottom-0 left-0 w-full flex justify-center items-center gap-6 p-4 bg-[#0a0a0a] z-20 border-t border-r border-gray-800">
+            <a href="/logout" class="text-gray-500 hover:text-red-500 transition" title="Logout"><i class="fas fa-power-off text-xl"></i></a>
+            <a href="#" class="text-gray-500 hover:text-white transition" title="Settings"><i class="fas fa-cog text-xl"></i></a>
         </div>
     </aside>
 
