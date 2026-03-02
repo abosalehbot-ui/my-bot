@@ -363,7 +363,8 @@
         }
 
         document.addEventListener("DOMContentLoaded", () => {
-            const urlParams = newSearchParams(window.location.search);
+          const urlParams = new URLSearchParams(window.location.search);
+           
             switchTab(urlParams.get('tab') || 'overview');
         });
 
@@ -480,3 +481,4 @@
     </script>
 </body>
 </html>
+
