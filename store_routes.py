@@ -19,9 +19,6 @@ GOOGLE_CLIENT_ID = "671995925834-4bf0od4fm0pkkhvkfrvqh41h6rpb574v.apps.googleuse
 def check_auth(request: Request):
     return request.cookies.get("admin_session") == SECRET_TOKEN
 
-# ==========================================
-# 1. متجر الزبائن (الواجهة الرئيسية للموقع /)
-# ==========================================
 @router.get("/", response_class=HTMLResponse)
 async def public_storefront(request: Request):
     store_prices = await db.settings.find_one({"_id": "store_prices"}) or {}
@@ -36,10 +33,9 @@ async def store_login_page(request: Request):
 async def google_login(request: Request, credential: str = Form(...)):
     async with httpx.AsyncClient() as client_http:
         res = await client_http.get(f"https://oauth2.googleapis.com/tokeninfo?id_token={credential}")
-        if res.status_code != 200: return JSONResponse({"success": False, "msg": "فشل التحقق من حساب جوجل."})
-        
+        if res.status_code != 200: return JSONResponse({"success": False, "msg": "Google verification failed."})
         user_info = res.json()
-        if user_info.get("aud") != GOOGLE_CLIENT_ID: return JSONResponse({"success": False, "msg": "توكن غير صالح."})
+        if user_info.get("aud") != GOOGLE_CLIENT_ID: return JSONResponse({"success": False, "msg": "Invalid token."})
         
         email = user_info.get("email")
         name = user_info.get("name")
@@ -48,50 +44,35 @@ async def google_login(request: Request, credential: str = Form(...)):
         if not user:
             await db.store_customers.insert_one({"email": email, "name": name, "balance": 0, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")})
             balance = 0
-        else:
-            balance = user.get("balance", 0)
-            
+        else: balance = user.get("balance", 0)
         return JSONResponse({"success": True, "email": email, "name": name, "balance": balance})
 
 @router.post("/api/store/buy")
 async def customer_buy_uc(request: Request, email: str = Form(...), category: str = Form(...)):
     user = await db.store_customers.find_one({"email": email})
-    if not user: return JSONResponse({"success": False, "msg": "حساب غير موجود!"})
-    
+    if not user: return JSONResponse({"success": False, "msg": "Account not found!"})
     prices = await db.settings.find_one({"_id": "store_prices"}) or {}
     price = int(prices.get(category, 999999))
-    
-    if user["balance"] < price: return JSONResponse({"success": False, "msg": "رصيدك غير كافٍ! يرجى شحن محفظتك."})
+    if user["balance"] < price: return JSONResponse({"success": False, "msg": "Insufficient balance! Please recharge."})
         
     code_doc = await db.stock.find_one_and_delete({"category": category})
-    if not code_doc: return JSONResponse({"success": False, "msg": "عذراً، هذه الفئة نفذت من المخزن حالياً."})
+    if not code_doc: return JSONResponse({"success": False, "msg": "Sorry, this category is out of stock."})
         
     code_str = str(code_doc.get("code") or code_doc["_id"])
-    
     await db.store_customers.update_one({"email": email}, {"$inc": {"balance": -price}})
     order_id = int(datetime.now().timestamp() % 100000)
     await db.store_orders.insert_one({"_id": order_id, "email": email, "name": user["name"], "category": category, "code": code_str, "price": price, "date": datetime.now().strftime("%Y-%m-%d %H:%M")})
-    
-    return JSONResponse({"success": True, "code": code_str, "new_balance": user["balance"] - price, "msg": "تم الشراء بنجاح!"})
+    return JSONResponse({"success": True, "code": code_str, "new_balance": user["balance"] - price, "msg": "Purchase successful!"})
 
-# ==========================================
-# 2. لوحة تحكم المتجر للأدمن (/store-admin)
-# ==========================================
 @router.get("/store-admin", response_class=HTMLResponse)
 async def store_admin_page(request: Request):
     if not check_auth(request): return RedirectResponse(url="/login")
     store_prices = await db.settings.find_one({"_id": "store_prices"}) or {}
     store_customers = await db.store_customers.find().sort("created_at", -1).to_list(100)
     store_orders = await db.store_orders.find().sort("date", -1).to_list(100)
-    
     total_revenue = sum(int(o.get("price", 0)) for o in store_orders)
     stock_details = {cat: await db.stock.count_documents({"category": cat}) for cat in ["60", "325", "660", "1800", "3850", "8100"]}
-
-    return templates.TemplateResponse("store_admin.html", {
-        "request": request, "store_prices": store_prices, "store_customers": store_customers,
-        "store_orders": store_orders, "stock": stock_details,
-        "stats": {"revenue": total_revenue, "orders": len(store_orders), "customers": len(store_customers)}
-    })
+    return templates.TemplateResponse("store_admin.html", {"request": request, "store_prices": store_prices, "store_customers": store_customers, "store_orders": store_orders, "stock": stock_details, "stats": {"revenue": total_revenue, "orders": len(store_orders), "customers": len(store_customers)}})
 
 @router.post("/api/store/update_prices")
 async def store_update_prices(request: Request, p_60: int = Form(0), p_325: int = Form(0), p_660: int = Form(0), p_1800: int = Form(0), p_3850: int = Form(0), p_8100: int = Form(0)):
@@ -102,8 +83,7 @@ async def store_update_prices(request: Request, p_60: int = Form(0), p_325: int 
 @router.post("/api/store/add_customer")
 async def store_add_customer(request: Request, email: str = Form(...), name: str = Form(...), balance: int = Form(0)):
     if not check_auth(request): return RedirectResponse("/login")
-    if not await db.store_customers.find_one({"email": email}):
-        await db.store_customers.insert_one({"email": email, "name": name, "balance": balance, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")})
+    if not await db.store_customers.find_one({"email": email}): await db.store_customers.insert_one({"email": email, "name": name, "balance": balance, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")})
     return RedirectResponse(url="/store-admin", status_code=status.HTTP_302_FOUND)
 
 @router.post("/api/store/manage_balance")
