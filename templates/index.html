@@ -10,13 +10,20 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
         body { font-family: 'Cairo', sans-serif; background-color: #050505; color: #d1d5db; scroll-behavior: smooth; overflow: hidden; }
-        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #050505; } ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; transition: 0.3s; } ::-webkit-scrollbar-thumb:hover { background: #7dfc89; box-shadow: 0 0 10px #7dfc89; }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #050505; } ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; transition: 0.3s; } ::-webkit-scrollbar-thumb:hover { background: #7dfc89; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } } .fade-in { animation: fadeIn 0.5s ease-out forwards; }
-        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-8px); } 100% { transform: translateY(0px); } } .floating { animation: float 3s ease-in-out infinite; }
-        @keyframes pulseGlow { 0% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } 50% { box-shadow: 0 0 25px rgba(125,252,137,0.6); transform: scale(1.02); } 100% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } } .btn-glow { transition: all 0.3s ease; } .btn-glow:hover { animation: pulseGlow 1.5s infinite; border-color: #7dfc89; }
-        @keyframes gradientX { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } } .text-gradient-animate { background-size: 200% 200%; animation: gradientX 3s ease infinite; }
-        input:focus, select:focus, textarea:focus { box-shadow: 0 0 15px rgba(125,252,137,0.15); transition: box-shadow 0.3s ease; outline: none; border-color: #7dfc89;}
-        .nav-active { background: linear-gradient(90deg, rgba(125,252,137,0.15) 0%, transparent 100%); border-left: 3px solid #7dfc89; color: #7dfc89; text-shadow: 0 0 10px rgba(125,252,137,0.3); }
+        .btn-glow:hover { box-shadow: 0 0 15px rgba(125,252,137,0.4); border-color: #7dfc89; }
+        .text-gradient-animate { background-size: 200% 200%; animation: gradientX 3s ease infinite; }
+        @keyframes gradientX { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        
+        /* كلاسات القائمة الجانبية الجديدة */
+        .nav-btn { width: 100%; display: flex; align-items: center; padding: 0.75rem; border-radius: 0.5rem; transition: all 0.2s; font-weight: bold; }
+        .nav-inactive { color: #9ca3af; }
+        .nav-inactive:hover { background-color: #111827; color: #ffffff; }
+        .nav-inactive:hover i { color: #7dfc89; }
+        .nav-active { background-color: #111827; color: #ffffff; border-left: 3px solid #7dfc89; }
+        .nav-active i { color: #7dfc89; text-shadow: 0 0 10px rgba(125,252,137,0.5); }
+        
         #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
         .toast { background: #111; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-left: 4px solid #7dfc89; animation: slideIn 0.3s ease-out, fadeOut 0.3s ease-in 2.7s forwards; font-weight: bold; font-size: 14px; display: flex; align-items: center; gap: 10px; }
         .toast.error { border-left-color: #ef4444; }
@@ -24,45 +31,54 @@
         @keyframes fadeOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
     </style>
 </head>
-<body class="bg-darkbg text-gray-300 flex h-screen overflow-hidden selection:bg-szgreen selection:text-black relative">
-    
+<body class="selection:bg-szgreen selection:text-black flex h-screen">
+
     <div id="toast-container"></div>
-    <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black/70 z-30 hidden md:hidden transition-opacity"></div>
-    
-    <aside id="sidebar" class="w-64 bg-panelbg border-r border-gray-900 flex flex-col justify-between fixed md:relative z-40 h-full transition-transform transform -translate-x-full md:translate-x-0 shadow-2xl flex-shrink-0">
-        <div class="flex flex-col h-full">
-            <div class="h-20 flex items-center px-6 border-b border-gray-900 justify-between flex-shrink-0">
-                <div class="flex items-center">
-                    <div class="inline-flex items-center justify-center w-8 h-8 bg-black rounded-full border border-szgreen/50 mr-2 shadow-[0_0_10px_rgba(125,252,137,0.2)] font-black text-szgreen text-xs floating">SZ</div>
-                    <span class="text-xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">MASTER</span>
+    <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black/80 z-30 hidden md:hidden transition-opacity backdrop-blur-sm"></div>
+
+    <aside id="sz-sidebar" class="fixed top-0 left-0 z-40 w-64 h-screen transition-transform -translate-x-full md:translate-x-0 shadow-2xl" aria-label="Sidenav">
+        <div class="overflow-y-auto py-5 px-3 h-full bg-panelbg border-r border-gray-800 pb-24">
+            
+            <div class="flex items-center justify-between px-2 mb-6 pb-6 border-b border-gray-800">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-black rounded-full border border-szgreen/50 flex items-center justify-center shadow-[0_0_10px_rgba(125,252,137,0.3)] text-xs font-black text-szgreen">SZ</div>
+                    <span class="text-xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan">MASTER</span>
                 </div>
-                <button onclick="toggleSidebar()" class="md:hidden text-gray-500 hover:text-white"><i class="fas fa-times text-xl"></i></button>
+                <button onclick="toggleSidebar()" class="md:hidden text-gray-500 hover:text-white transition"><i class="fas fa-times text-xl"></i></button>
             </div>
-            <nav class="mt-4 flex flex-col gap-1 px-3 overflow-y-auto flex-1 pb-4">
-                <button onclick="switchTab('overview')" id="btn-overview" class="nav-active text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-chart-pie w-6"></i> Overview & Logs</button>
-                <button onclick="switchTab('catalog')" id="btn-catalog" class="text-gray-500 text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-layer-group w-6"></i> System Catalog</button>
-                <button onclick="switchTab('stock')" id="btn-stock" class="text-gray-500 text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-box-open w-6"></i> Stock Manager</button>
-                <button onclick="switchTab('users')" id="btn-users" class="text-gray-500 text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-user-tie w-6"></i> Staff & Tokens</button>
-                <button onclick="switchTab('tools')" id="btn-tools" class="text-gray-500 text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-tools w-6"></i> Advanced Tools</button>
-                
-                <div class="my-4 border-t border-gray-800"></div>
-                <a href="/store-admin" class="text-yellow-500 text-left px-4 py-3 rounded-lg text-sm font-bold hover:bg-yellow-500 hover:text-black transition border border-yellow-500/30 flex items-center"><i class="fas fa-shopping-cart w-6"></i> Go to Store ERP</a>
-            </nav>
-            <div class="p-4 border-t border-gray-900 flex-shrink-0">
-                <a href="/logout" class="block text-center bg-gray-900 hover:bg-red-900/50 hover:text-red-400 text-gray-500 py-2 rounded-lg text-sm font-bold transition border border-gray-800"><i class="fas fa-power-off mr-2"></i> LOGOUT</a>
-            </div>
+
+            <ul class="space-y-2">
+                <li><button onclick="switchTab('overview')" id="btn-overview" class="nav-btn nav-active"><i class="fas fa-chart-pie w-6 text-lg transition duration-75"></i><span class="ml-3">Overview & Logs</span></button></li>
+                <li><button onclick="switchTab('catalog')" id="btn-catalog" class="nav-btn nav-inactive"><i class="fas fa-layer-group w-6 text-lg transition duration-75"></i><span class="ml-3">System Catalog</span></button></li>
+                <li><button onclick="switchTab('stock')" id="btn-stock" class="nav-btn nav-inactive"><i class="fas fa-box-open w-6 text-lg transition duration-75"></i><span class="ml-3">Stock Manager</span></button></li>
+                <li><button onclick="switchTab('users')" id="btn-users" class="nav-btn nav-inactive"><i class="fas fa-user-tie w-6 text-lg transition duration-75"></i><span class="ml-3">Staff & Tokens</span></button></li>
+                <li><button onclick="switchTab('tools')" id="btn-tools" class="nav-btn nav-inactive"><i class="fas fa-tools w-6 text-lg transition duration-75"></i><span class="ml-3">Advanced Tools</span></button></li>
+            </ul>
+
+            <ul class="pt-5 mt-5 space-y-2 border-t border-gray-800">
+                <li>
+                    <a href="/store-admin" class="flex items-center p-2 text-base font-bold text-yellow-500 rounded-lg hover:bg-yellow-500/10 transition group">
+                        <i class="fas fa-shopping-cart w-6 text-lg transition duration-75 group-hover:scale-110"></i><span class="ml-3">Go to Store ERP</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <div class="absolute bottom-0 left-0 w-full flex justify-center p-4 bg-[#0a0a0a] z-20 border-t border-r border-gray-800">
+            <a href="/logout" class="flex items-center justify-center w-full p-2 text-sm font-bold text-red-500 rounded hover:bg-red-900/20 hover:text-red-400 transition cursor-pointer">
+                <i class="fas fa-power-off mr-2"></i> LOGOUT
+            </a>
         </div>
     </aside>
 
-    <main class="flex-1 flex flex-col h-screen overflow-y-auto">
-        <header class="h-16 bg-panelbg border-b border-gray-900 flex items-center justify-between px-6 md:hidden sticky top-0 z-20 shadow-md">
-            <button onclick="toggleSidebar()" class="text-white text-xl"><i class="fas fa-bars"></i></button>
-            <span class="text-lg font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">MASTER</span>
-            <div class="w-6"></div>
+    <main class="flex-1 flex flex-col h-screen overflow-y-auto bg-[#0a0a0a]">
+        <header class="h-16 bg-panelbg border-b border-gray-900 flex items-center justify-between px-4 md:hidden sticky top-0 z-20 shadow-md">
+            <button onclick="toggleSidebar()" class="p-2 text-gray-400 hover:text-white focus:outline-none"><i class="fas fa-bars text-xl"></i></button>
+            <span class="text-lg font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan">MASTER</span>
+            <div class="w-8"></div>
         </header>
 
         <div class="p-4 md:p-10 fade-in pb-20">
-            
             <div id="tab-overview" class="tab-content block">
                 <h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-robot text-szgreen mr-2"></i> Bot Operations (Staff)</h3>
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -384,10 +400,16 @@
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.getElementById('tab-' + tabId).classList.remove('hidden');
-            document.querySelectorAll('.nav-btn').forEach(el => { el.classList.remove('nav-active', 'text-white'); el.classList.add('text-gray-500'); });
-            if(tabId !== 'store') { document.getElementById('btn-' + tabId).classList.add('nav-active', 'text-white'); } 
+            
+            document.querySelectorAll('.nav-btn').forEach(el => { 
+                el.classList.remove('nav-active'); 
+                el.classList.add('nav-inactive'); 
+            });
+            document.getElementById('btn-' + tabId).classList.remove('nav-inactive');
+            document.getElementById('btn-' + tabId).classList.add('nav-active');
+            
             window.history.replaceState({}, '', '/admin?tab=' + tabId);
-            const sidebar = document.getElementById('sidebar');
+            const sidebar = document.getElementById('sz-sidebar');
             if(window.innerWidth < 768 && !sidebar.classList.contains('-translate-x-full')) toggleSidebar();
         }
 
@@ -397,7 +419,7 @@
         });
 
         function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('-translate-x-full');
+            document.getElementById('sz-sidebar').classList.toggle('-translate-x-full');
             document.getElementById('sidebar-backdrop').classList.toggle('hidden');
         }
 
