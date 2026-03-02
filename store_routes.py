@@ -46,7 +46,24 @@ async def google_login(request: Request, credential: str = Form(...)):
             balance = 0
         else: balance = user.get("balance", 0)
         return JSONResponse({"success": True, "email": email, "name": name, "balance": balance})
-
+@router.post("/api/store/telegram-login")
+async def telegram_login(request: Request, tg_id: str = Form(...), name: str = Form(...), username: str = Form("")):
+    # بنعمل إيميل وهمي عشان الداتا بيز تقبله زي نظام جوجل
+    email = f"tg_{tg_id}@telegram.zone"
+    
+    user = await db.store_customers.find_one({"email": email})
+    if not user:
+        await db.store_customers.insert_one({
+            "email": email, 
+            "name": name, 
+            "balance": 0, 
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+        })
+        balance = 0
+    else:
+        balance = user.get("balance", 0)
+        
+    return JSONResponse({"success": True, "email": email, "name": name, "balance": balance})
 @router.post("/api/store/buy")
 async def customer_buy_uc(request: Request, email: str = Form(...), category: str = Form(...)):
     user = await db.store_customers.find_one({"email": email})
