@@ -20,7 +20,7 @@ db = client["salehzon_db"]
 SECRET_TOKEN = "salehzon_secure_2026"
 GOOGLE_CLIENT_ID = "671995925834-4bf0od4fm0pkkhvkfrvqh41h6rpb574v.apps.googleusercontent.com"
 
-# تشفير الباسوردات (أمان عالي)
+# تشفير الباسوردات
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
@@ -29,7 +29,14 @@ def check_auth(request: Request):
 
 def send_email_sync(to_email, otp):
     print(f"\n[MOCK EMAIL] To: {to_email} | OTP CODE: {otp}\n")
-    return True # حالياً بيطبع الكود في الكونسول فقط لحد ما تفعل الإيميل بعدين
+    return True # سيطبع في الكونسول حتى تضيف بيانات الإيميل الحقيقية
+
+# دالة لتوليد آيدي فريد من 8 أرقام
+async def generate_unique_id():
+    while True:
+        new_id = random.randint(10000000, 99999999)
+        if not await db.store_customers.find_one({"user_id": new_id}):
+            return new_id
 
 # ==========================================
 # 1. واجهة المتجر
@@ -41,7 +48,7 @@ async def public_storefront(request: Request):
     return templates.TemplateResponse("storefront.html", {"request": request, "prices": store_prices, "stock": stock_details, "client_id": GOOGLE_CLIENT_ID})
 
 # ==========================================
-# 2. أنظمة تسجيل الدخول (محمية بـ Secure Cookies)
+# 2. أنظمة تسجيل الدخول والتسجيل
 # ==========================================
 @router.post("/api/store/login-manual")
 async def login_manual(request: Request, email: str = Form(...), password: str = Form(...)):
@@ -53,17 +60,23 @@ async def login_manual(request: Request, email: str = Form(...), password: str =
         return JSONResponse({"success": False, "msg": "Incorrect password!"})
         
     response = JSONResponse({"success": True, "email": user["email"], "name": user["name"], "balance": user.get("balance", 0)})
-    response.set_cookie(key="store_session", value=user["email"], httponly=True, max_age=86400 * 30) # الكوكي صالح لـ 30 يوم
+    response.set_cookie(key="store_session", value=user["email"], httponly=True, max_age=86400 * 30)
     return response
 
 @router.post("/api/store/signup-request")
-async def signup_request(request: Request, name: str = Form(...), email: str = Form(...), password: str = Form(...)):
+async def signup_request(request: Request, name: str = Form(...), username: str = Form(...), email: str = Form(...), password: str = Form(...)):
+    if len(password) < 8:
+        return JSONResponse({"success": False, "msg": "Password must be at least 8 characters!"})
+        
     if await db.store_customers.find_one({"email": email}):
         return JSONResponse({"success": False, "msg": "Email is already registered!"})
         
+    if await db.store_customers.find_one({"username": username.lower()}):
+        return JSONResponse({"success": False, "msg": "Username is already taken!"})
+        
     code = str(random.randint(100000, 999999))
-    hashed_pw = hash_password(password) # تشفير الباسورد قبل حفظه
-    await db.otps.update_one({"email": email}, {"$set": {"code": code, "name": name, "password": hashed_pw, "created_at": datetime.now()}}, upsert=True)
+    hashed_pw = hash_password(password)
+    await db.otps.update_one({"email": email}, {"$set": {"code": code, "name": name, "username": username.lower(), "password": hashed_pw, "created_at": datetime.now()}}, upsert=True)
     
     send_email_sync(email, code)
     return JSONResponse({"success": True, "msg": "OTP sent to your email!"})
@@ -75,8 +88,11 @@ async def signup_verify(request: Request, email: str = Form(...), code: str = Fo
     if (datetime.now() - otp_doc["created_at"]).total_seconds() > 300:
         return JSONResponse({"success": False, "msg": "Code expired! Please try again."})
         
+    user_id = await generate_unique_id()
+    
     await db.store_customers.insert_one({
-        "email": email, "name": otp_doc["name"], "password": otp_doc["password"], # محفوظ مشفر أصلاً
+        "user_id": user_id, "username": otp_doc["username"],
+        "email": email, "name": otp_doc["name"], "password": otp_doc["password"],
         "balance": 0, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
     })
     await db.otps.delete_one({"_id": otp_doc["_id"]})
@@ -95,8 +111,17 @@ async def google_login(request: Request, credential: str = Form(...)):
         
         email = user_info.get("email"); name = user_info.get("name")
         user = await db.store_customers.find_one({"email": email})
+        
         if not user:
-            await db.store_customers.insert_one({"email": email, "name": name, "balance": 0, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")})
+            user_id = await generate_unique_id()
+            base_username = email.split("@")[0].lower()
+            username = base_username
+            counter = 1
+            while await db.store_customers.find_one({"username": username}):
+                username = f"{base_username}{counter}"
+                counter += 1
+                
+            await db.store_customers.insert_one({"user_id": user_id, "username": username, "email": email, "name": name, "balance": 0, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")})
             balance = 0
         else: balance = user.get("balance", 0)
         
@@ -108,8 +133,17 @@ async def google_login(request: Request, credential: str = Form(...)):
 async def telegram_login(request: Request, tg_id: str = Form(...), name: str = Form(...), username: str = Form("")):
     email = f"tg_{tg_id}@telegram.zone"
     user = await db.store_customers.find_one({"email": email})
+    
     if not user:
-        await db.store_customers.insert_one({"email": email, "name": name, "balance": 0, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")})
+        user_id = await generate_unique_id()
+        base_username = username.lower() if username else f"user{tg_id}"
+        final_username = base_username
+        counter = 1
+        while await db.store_customers.find_one({"username": final_username}):
+            final_username = f"{base_username}{counter}"
+            counter += 1
+            
+        await db.store_customers.insert_one({"user_id": user_id, "username": final_username, "email": email, "name": name, "balance": 0, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")})
         balance = 0
     else: balance = user.get("balance", 0)
     
@@ -124,11 +158,10 @@ async def store_logout():
     return response
 
 # ==========================================
-# 3. عملية الشراء (محمية ولا تقبل التلاعب)
+# 3. عملية الشراء
 # ==========================================
 @router.post("/api/store/buy")
 async def customer_buy_uc(request: Request, category: str = Form(...)):
-    # هنا الحماية الحقيقية: بناخد الإيميل من الكوكي السري المشفر، مش من اللي الزبون بيبعته
     email = request.cookies.get("store_session")
     if not email: return JSONResponse({"success": False, "msg": "Unauthorized! Please login again.", "force_logout": True})
     
@@ -172,7 +205,10 @@ async def store_update_prices(request: Request, p_60: int = Form(0), p_325: int 
 async def store_add_customer(request: Request, email: str = Form(...), name: str = Form(...), balance: int = Form(0)):
     if not check_auth(request): return RedirectResponse("/login")
     if not await db.store_customers.find_one({"email": email}):
-        await db.store_customers.insert_one({"email": email, "name": name, "balance": balance, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")})
+        # إنشاء يوزر نيم وآيدي للأدمن اللي بيضيف زباين
+        user_id = random.randint(10000000, 99999999)
+        username = email.split("@")[0] + str(random.randint(10,99))
+        await db.store_customers.insert_one({"user_id": user_id, "username": username, "email": email, "name": name, "balance": balance, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")})
     return RedirectResponse(url="/store-admin", status_code=status.HTTP_302_FOUND)
 
 @router.post("/api/store/manage_balance")
