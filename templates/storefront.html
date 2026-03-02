@@ -223,7 +223,13 @@
             closeModal('auth-modal');
         }
 
-        function logout() { localStorage.clear(); location.reload(); }
+        // تسجيل الخروج الآمن (بيمسح الكوكي من السيرفر)
+        async function logout() { 
+            await fetch('/api/store/logout', {method: 'POST'});
+            localStorage.clear(); 
+            location.reload(); 
+        }
+
         function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
         
@@ -237,7 +243,6 @@
             el.innerHTML = isError ? `<span class="text-red-500">${msg}</span>` : `<span class="text-szcyan">${msg}</span>`;
         }
 
-        // تبديل بين الدخول والتسجيل ونافذة الكود
         function switchAuthView(view) {
             document.querySelectorAll('.auth-view').forEach(el => el.classList.add('hidden'));
             document.getElementById(view + '-view').classList.remove('hidden');
@@ -251,7 +256,6 @@
             else if(view === 'otp') { title.innerText = 'Verify Email'; social.classList.add('hidden'); }
         }
 
-        // 1. تسجيل الدخول العادي
         async function doManualLogin(e) {
             e.preventDefault();
             const btn = document.getElementById('btn-signin');
@@ -269,7 +273,6 @@
             btn.innerHTML = 'Sign in'; btn.disabled = false;
         }
 
-        // 2. إنشاء حساب جديد (طلب كود)
         async function doSignupRequest(e) {
             e.preventDefault();
             const btn = document.getElementById('btn-signup');
@@ -279,6 +282,7 @@
             const conf = document.getElementById('signup-confirm').value;
 
             if(pass !== conf) { setStatus("Passwords do not match!", true); return; }
+            if(pass.length < 6) { setStatus("Password must be at least 6 characters.", true); return; }
 
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending Code...'; btn.disabled = true;
             const fd = new FormData(); fd.append('name', name); fd.append('email', email); fd.append('password', pass);
@@ -294,11 +298,10 @@
             btn.innerHTML = 'Create Account'; btn.disabled = false;
         }
 
-        // 3. تأكيد الكود (OTP)
         async function doVerifyOTP(e) {
             e.preventDefault();
             const btn = document.getElementById('btn-verify');
-            const email = document.getElementById('signup-email').value; // ناخده من الفورم اللي فات
+            const email = document.getElementById('signup-email').value; 
             const code = document.getElementById('verify-otp').value;
 
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...'; btn.disabled = true;
@@ -312,7 +315,6 @@
             btn.innerHTML = 'Verify & Login'; btn.disabled = false;
         }
 
-        // جوجل
         async function handleGoogleResponse(response) {
             setStatus('<i class="fas fa-spinner fa-spin"></i> Verifying Google...');
             const fd = new FormData(); fd.append('credential', response.credential);
@@ -323,7 +325,6 @@
             } catch(err) { setStatus('Connection error!', true); }
         }
 
-        // تليجرام
         async function onTelegramAuth(user) {
             setStatus('<i class="fas fa-spinner fa-spin"></i> Verifying Telegram...');
             const fd = new FormData();
@@ -335,7 +336,7 @@
             } catch(err) { setStatus('Connection error!', true); }
         }
 
-        // شراء الشدات
+        // عملية الشراء الآمنة (مش بنبعت الإيميل من هنا خالص، السيرفر بيقراه من الكوكي المشفّرة)
         async function buyUC(cat, price) {
             const email = localStorage.getItem('store_email');
             if(!email) { openAuthModal('signin'); return; }
@@ -346,17 +347,19 @@
             const originalHtml = btn.innerHTML;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...'; btn.disabled = true;
 
-            const fd = new FormData(); fd.append('email', email); fd.append('category', cat);
+            const fd = new FormData(); fd.append('category', cat); // الإيميل اتشال من هنا للحماية
             try {
                 const res = await fetch('/api/store/buy', {method: 'POST', body: fd});
                 const data = await res.json();
+                
                 if(data.success) {
                     updateUI(localStorage.getItem('store_name'), data.new_balance);
                     document.getElementById('purchased-code').innerText = data.code;
                     openModal('success-modal');
                 } else { 
                     alert(data.msg); 
-                    if(data.msg.includes("balance") || data.msg.includes("stock")) location.reload();
+                    if(data.force_logout) { logout(); } // لو الهاكر بيلعب في المتصفح، بيعمله تسجيل خروج فوراً
+                    else if(data.msg.includes("balance") || data.msg.includes("stock")) location.reload();
                 }
             } catch(err) { alert("An error occurred during purchase!"); }
             btn.innerHTML = originalHtml; btn.disabled = false;
