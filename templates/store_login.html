@@ -1,55 +1,20 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تسجيل الدخول - متجر صالح زون</title>
+    <title>Secure Login - Saleh Zone</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script>tailwind.config={theme:{extend:{colors:{szgreen:'#7dfc89',szcyan:'#5eead4',darkbg:'#050505',panelbg:'#111'}}}}</script>
     <style>
-        /* الخطوط والخلفية الأساسية */
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
         body { font-family: 'Cairo', sans-serif; background-color: #050505; color: #d1d5db; scroll-behavior: smooth; }
-        
-        /* شريط التمرير (Scrollbar) المضيء */
-        ::-webkit-scrollbar { width: 6px; } 
-        ::-webkit-scrollbar-track { background: #050505; } 
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; transition: 0.3s; }
-        ::-webkit-scrollbar-thumb:hover { background: #7dfc89; box-shadow: 0 0 10px #7dfc89; }
-
-        /* 1. تأثير الدخول الناعم (Fade In) */
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
-        .fade-in-delayed { animation: fadeIn 0.5s ease-out 0.2s forwards; opacity: 0; }
-
-        /* 2. تأثير الطيران (Floating) لصور الشدات واللوجو */
-        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-8px); } 100% { transform: translateY(0px); } }
-        .floating { animation: float 3s ease-in-out infinite; }
-
-        /* 3. تأثير النبض المضيء (Pulse Glow) للزراير */
-        @keyframes pulseGlow { 
-            0% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } 
-            50% { box-shadow: 0 0 25px rgba(125,252,137,0.6); transform: scale(1.02); } 
-            100% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } 
-        }
-        .btn-glow { transition: all 0.3s ease; }
-        .btn-glow:hover { animation: pulseGlow 1.5s infinite; border-color: #7dfc89; }
-
-        /* 4. تأثير حركة الألوان في النصوص (Gradient Flow) */
-        @keyframes gradientX { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-        .text-gradient-animate { background-size: 200% 200%; animation: gradientX 3s ease infinite; }
-
-        /* 5. تصميم الكروت الزجاجية (Glass & Hover Cards) */
-        .glass-panel { background: rgba(17, 17, 17, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
-        .uc-card { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        .uc-card:hover { transform: translateY(-8px); box-shadow: 0 15px 35px rgba(94, 234, 212, 0.15); border-color: #5eead4; }
-
-        /* 6. توهج عند الكتابة في الخانات (Input Focus) */
-        input:focus, select:focus, textarea:focus { box-shadow: 0 0 15px rgba(125,252,137,0.15); transition: box-shadow 0.3s ease; }
-        
-        /* تأثيرات القائمة الجانبية للأدمن */
-        .nav-active { background: linear-gradient(90deg, rgba(125,252,137,0.15) 0%, transparent 100%); border-left: 3px solid #7dfc89; color: #7dfc89; text-shadow: 0 0 10px rgba(125,252,137,0.3); }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #050505; } ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; transition: 0.3s; } ::-webkit-scrollbar-thumb:hover { background: #7dfc89; box-shadow: 0 0 10px #7dfc89; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } } .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-8px); } 100% { transform: translateY(0px); } } .floating { animation: float 3s ease-in-out infinite; }
+        @keyframes pulseGlow { 0% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } 50% { box-shadow: 0 0 25px rgba(125,252,137,0.6); transform: scale(1.02); } 100% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } } .btn-glow { transition: all 0.3s ease; } .btn-glow:hover { animation: pulseGlow 1.5s infinite; border-color: #7dfc89; }
+        @keyframes gradientX { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } } .text-gradient-animate { background-size: 200% 200%; animation: gradientX 3s ease infinite; }
     </style>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -58,51 +23,35 @@
     <div class="absolute -top-40 -right-40 w-96 h-96 bg-szgreen/10 rounded-full blur-[100px] pointer-events-none"></div>
     <div class="absolute -bottom-40 -left-40 w-96 h-96 bg-szcyan/10 rounded-full blur-[100px] pointer-events-none"></div>
 
-    <div class="w-full max-w-md p-8 bg-panelbg/80 backdrop-blur-xl border border-gray-800 rounded-3xl shadow-2xl relative z-10 m-4 text-center">
+    <div class="w-full max-w-md p-8 bg-panelbg/80 backdrop-blur-xl border border-gray-800 rounded-3xl shadow-2xl relative z-10 m-4 text-center fade-in">
         
-        <div class="inline-flex items-center justify-center w-20 h-20 bg-black rounded-full border border-gray-800 mb-4 shadow-[0_0_20px_rgba(125,252,137,0.15)]">
-            <img src="/static/logo.png" alt="SZ" class="w-12 drop-shadow-[0_0_8px_rgba(125,252,137,0.5)]" onerror="this.style.display='none'">
-        </div>
-        <h2 class="text-3xl font-black text-white tracking-wide mb-1">صالح <span class="text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan">زون</span></h2>
-        <p class="text-gray-400 text-sm font-bold mb-8">تسجيل الدخول الآمن للمتجر</p>
+        <div class="inline-flex items-center justify-center w-20 h-20 bg-black rounded-full border border-gray-800 mb-4 shadow-[0_0_20px_rgba(125,252,137,0.15)] floating text-3xl font-black text-szgreen tracking-tighter">SZ</div>
+        
+        <h2 class="text-3xl font-black text-white tracking-wide mb-1 text-gradient-animate">Saleh <span class="text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan">Zone</span></h2>
+        <p class="text-gray-400 text-sm font-bold mb-8 uppercase tracking-widest">Secure Store Login</p>
 
-        <div id="g_id_onload"
-             data-client_id="{{ client_id }}"
-             data-context="signin"
-             data-ux_mode="popup"
-             data-callback="handleGoogleResponse"
-             data-auto_prompt="false">
-        </div>
+        <div id="g_id_onload" data-client_id="{{ client_id }}" data-context="signin" data-ux_mode="popup" data-callback="handleGoogleResponse" data-auto_prompt="false"></div>
 
         <div class="flex justify-center mb-4">
-            <div class="g_id_signin"
-                 data-type="standard"
-                 data-shape="rectangular"
-                 data-theme="filled_black"
-                 data-text="signin_with"
-                 data-size="large"
-                 data-logo_alignment="left"
-                 data-width="300">
-            </div>
+            <div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="filled_black" data-text="signin_with" data-size="large" data-logo_alignment="left" data-width="300"></div>
         </div>
         
         <div id="login-status" class="text-sm font-bold text-szcyan mt-4 h-6"></div>
 
         <div class="mt-8 text-center border-t border-gray-800 pt-6">
-            <p class="text-xs text-gray-500">سيتم إنشاء حساب لك تلقائياً إذا كانت هذه أول زيارة.</p>
+            <p class="text-xs text-gray-500">An account will be automatically created on your first visit.</p>
         </div>
     </div>
 
     <script>
         document.addEventListener("DOMContentLoaded", () => {
-            // لو هو مسجل دخول، رجعه للصفحة الرئيسية (المتجر)
             if(localStorage.getItem('store_email')) { window.location.href = '/'; }
         });
 
         async function handleGoogleResponse(response) {
             const token = response.credential;
             const statusDiv = document.getElementById('login-status');
-            statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري التحقق من الحساب...';
+            statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying account...';
 
             const fd = new FormData(); 
             fd.append('credential', token);
@@ -115,14 +64,9 @@
                     localStorage.setItem('store_email', data.email);
                     localStorage.setItem('store_name', data.name);
                     localStorage.setItem('store_balance', data.balance);
-                    // بعد نجاح التسجيل، يحوله للصفحة الرئيسية للمتجر
                     window.location.href = '/';
-                } else { 
-                    statusDiv.innerHTML = `<span class="text-red-500">${data.msg}</span>`;
-                }
-            } catch(err) { 
-                statusDiv.innerHTML = '<span class="text-red-500">حدث خطأ في الاتصال.</span>';
-            }
+                } else { statusDiv.innerHTML = `<span class="text-red-500">${data.msg}</span>`; }
+            } catch(err) { statusDiv.innerHTML = '<span class="text-red-500">Connection error.</span>'; }
         }
     </script>
 </body>
