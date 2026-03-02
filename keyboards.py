@@ -1,18 +1,15 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from config import UC_CATEGORIES
 
 def get_main_keyboard(role):
-    # إزالة سجل العمليات من هنا، وترك حسابي والسحب فقط
     btns = [[InlineKeyboardButton("💳 حسابي", callback_data="my_profile")]]
     if role in ["admin", "employee"]:
-        btns.insert(0, [InlineKeyboardButton("🚀 سحب حسابات API", callback_data="pull_api"), InlineKeyboardButton("🎮 سحب أكواد UC", callback_data="pull_stock_menu")])
+        btns.insert(0, [InlineKeyboardButton("🚀 سحب حسابات API", callback_data="pull_api"), InlineKeyboardButton("🎮 سحب أكواد", callback_data="pull_stock_menu")])
     if role == "admin":
         btns.append([InlineKeyboardButton("🛠 لوحة التحكم (الأدمن)", callback_data="admin_panel")])
         btns.append([InlineKeyboardButton("♻️ سحب من التخزين (24س)", callback_data="pull_cached_api")])
     return InlineKeyboardMarkup(btns)
 
 def profile_keyboard(role):
-    # تم نقل سجل العمليات ليكون بداخل حسابي
     btns = [
         [InlineKeyboardButton("🔑 توكناتي الشخصية", callback_data="view_my_tokens")],
         [InlineKeyboardButton("📜 سجل عملياتي", callback_data="my_history")],
@@ -67,10 +64,12 @@ def stock_manage_keyboard():
     ])
 
 async def categories_keyboard(prefix, db):
+    from database import get_dynamic_categories
+    cats = await get_dynamic_categories()
     btns, row = [], []
-    for cat in UC_CATEGORIES:
+    for cat in cats:
         c = await db.stock.count_documents({"category": cat})
-        row.append(InlineKeyboardButton(f"{cat} UC ({c})", callback_data=f"{prefix}_{cat}"))
+        row.append(InlineKeyboardButton(f"{cat} ({c})", callback_data=f"{prefix}_{cat}"))
         if len(row) == 3:
             btns.append(row)
             row = []
