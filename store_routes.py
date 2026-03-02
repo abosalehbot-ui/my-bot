@@ -14,8 +14,8 @@ client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
 db = client["salehzon_db"]
 SECRET_TOKEN = "salehzon_secure_2026"
 
-# الـ Client ID الخاص بك من ملف الـ JSON
-GOOGLE_CLIENT_ID = "771769206518-8mm08g177dfraqr2u9da8lu85r2svulb.apps.googleusercontent.com"
+# تم تحديث الـ Client ID الخاص بك من ملف الـ JSON الجديد
+GOOGLE_CLIENT_ID = "671995925834-4bf0od4fm0pkkhvkfrvqh41h6rpb574v.apps.googleusercontent.com"
 
 def check_auth(request: Request):
     return request.cookies.get("admin_session") == SECRET_TOKEN
@@ -76,6 +76,7 @@ async def public_storefront(request: Request):
 
 @router.get("/store-login", response_class=HTMLResponse)
 async def store_login_page(request: Request):
+    # السطر ده بيبعت مفتاح جوجل لصفحة تسجيل الدخول عشان الزرار يشتغل
     return templates.TemplateResponse("store_login.html", {"request": request, "client_id": GOOGLE_CLIENT_ID})
 
 @router.post("/api/store/google-login")
