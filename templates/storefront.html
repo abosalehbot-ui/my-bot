@@ -9,16 +9,17 @@
     <script>tailwind.config={theme:{extend:{colors:{szgreen:'#7dfc89',szcyan:'#5eead4',darkbg:'#050505',panelbg:'#111'}}}}</script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
-        body { font-family: 'Cairo', sans-serif; background-color: #050505; color: #d1d5db; scroll-behavior: smooth; }
+        body { font-family: 'Cairo', sans-serif; background-color: #050505; color: #d1d5db; scroll-behavior: smooth; overflow: hidden; }
         ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #050505; } ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; transition: 0.3s; } ::-webkit-scrollbar-thumb:hover { background: #7dfc89; box-shadow: 0 0 10px #7dfc89; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } } .fade-in { animation: fadeIn 0.5s ease-out forwards; }
         @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-8px); } 100% { transform: translateY(0px); } } .floating { animation: float 3s ease-in-out infinite; }
         @keyframes pulseGlow { 0% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } 50% { box-shadow: 0 0 25px rgba(125,252,137,0.6); transform: scale(1.02); } 100% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } } .btn-glow { transition: all 0.3s ease; } .btn-glow:hover { animation: pulseGlow 1.5s infinite; border-color: #7dfc89; }
         @keyframes gradientX { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } } .text-gradient-animate { background-size: 200% 200%; animation: gradientX 3s ease infinite; }
-        .glass-nav { background: rgba(17, 17, 17, 0.85); backdrop-filter: blur(12px); border-bottom: 1px solid #1f2937; }
+        
         .uc-card { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         .uc-card:hover { transform: translateY(-8px); box-shadow: 0 15px 35px rgba(94, 234, 212, 0.15); border-color: #5eead4; }
         
+        /* أيقونات التواصل */
         .social-btn { position: relative; width: 45px; height: 45px; display: flex; justify-content: center; align-items: center; border-radius: 8px; background-color: transparent; cursor: pointer; transition: background-color 0.3s; overflow: hidden; }
         .social-btn:hover { background-color: rgba(255,255,255,0.05); }
         .social-btn svg { width: 22px; height: 22px; fill: #9ca3af; transition: fill 0.3s, transform 0.3s; position: absolute; pointer-events: none; z-index: 1; }
@@ -29,75 +30,102 @@
     </style>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
-<body class="selection:bg-szgreen selection:text-black">
+<body class="selection:bg-szgreen selection:text-black flex h-screen">
 
-    <nav class="glass-nav fixed w-full top-0 z-40 transition-all">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-20 items-center">
+    <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black/80 z-40 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
+
+    <aside id="sidebar" class="w-64 bg-panelbg border-r border-gray-800 flex flex-col justify-between fixed md:relative z-50 h-full transition-transform transform -translate-x-full md:translate-x-0 shadow-[4px_0_24px_rgba(0,0,0,0.5)]">
+        <div>
+            <div class="h-20 flex items-center px-6 border-b border-gray-800 justify-between md:justify-center">
                 <div class="flex items-center gap-3">
-                    <div class="inline-flex items-center justify-center w-10 h-10 bg-black rounded-full border border-szgreen/50 shadow-[0_0_15px_rgba(125,252,137,0.3)] floating">
-                        <span class="text-lg font-black text-szgreen tracking-tighter">SZ</span>
+                    <div class="inline-flex items-center justify-center w-8 h-8 bg-black rounded-full border border-szgreen/50 shadow-[0_0_10px_rgba(125,252,137,0.3)] floating">
+                        <span class="text-xs font-black text-szgreen">SZ</span>
                     </div>
-                    <span class="text-2xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">SALEH ZONE</span>
+                    <span class="text-xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">SALEH ZONE</span>
+                </div>
+                <button onclick="toggleSidebar()" class="md:hidden text-gray-500 hover:text-white transition"><i class="fas fa-times text-xl"></i></button>
+            </div>
+
+            <div class="p-4 border-b border-gray-800 bg-[#0a0a0a]">
+                <div id="sidebar-guest" class="text-center fade-in">
+                    <div class="inline-flex justify-center items-center w-12 h-12 rounded-full bg-gray-900 border border-gray-700 text-gray-500 mb-3"><i class="fas fa-user text-xl"></i></div>
+                    <p class="text-xs text-gray-500 mb-3 uppercase tracking-widest">Welcome, Guest</p>
+                    <button onclick="openAuthModal('signin'); toggleSidebarMobile();" class="w-full border border-szgreen text-szgreen py-2 rounded-lg text-sm font-bold hover:bg-szgreen hover:text-black transition btn-glow"><i class="fas fa-sign-in-alt mr-2"></i> Login / Sign Up</button>
                 </div>
                 
-                <div id="auth-section">
-                    <button onclick="openAuthModal('signin')" class="border border-szgreen text-szgreen px-6 py-2 rounded-lg font-bold hover:bg-szgreen hover:text-black transition flex items-center gap-2 btn-glow">
-                        <i class="fas fa-sign-in-alt"></i> Login
-                    </button>
-                </div>
-                
-                <div id="user-section" class="hidden flex items-center gap-4">
-                    <div class="text-right hidden md:block">
-                        <div class="text-xs text-gray-500 font-bold uppercase tracking-widest" id="ui-name">Welcome</div>
-                        <div class="font-black text-szcyan tracking-wide">Balance: <span id="ui-balance" class="text-white">0</span> EGP</div>
+                <div id="sidebar-user" class="hidden fade-in">
+                    <p class="text-[10px] text-gray-500 uppercase tracking-widest mb-1"><i class="fas fa-id-badge mr-1 text-szgreen"></i> Player Profile</p>
+                    <div class="font-bold text-white text-lg truncate mb-1" id="sidebar-ui-name">Name</div>
+                    <div class="bg-black border border-gray-800 rounded-lg p-3 mt-2">
+                        <div class="text-[10px] text-gray-500 uppercase mb-1">Wallet Balance</div>
+                        <div class="text-szcyan font-black text-2xl"><span id="sidebar-ui-balance">0</span> <span class="text-xs text-gray-500">EGP</span></div>
                     </div>
-                    <button onclick="logout()" class="text-red-500 bg-red-500/10 p-2 rounded-lg hover:bg-red-500 hover:text-white transition border border-red-500/20" title="Logout"><i class="fas fa-power-off"></i></button>
                 </div>
             </div>
+
+            <nav class="mt-4 flex flex-col gap-1 px-3">
+                <a href="/" class="bg-gradient-to-r from-szgreen/10 to-transparent border-l-2 border-szgreen text-szgreen px-4 py-3 rounded-r-lg text-sm font-bold flex items-center shadow-[0_0_10px_rgba(125,252,137,0.05)]"><i class="fas fa-store w-6"></i> UC Top-Up</a>
+                <button onclick="alert('My Orders page coming soon!');" class="text-gray-500 hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition flex items-center w-full text-left"><i class="fas fa-history w-6"></i> Order History</button>
+                <button onclick="alert('Support system coming soon!');" class="text-gray-500 hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition flex items-center w-full text-left"><i class="fas fa-headset w-6"></i> Help & Support</button>
+            </nav>
         </div>
-    </nav>
+        
+        <div class="p-4 border-t border-gray-800" id="sidebar-logout-section" style="display: none;">
+            <button onclick="logout()" class="w-full text-center bg-red-900/10 hover:bg-red-600 hover:text-white text-red-500 py-3 rounded-lg text-sm font-bold transition border border-red-900/30 flex justify-center items-center gap-2"><i class="fas fa-power-off"></i> Secure Logout</button>
+        </div>
+    </aside>
 
-    <div class="pt-32 pb-12 text-center px-4 fade-in">
-        <h1 class="text-4xl md:text-5xl font-black mb-4 text-white uppercase tracking-widest">PUBG Mobile <span class="text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">Top-Up</span></h1>
-        <p class="text-gray-400 max-w-xl mx-auto mb-8 text-sm">Get your UC code instantly after payment! Fully automated service.</p>
-    </div>
+    <main class="flex-1 flex flex-col h-screen overflow-y-auto bg-darkbg relative">
+        
+        <header class="h-16 bg-panelbg/80 backdrop-blur-md border-b border-gray-800 flex items-center justify-between px-4 md:hidden sticky top-0 z-30">
+            <button onclick="toggleSidebar()" class="text-white text-xl p-2"><i class="fas fa-bars"></i></button>
+            <span class="text-lg font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">SALEH ZONE</span>
+            <div class="w-8 flex justify-end">
+                <button onclick="toggleSidebar()" class="text-szgreen"><i class="fas fa-user-circle text-xl"></i></button>
+            </div>
+        </header>
 
-    <div class="max-w-7xl mx-auto px-4 pb-20">
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4 md:gap-6">
-            {% for cat in ['60', '325', '660', '1800', '3850', '8100'] %}
-            <div class="uc-card bg-panelbg border border-gray-800 rounded-2xl p-6 flex flex-col items-center text-center relative overflow-hidden fade-in">
-                {% if stock.get(cat, 0) > 0 %}
-                <div class="absolute top-3 right-3 bg-szgreen/20 text-szgreen text-[10px] font-bold px-2 py-1 rounded border border-szgreen/30">IN STOCK</div>
-                {% else %}
-                <div class="absolute top-3 right-3 bg-red-900/50 text-red-400 text-[10px] font-bold px-2 py-1 rounded border border-red-900/50">OUT OF STOCK</div>
-                {% endif %}
+        <div class="p-6 md:p-10 max-w-6xl mx-auto w-full">
+            <div class="text-center md:text-left mb-10 fade-in">
+                <h1 class="text-3xl md:text-5xl font-black mb-3 text-white uppercase tracking-widest">Instant <span class="text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">Delivery</span></h1>
+                <p class="text-gray-400 max-w-xl text-sm">Select your UC package. Codes are delivered instantly after payment.</p>
+            </div>
 
-                <div class="w-24 h-24 mb-4 rounded-full bg-gradient-to-br from-yellow-600/10 to-yellow-900/20 border border-yellow-500/40 flex items-center justify-center shadow-[0_0_20px_rgba(250,204,21,0.15)] floating">
-                    <span class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-yellow-600 tracking-tighter">UC</span>
-                </div>
-                
-                <h3 class="text-2xl font-black text-white mb-1">{{ cat }} UC</h3>
-                
-                <div class="mt-2 mb-6 bg-black w-full py-2 rounded-lg border border-gray-800">
-                    {% if prices.get(cat, 0)|int > 0 %}
-                    <span class="text-2xl font-black text-szcyan">{{ prices.get(cat, 0) }}</span> <span class="text-xs text-gray-500 font-bold">EGP</span>
+            <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 pb-20">
+                {% for cat in ['60', '325', '660', '1800', '3850', '8100'] %}
+                <div class="uc-card bg-panelbg border border-gray-800 rounded-2xl p-5 md:p-6 flex flex-col items-center text-center relative overflow-hidden fade-in">
+                    {% if stock.get(cat, 0) > 0 %}
+                    <div class="absolute top-3 right-3 bg-szgreen/20 text-szgreen text-[10px] font-bold px-2 py-1 rounded border border-szgreen/30"><i class="fas fa-bolt mr-1"></i> INSTANT</div>
                     {% else %}
-                    <span class="text-sm font-bold text-gray-600">Unpriced</span>
+                    <div class="absolute top-3 right-3 bg-red-900/50 text-red-400 text-[10px] font-bold px-2 py-1 rounded border border-red-900/50">OUT OF STOCK</div>
+                    {% endif %}
+
+                    <div class="w-20 h-20 md:w-24 md:h-24 mt-4 md:mt-0 mb-4 rounded-full bg-gradient-to-br from-yellow-600/10 to-yellow-900/20 border border-yellow-500/40 flex items-center justify-center shadow-[0_0_20px_rgba(250,204,21,0.15)] floating">
+                        <span class="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-yellow-600 tracking-tighter">UC</span>
+                    </div>
+                    
+                    <h3 class="text-xl md:text-2xl font-black text-white mb-1">{{ cat }} UC</h3>
+                    
+                    <div class="mt-2 mb-6 bg-black w-full py-2 rounded-lg border border-gray-800">
+                        {% if prices.get(cat, 0)|int > 0 %}
+                        <span class="text-xl md:text-2xl font-black text-szcyan">{{ prices.get(cat, 0) }}</span> <span class="text-[10px] text-gray-500 font-bold">EGP</span>
+                        {% else %}
+                        <span class="text-sm font-bold text-gray-600">Unpriced</span>
+                        {% endif %}
+                    </div>
+
+                    {% if stock.get(cat, 0) > 0 and prices.get(cat, 0)|int > 0 %}
+                    <button id="btn-buy-{{ cat }}" onclick="buyUC('{{ cat }}', '{{ prices.get(cat, 0) }}')" class="w-full bg-szgreen text-black font-bold py-2.5 md:py-3 rounded-xl btn-glow flex justify-center items-center gap-2 text-sm md:text-base">
+                        <span>BUY NOW</span> <i class="fas fa-shopping-cart"></i>
+                    </button>
+                    {% else %}
+                    <button disabled class="w-full bg-gray-900 text-gray-600 font-bold py-2.5 md:py-3 rounded-xl cursor-not-allowed border border-gray-800 text-sm md:text-base">UNAVAILABLE</button>
                     {% endif %}
                 </div>
-
-                {% if stock.get(cat, 0) > 0 and prices.get(cat, 0)|int > 0 %}
-                <button id="btn-buy-{{ cat }}" onclick="buyUC('{{ cat }}', '{{ prices.get(cat, 0) }}')" class="w-full bg-szgreen text-black font-bold py-3 rounded-xl btn-glow flex justify-center items-center gap-2">
-                    <span>BUY NOW</span> <i class="fas fa-shopping-cart"></i>
-                </button>
-                {% else %}
-                <button disabled class="w-full bg-gray-900 text-gray-600 font-bold py-3 rounded-xl cursor-not-allowed border border-gray-800">UNAVAILABLE</button>
-                {% endif %}
+                {% endfor %}
             </div>
-            {% endfor %}
         </div>
-    </div>
+    </main>
 
     <div id="success-modal" class="fixed inset-0 bg-black/90 z-[60] hidden flex items-center justify-center p-4 backdrop-blur-sm">
         <div class="bg-panelbg border border-szgreen w-full max-w-md rounded-2xl p-8 text-center relative overflow-hidden shadow-[0_0_40px_rgba(125,252,137,0.15)] fade-in">
@@ -115,7 +143,7 @@
     </div>
 
     <div id="auth-modal" class="fixed inset-0 bg-black/90 z-[60] hidden flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="w-[360px] bg-[#111827] p-8 rounded-xl shadow-2xl relative border border-gray-800 fade-in overflow-hidden max-h-[90vh] overflow-y-auto">
+        <div class="w-full max-w-[360px] bg-[#111827] p-8 rounded-xl shadow-2xl relative border border-gray-800 fade-in overflow-hidden max-h-[90vh] overflow-y-auto">
             <button onclick="closeModal('auth-modal')" class="absolute top-4 right-4 text-gray-500 hover:text-red-500 transition z-50"><i class="fas fa-times text-xl"></i></button>
             
             <h2 id="modal-title" class="text-center text-2xl font-black text-white mb-6">Login</h2>
@@ -204,6 +232,15 @@
     </div>
 
     <script>
+        // إظهار/إخفاء القائمة الجانبية في الموبايل
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('-translate-x-full');
+            document.getElementById('sidebar-backdrop').classList.toggle('hidden');
+        }
+        function toggleSidebarMobile() {
+            if(window.innerWidth < 768) { toggleSidebar(); }
+        }
+
         document.addEventListener("DOMContentLoaded", () => {
             const email = localStorage.getItem('store_email');
             const name = localStorage.getItem('store_name');
@@ -211,11 +248,14 @@
             if(email && name) { updateUI(name, balance); }
         });
 
+        // تحديث بيانات القائمة الجانبية
         function updateUI(name, balance) {
-            document.getElementById('auth-section').classList.add('hidden');
-            document.getElementById('user-section').classList.remove('hidden');
-            document.getElementById('ui-name').innerText = name;
-            document.getElementById('ui-balance').innerText = balance;
+            document.getElementById('sidebar-guest').classList.add('hidden');
+            document.getElementById('sidebar-user').classList.remove('hidden');
+            document.getElementById('sidebar-logout-section').style.display = 'block';
+            
+            document.getElementById('sidebar-ui-name').innerText = name;
+            document.getElementById('sidebar-ui-balance').innerText = balance;
             localStorage.setItem('store_balance', balance);
         }
 
@@ -259,6 +299,7 @@
             else if(view === 'otp') { title.innerText = 'Verify Email'; social.classList.add('hidden'); }
         }
 
+        // العمليات البرمجية للتسجيل
         async function doManualLogin(e) {
             e.preventDefault();
             const btn = document.getElementById('btn-signin');
@@ -342,7 +383,7 @@
 
         async function buyUC(cat, price) {
             const email = localStorage.getItem('store_email');
-            if(!email) { openAuthModal('signin'); return; }
+            if(!email) { openAuthModal('signin'); toggleSidebarMobile(); return; }
 
             if(!confirm(`Are you sure you want to buy ${cat} UC for ${price} EGP?`)) return;
 
