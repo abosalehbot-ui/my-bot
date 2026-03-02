@@ -6,8 +6,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import motor.motor_asyncio
 from datetime import datetime, timedelta
-from store_routes import router as store_router
 
+from store_routes import router as store_router
 
 app = FastAPI(title="Saleh Zone Dashboard")
 app.include_router(store_router)
@@ -68,7 +68,6 @@ async def dashboard(request: Request):
     now = datetime.now()
     today_str = now.strftime("%Y-%m-%d")
     start_of_month_str = now.strftime("%Y-%m-01")
-    start_of_week_str = (now - timedelta(days=now.weekday())).strftime("%Y-%m-%d")
 
     users_count = await db.users.count_documents({})
     stock_count = await db.stock.count_documents({})
@@ -76,39 +75,59 @@ async def dashboard(request: Request):
     logs = await db.system_logs.find().sort("timestamp", -1).to_list(length=100)
     all_users = await db.users.find().sort("_id", -1).to_list(length=50)
     
-    month_orders = await db.orders.find({"type": {"$regex": "API Pull|PUBG Stock"}, "date": {"$gte": start_of_month_str}}).to_list(None)
+    # === 1. إحصائيات البوت (الموظفين) ===
+    month_orders = await db.orders.find({"date": {"$gte": start_of_month_str}}).to_list(None)
     
-    user_pull_stats = {}
-    global_today, global_month = 0, 0
+    global_stats = {"api_today": 0, "api_month": 0, "stock_today": 0, "stock_month": 0}
+    user_stats = {}
     
     for o in month_orders:
         uid = o.get("user_id")
         count = len(o.get("items", []))
-        if uid not in user_pull_stats:
-            user_pull_stats[uid] = {"today": 0, "week": 0, "month": 0}
+        is_today = o.get("date", "").startswith(today_str)
+        is_api = "API" in o.get("type", "")
+        
+        if uid not in user_stats: 
+            user_stats[uid] = {"api_today": 0, "api_month": 0, "stock_today": 0, "stock_month": 0}
             
-        global_month += count
-        user_pull_stats[uid]["month"] += count
-        if o.get("date", "").startswith(today_str):
-            global_today += count
-            user_pull_stats[uid]["today"] += count
-        if o.get("date", "") >= start_of_week_str:
-            user_pull_stats[uid]["week"] += count
+        if is_api:
+            global_stats["api_month"] += count
+            user_stats[uid]["api_month"] += count
+            if is_today:
+                global_stats["api_today"] += count
+                user_stats[uid]["api_today"] += count
+        else: # أكواد UC
+            global_stats["stock_month"] += count
+            user_stats[uid]["stock_month"] += count
+            if is_today:
+                global_stats["stock_today"] += count
+                user_stats[uid]["stock_today"] += count
+
+    # === 2. إحصائيات متجر الزبائن ===
+    store_orders = await db.store_orders.find({"date": {"$gte": start_of_month_str}}).to_list(None)
+    store_stats = {"sales_today": 0, "sales_month": len(store_orders), "rev_today": 0, "rev_month": 0}
+    
+    for so in store_orders:
+        price = int(so.get("price", 0))
+        store_stats["rev_month"] += price
+        if so.get("date", "").startswith(today_str):
+            store_stats["sales_today"] += 1
+            store_stats["rev_today"] += price
 
     total_user_tokens = sum(len(u.get("tokens", [])) for u in all_users)
     shared_doc = await db.settings.find_one({"_id": "shared_tokens"})
     shared_tokens_count = len(shared_doc.get("tokens", [])) if shared_doc else 0
     total_system_tokens = total_user_tokens + shared_tokens_count
 
+    # ربط الإحصائيات الدقيقة بكل موظف
     for u in all_users:
-        u["pull_stats"] = user_pull_stats.get(u["_id"], {"today": 0, "week": 0, "month": 0})
+        u["stats_details"] = user_stats.get(u["_id"], {"api_today": 0, "api_month": 0, "stock_today": 0, "stock_month": 0})
 
     categories = ["60", "325", "660", "1800", "3850", "8100"]
     stock_details = {cat: await db.stock.count_documents({"category": cat}) for cat in categories}
         
     settings = await db.settings.find_one({"_id": "config"})
     maintenance = settings.get("maintenance", False) if settings else False
-    
     cache_config = await db.settings.find_one({"_id": "cache_config"})
     tracked_users = cache_config.get("tracked_users", []) if cache_config else []
 
@@ -117,10 +136,10 @@ async def dashboard(request: Request):
         "cached_count": cached_count, "logs": logs, "all_users": all_users,
         "stock_details": stock_details, "maintenance": maintenance,
         "shared_tokens_count": shared_tokens_count, "total_system_tokens": total_system_tokens,
-        "global_today": global_today, "global_month": global_month,
-        "tracked_users": tracked_users
+        "global_stats": global_stats, "store_stats": store_stats, "tracked_users": tracked_users
     })
 
+# --- APIs للتحكم المتقدم والمخزن ---
 @app.post("/api/toggle_maintenance")
 async def toggle_maint(request: Request):
     if not check_auth(request): return {"status": "error"}
@@ -167,7 +186,6 @@ async def api_view_stock(category: str, request: Request):
     codes_list = [str(c.get("code") or c.get("_id")) for c in codes_docs]
     return JSONResponse({"category": category, "codes": codes_list})
 
-# 👁️ جلب التوكنات المشتركة للعرض في الويب
 @app.get("/api/view_shared_tokens")
 async def api_view_shared_tokens(request: Request):
     if not check_auth(request): return JSONResponse({"error": "unauth"}, status_code=401)
@@ -204,7 +222,7 @@ async def api_add_user_tokens(request: Request, user_id: int = Form(...), tokens
     extracted_tokens = clean_and_extract_tokens(tokens)
     if extracted_tokens: 
         await db.users.update_one({"_id": user_id}, {"$push": {"tokens": {"$each": extracted_tokens}}})
-        await web_log(f"إضافة ذكية: تم إضافة {len(extracted_tokens)} توكن للمستخدم {user_id}")
+        await web_log(f"إضافة {len(extracted_tokens)} توكن للمستخدم {user_id}")
     return RedirectResponse(url="/?tab=users", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/add_user")
@@ -223,26 +241,19 @@ async def api_user_action(request: Request, user_id: int = Form(...), action: st
         await web_log(f"حذف المستخدم ID: {user_id}")
     elif action == "clear_tokens": 
         await db.users.update_one({"_id": user_id}, {"$set": {"tokens": []}})
-        await web_log(f"تصفير توكنات المستخدم {user_id}")
     elif action == "toggle_role":
         u = await db.users.find_one({"_id": user_id})
         nr = "employee" if u.get("role") == "user" else "user"
         await db.users.update_one({"_id": user_id}, {"$set": {"role": nr}})
-        await web_log(f"تعديل رتبة المستخدم {user_id} إلى {nr}")
     elif action == "clear_logs":
         await db.users.update_one({"_id": user_id}, {"$set": {"logs": [], "history": [], "token_logs": []}})
-        await web_log(f"مسح سجلات المستخدم {user_id}")
     return RedirectResponse(url="/?tab=users", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/tracked_users")
 async def api_tracked_users(request: Request, user_id: int = Form(...), action: str = Form(...)):
     if not check_auth(request): return RedirectResponse("/login")
-    if action == "add": 
-        await db.settings.update_one({"_id": "cache_config"}, {"$addToSet": {"tracked_users": user_id}}, upsert=True)
-        await web_log(f"إضافة الآيدي {user_id} لقائمة التخزين التلقائي")
-    elif action == "remove": 
-        await db.settings.update_one({"_id": "cache_config"}, {"$pull": {"tracked_users": user_id}}, upsert=True)
-        await web_log(f"إزالة الآيدي {user_id} من قائمة التخزين التلقائي")
+    if action == "add": await db.settings.update_one({"_id": "cache_config"}, {"$addToSet": {"tracked_users": user_id}}, upsert=True)
+    elif action == "remove": await db.settings.update_one({"_id": "cache_config"}, {"$pull": {"tracked_users": user_id}}, upsert=True)
     return RedirectResponse(url="/?tab=tools", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/return_order")
@@ -256,7 +267,6 @@ async def api_return_order(request: Request, order_id: int = Form(...)):
         await db.codes_map.delete_many({"$or": [{"_id": {"$in": order["items"]}}, {"code": {"$in": order["items"]}}], "order_id": order_id})
         await db.orders.delete_one({"_id": order_id})
         await db.users.update_one({"_id": order["user_id"]}, {"$inc": {"stats.stock": -len(order["items"])}})
-        await web_log(f"إرجاع الطلب #{order_id} للمخزن", f"الفئة: {cat} | العدد: {len(order['items'])}")
     return RedirectResponse(url="/?tab=tools", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/search")
@@ -275,8 +285,7 @@ async def api_search(request: Request):
                        f"⬇️ العناصر المسحوبة ({len(order.get('items', []))}):\n{items_str}")
             return JSONResponse({"result": res_msg})
         user = await db.users.find_one({"_id": int(query)})
-        if user: 
-            return JSONResponse({"result": f"👤 {user.get('name')}\n🆔 الآيدي: {user.get('_id')}\n🎖 الرتبة: {user.get('role')}\n🔑 التوكنات: {len(user.get('tokens',[]))}"})
+        if user: return JSONResponse({"result": f"👤 {user.get('name')}\n🆔 الآيدي: {user.get('_id')}\n🎖 الرتبة: {user.get('role')}\n🔑 التوكنات: {len(user.get('tokens',[]))}"})
 
     records = await db.codes_map.find({"$or": [{"_id": query}, {"code": query}]}).to_list(length=10)
     in_stock = await db.stock.count_documents({"$or": [{"_id": query}, {"code": query}]})
