@@ -2,206 +2,89 @@
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Store ERP - Saleh Zone</title>
+    <title>Store CRM - Saleh Zone</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script>tailwind.config={theme:{extend:{colors:{szgreen:'#7dfc89',szcyan:'#5eead4',darkbg:'#050505',panelbg:'#111'}}}}</script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
-        body { font-family: 'Cairo', sans-serif; background-color: #050505; color: #d1d5db; scroll-behavior: smooth; overflow: hidden; }
-        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #050505; } ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; transition: 0.3s; } ::-webkit-scrollbar-thumb:hover { background: #7dfc89; box-shadow: 0 0 10px #7dfc89; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } } .fade-in { animation: fadeIn 0.5s ease-out forwards; }
-        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-8px); } 100% { transform: translateY(0px); } } .floating { animation: float 3s ease-in-out infinite; }
-        @keyframes pulseGlow { 0% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } 50% { box-shadow: 0 0 25px rgba(125,252,137,0.6); transform: scale(1.02); } 100% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } } .btn-glow { transition: all 0.3s ease; } .btn-glow:hover { animation: pulseGlow 1.5s infinite; border-color: #7dfc89; }
-        @keyframes gradientX { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } } .text-gradient-animate { background-size: 200% 200%; animation: gradientX 3s ease infinite; }
-        
+        body { font-family: 'Cairo', sans-serif; background-color: #050505; color: #d1d5db; overflow: hidden; }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; } @keyframes fadeIn { from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:translateY(0)} }
         #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
-        .toast { background: #111; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-left: 4px solid #7dfc89; animation: slideIn 0.3s ease-out, fadeOut 0.3s ease-in 2.7s forwards; font-weight: bold; font-size: 14px; display: flex; items-center gap: 10px; }
+        .toast { background: #111; color: white; padding: 16px 24px; border-radius: 8px; border-left: 4px solid #7dfc89; animation: slideIn 0.3s, fadeOut 0.3s 2.7s forwards; font-weight: bold; }
         .toast.error { border-left-color: #ef4444; }
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes fadeOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
     </style>
 </head>
 <body class="selection:bg-yellow-500 selection:text-black flex h-screen">
-
     <div id="toast-container"></div>
-
-    <aside class="w-64 bg-panelbg border-r border-gray-900 flex flex-col h-full z-10 shadow-2xl relative flex-shrink-0">
+    <aside class="w-64 bg-panelbg border-r border-gray-900 flex flex-col h-full shadow-2xl flex-shrink-0">
         <div class="h-20 flex items-center px-6 border-b border-gray-900">
-            <div class="bg-yellow-500/10 p-2 rounded-lg text-yellow-500 mr-3 floating"><i class="fas fa-store text-xl"></i></div>
-            <span class="text-xl font-black tracking-wider text-yellow-500 text-gradient-animate">STORE ERP</span>
+            <div class="bg-yellow-500/10 p-2 rounded-lg text-yellow-500 mr-3"><i class="fas fa-users text-xl"></i></div>
+            <span class="text-xl font-black text-yellow-500">STORE CRM</span>
         </div>
-        <nav class="mt-6 flex flex-col gap-2 px-3 overflow-y-auto flex-1 pb-6">
-            <a href="/admin" class="text-gray-400 hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition flex items-center bg-black border border-gray-800 mb-2"><i class="fas fa-arrow-left w-6"></i> Master Panel</a>
-            <button onclick="switchTab('dashboard')" id="btn-dashboard" class="nav-btn bg-yellow-500/10 border-l-2 border-yellow-500 text-yellow-500 px-4 py-3 rounded-r-lg text-sm font-bold text-left transition-colors"><i class="fas fa-chart-pie w-6"></i> Dashboard</button>
-            <button onclick="switchTab('categories')" id="btn-categories" class="nav-btn text-gray-500 hover:text-white px-4 py-3 rounded-lg text-sm font-bold text-left transition-colors"><i class="fas fa-layer-group w-6"></i> Categories Manager</button>
-            <button onclick="switchTab('customers')" id="btn-customers" class="nav-btn text-gray-500 hover:text-white px-4 py-3 rounded-lg text-sm font-bold text-left transition-colors"><i class="fas fa-users w-6"></i> Customers CRM</button>
-            <button onclick="switchTab('orders')" id="btn-orders" class="nav-btn text-gray-500 hover:text-white px-4 py-3 rounded-lg text-sm font-bold text-left transition-colors"><i class="fas fa-receipt w-6"></i> All Orders</button>
-            <a href="/" target="_blank" class="text-szcyan hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition flex items-center mt-auto bg-szcyan/10 border border-szcyan/20"><i class="fas fa-external-link-alt w-6"></i> Live Storefront</a>
+        <nav class="mt-6 flex flex-col gap-2 px-3 overflow-y-auto flex-1">
+            <a href="/admin" class="text-gray-400 hover:text-white px-4 py-3 rounded-lg text-sm font-bold bg-black border border-gray-800 mb-2"><i class="fas fa-arrow-left w-6"></i> Master Panel</a>
+            <button onclick="switchTab('customers')" id="btn-customers" class="nav-btn bg-yellow-500/10 border-l-2 border-yellow-500 text-yellow-500 px-4 py-3 rounded-r-lg text-sm font-bold text-left"><i class="fas fa-users w-6"></i> Client Balances</button>
+            <button onclick="switchTab('orders')" id="btn-orders" class="nav-btn text-gray-500 hover:text-white px-4 py-3 rounded-lg text-sm font-bold text-left"><i class="fas fa-receipt w-6"></i> Sales Log</button>
+            <a href="/" target="_blank" class="text-szcyan hover:text-white px-4 py-3 rounded-lg text-sm font-bold mt-auto bg-szcyan/10 border border-szcyan/20"><i class="fas fa-external-link-alt w-6"></i> Storefront</a>
         </nav>
     </aside>
 
-    <main class="flex-1 p-8 overflow-y-auto bg-[#0a0a0a] relative">
-        <div class="flex justify-between items-end mb-8 fade-in">
-            <div><h2 class="text-3xl font-black text-white">Store Management</h2><p class="text-sm text-gray-500 mt-1">Real-time control over categories, sales, and customers.</p></div>
-        </div>
+    <main class="flex-1 p-8 overflow-y-auto bg-[#0a0a0a]">
+        <div class="flex justify-between items-end mb-8"><div><h2 class="text-3xl font-black text-white">Client Management</h2><p class="text-sm text-gray-500">Multi-currency wallet control.</p></div></div>
 
-        <div id="tab-dashboard" class="tab-content block fade-in">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div class="bg-panelbg border border-gray-800 p-6 rounded-xl relative overflow-hidden hover:border-gray-600 transition"><div class="text-gray-500 text-xs font-bold uppercase mb-2">Total Revenue</div><div class="text-4xl font-black text-yellow-500">{{ stats.revenue }} <span class="text-lg text-gray-600">EGP</span></div></div>
-                <div class="bg-panelbg border border-gray-800 p-6 rounded-xl relative overflow-hidden hover:border-gray-600 transition"><div class="text-gray-500 text-xs font-bold uppercase mb-2">Total Sales (Orders)</div><div class="text-4xl font-black text-white">{{ stats.orders }}</div></div>
-                <div class="bg-panelbg border border-gray-800 p-6 rounded-xl relative overflow-hidden hover:border-gray-600 transition"><div class="text-gray-500 text-xs font-bold uppercase mb-2">Active Customers</div><div class="text-4xl font-black text-szcyan">{{ stats.customers }}</div></div>
-            </div>
-            <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden">
-                <div class="p-5 border-b border-gray-800 flex justify-between items-center bg-[#111]"><h3 class="font-bold text-white uppercase text-sm"><i class="fas fa-clock text-yellow-500 mr-2"></i> Recent Transactions</h3></div>
-                <div class="overflow-x-auto">
+        <div id="tab-customers" class="tab-content block fade-in">
+            <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden flex flex-col h-[750px]">
+                <div class="p-4 border-b border-gray-800 bg-[#111] flex justify-between items-center">
+                    <h3 class="font-bold text-white uppercase text-sm"><i class="fas fa-wallet text-yellow-500 mr-2"></i> User Wallets</h3>
+                    <input type="text" id="customer-search" onkeyup="filterTable('customer-search','customer-row')" placeholder="Search..." class="bg-[#050505] border border-gray-700 text-white px-3 py-1.5 rounded-lg text-sm outline-none focus:border-yellow-500 w-64">
+                </div>
+                <div class="overflow-y-auto flex-1 p-2">
                     <table class="w-full text-left text-sm whitespace-nowrap">
-                        <thead class="bg-[#151515] text-gray-500 uppercase text-[10px]"><tr><th class="px-5 py-3">Order ID</th><th class="px-5 py-3">Date</th><th class="px-5 py-3">Customer</th><th class="px-5 py-3">Product</th><th class="px-5 py-3">Amount</th></tr></thead>
+                        <thead class="bg-[#151515] text-gray-500 uppercase text-[10px] sticky top-0 z-10"><tr><th class="px-4 py-3">Player Info</th><th class="px-4 py-3">EGP Wallet</th><th class="px-4 py-3">USD Wallet</th><th class="px-4 py-3">Fund Manager</th></tr></thead>
                         <tbody class="divide-y divide-gray-900">
-                            {% for o in store_orders[:5] %}
-                            <tr class="hover:bg-gray-900/50 transition">
-                                <td class="px-5 py-3 font-mono text-gray-400">#{{ o._id }}</td><td class="px-5 py-3 text-xs text-gray-500">{{ o.date }}</td>
-                                <td class="px-5 py-3"><div class="font-bold text-white">{{ o.name }}</div><div class="text-[10px] text-gray-500">{{ o.email }}</div></td>
-                                <td class="px-5 py-3"><span class="bg-gray-800 text-white px-2 py-1 rounded text-xs font-bold border border-gray-700">{{ o.category }}</span></td>
-                                <td class="px-5 py-3 font-bold text-yellow-500">+{{ o.price }} EGP</td>
+                            {% for c in store_customers %}
+                            <tr class="hover:bg-gray-900/50 customer-row">
+                                <td class="px-4 py-3"><div class="font-bold text-white text-base">{{ c.name }}</div><div class="text-[10px] text-szcyan font-mono">@{{ c.username }}</div></td>
+                                <td class="px-4 py-3"><span class="text-yellow-500 font-black text-lg">{{ c.balance_egp|default(0) }}</span> <span class="text-[9px] text-gray-500">EGP</span></td>
+                                <td class="px-4 py-3"><span class="text-szcyan font-black text-lg">{{ c.balance_usd|default(0) }}</span> <span class="text-[9px] text-gray-500">USD</span></td>
+                                <td class="px-4 py-3">
+                                    <form onsubmit="submitAjax(event, '/api/store/manage_balance')" class="flex gap-2">
+                                        <input type="hidden" name="email" value="{{ c.email }}">
+                                        <select name="currency" class="bg-black border border-gray-700 text-white rounded text-xs outline-none"><option value="EGP">EGP</option><option value="USD">USD</option></select>
+                                        <input type="number" step="0.01" name="amount" placeholder="Amt" required class="w-20 bg-black border border-gray-700 text-white px-2 rounded text-xs outline-none">
+                                        <select name="action" class="bg-black border border-gray-700 text-white rounded text-xs outline-none"><option value="add">Add (+)</option><option value="set">Set (=)</option></select>
+                                        <button type="submit" class="bg-gray-800 text-yellow-500 px-3 py-1.5 rounded hover:bg-yellow-500 hover:text-black font-bold">Execute</button>
+                                    </form>
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
-                </div>
-            </div>
-        </div>
-
-        <div id="tab-categories" class="tab-content hidden fade-in">
-            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                <div class="bg-panelbg border border-gray-800 p-6 rounded-xl h-fit">
-                    <h3 class="font-bold text-white uppercase text-sm mb-4 border-b border-gray-800 pb-3"><i class="fas fa-folder-plus text-szcyan mr-2"></i> Create Main Category</h3>
-                    <form onsubmit="submitAjax(event, '/api/store/category/add')" class="space-y-4">
-                        <div><label class="text-xs text-gray-500 mb-1 block">Category ID (e.g. pubg_mobile)</label><input type="text" name="cat_id" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-szcyan font-mono text-sm"></div>
-                        <div><label class="text-xs text-gray-500 mb-1 block">Display Name</label><input type="text" name="name" required placeholder="PUBG Mobile" class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-szcyan"></div>
-                        <div><label class="text-xs text-gray-500 mb-1 block">Icon Class (FontAwesome)</label><input type="text" name="icon" value="fa-gamepad" class="w-full bg-[#050505] border border-gray-800 text-gray-400 p-3 rounded-lg outline-none focus:border-szcyan font-mono text-sm"></div>
-                        <button type="submit" class="w-full bg-szcyan text-black font-bold py-3 rounded-lg mt-2 btn-glow">Create Category</button>
-                    </form>
-                </div>
-                
-                <div class="lg:col-span-3 space-y-6">
-                    {% for cat in categories %}
-                    <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden">
-                        <div class="bg-[#111] p-4 border-b border-gray-800 flex justify-between items-center">
-                            <div class="flex items-center gap-3">
-                                <i class="fas {{ cat.icon }} text-2xl text-szcyan p-2 bg-szcyan/10 rounded-lg"></i>
-                                <div><h3 class="font-bold text-white text-lg">{{ cat.name }}</h3><p class="text-xs text-gray-500 font-mono">ID: {{ cat._id }}</p></div>
-                            </div>
-                            <form onsubmit="if(confirm('Delete entire category?')) submitAjax(event, '/api/store/category/delete'); else event.preventDefault();">
-                                <input type="hidden" name="cat_id" value="{{ cat._id }}"><button class="text-red-500 hover:bg-red-500 hover:text-white p-2 rounded transition"><i class="fas fa-trash"></i></button>
-                            </form>
-                        </div>
-                        <div class="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {% for p in cat.products %}
-                            <div class="bg-black border border-gray-800 p-4 rounded-lg relative group">
-                                <form onsubmit="if(confirm('Delete product?')) submitAjax(event, '/api/store/product/delete'); else event.preventDefault();" class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition">
-                                    <input type="hidden" name="cat_id" value="{{ cat._id }}"><input type="hidden" name="stock_key" value="{{ p.stock_key }}"><button class="text-red-500"><i class="fas fa-times"></i></button>
-                                </form>
-                                <div class="font-bold text-white mb-1">{{ p.name }}</div>
-                                <div class="flex justify-between items-center mt-2">
-                                    <div class="text-xs font-mono text-gray-500">Key: <span class="text-szgreen">{{ p.stock_key }}</span></div>
-                                    <div class="font-black text-yellow-500">{{ p.price }} <span class="text-[10px] text-gray-500">EGP</span></div>
-                                </div>
-                                <div class="text-[10px] uppercase font-bold mt-2 {% if stock.get(p.stock_key, 0) > 0 %}text-szcyan{% else %}text-red-500{% endif %}">Stock: {{ stock.get(p.stock_key, 0) }}</div>
-                            </div>
-                            {% endfor %}
-                            
-                            <div class="border border-dashed border-gray-700 p-4 rounded-lg bg-white/5 flex flex-col justify-center">
-                                <form onsubmit="submitAjax(event, '/api/store/product/add')" class="space-y-2">
-                                    <input type="hidden" name="cat_id" value="{{ cat._id }}">
-                                    <input type="text" name="stock_key" required placeholder="Stock Key (e.g. 60_uc)" class="w-full bg-black border border-gray-800 text-white px-2 py-1.5 rounded text-xs outline-none focus:border-szgreen">
-                                    <input type="text" name="name" required placeholder="Display Name (e.g. 60 UC)" class="w-full bg-black border border-gray-800 text-white px-2 py-1.5 rounded text-xs outline-none focus:border-szgreen">
-                                    <input type="number" name="price" required placeholder="Price (EGP)" class="w-full bg-black border border-gray-800 text-white px-2 py-1.5 rounded text-xs outline-none focus:border-szgreen">
-                                    <button class="w-full bg-gray-800 hover:bg-szgreen hover:text-black text-white text-xs font-bold py-1.5 rounded transition">Add Product</button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                    {% else %}
-                    <div class="bg-panelbg border border-gray-800 rounded-xl p-10 text-center text-gray-500"><i class="fas fa-folder-open text-4xl mb-3"></i><p>No categories found. Create one to start.</p></div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-
-        <div id="tab-customers" class="tab-content hidden fade-in">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="bg-panelbg border border-gray-800 p-6 rounded-xl h-fit">
-                    <h3 class="font-bold text-white uppercase text-sm mb-4 border-b border-gray-800 pb-3"><i class="fas fa-user-plus text-yellow-500 mr-2"></i> Add Customer</h3>
-                    <form onsubmit="submitAjax(event, '/api/store/add_customer')" class="space-y-4">
-                        <div><label class="text-xs text-gray-500 mb-1 block">Full Name</label><input type="text" name="name" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500"></div>
-                        <div><label class="text-xs text-gray-500 mb-1 block">Email Address</label><input type="email" name="email" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500 font-mono"></div>
-                        <div><label class="text-xs text-gray-500 mb-1 block">Balance (EGP)</label><input type="number" name="balance" value="0" class="w-full bg-[#050505] border border-gray-800 text-yellow-500 font-bold p-3 rounded-lg outline-none focus:border-yellow-500"></div>
-                        <button type="submit" class="w-full bg-yellow-500 text-black font-bold py-3 rounded-lg mt-2 btn-glow">Create Account</button>
-                    </form>
-                </div>
-                
-                <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden lg:col-span-2 flex flex-col h-[650px]">
-                    <div class="p-4 border-b border-gray-800 bg-[#111] flex justify-between items-center">
-                        <h3 class="font-bold text-white uppercase text-sm"><i class="fas fa-users text-szcyan mr-2"></i> Database</h3>
-                        <input type="text" id="customer-search" onkeyup="filterCustomers()" placeholder="Search Name, Username or Email..." class="bg-[#050505] border border-gray-700 text-white px-3 py-1.5 rounded-lg text-sm outline-none focus:border-szcyan w-64 transition">
-                    </div>
-                    <div class="overflow-y-auto flex-1 p-2">
-                        <table class="w-full text-left text-sm whitespace-nowrap" id="customers-table">
-                            <thead class="bg-[#151515] text-gray-500 uppercase text-[10px] sticky top-0 z-10"><tr><th class="px-4 py-3">Player Info</th><th class="px-4 py-3">Wallet</th><th class="px-4 py-3">Manage Funds</th><th class="px-4 py-3 text-right">Actions</th></tr></thead>
-                            <tbody class="divide-y divide-gray-900">
-                                {% for c in store_customers %}
-                                <tr class="hover:bg-gray-900/50 transition customer-row">
-                                    <td class="px-4 py-3">
-                                        <div class="font-bold text-white text-base customer-name">{{ c.name }}</div>
-                                        <div class="text-[10px] text-szcyan font-mono mt-0.5 customer-username">@{{ c.username }}</div>
-                                        <div class="text-[10px] text-gray-500 font-mono mt-0.5 customer-email"><i class="fas fa-envelope mr-1"></i> {{ c.email }}</div>
-                                        <div class="text-[9px] text-gray-600 font-mono mt-0.5">ID: {{ c.user_id }}</div>
-                                    </td>
-                                    <td class="px-4 py-3"><span class="text-yellow-500 font-black text-xl">{{ c.balance }}</span> <span class="text-xs text-gray-500">EGP</span></td>
-                                    <td class="px-4 py-3">
-                                        <form onsubmit="submitAjax(event, '/api/store/manage_balance')" class="flex gap-2">
-                                            <input type="hidden" name="email" value="{{ c.email }}">
-                                            <input type="number" name="amount" placeholder="Amt" required class="w-20 bg-black border border-gray-700 text-white px-2 py-1.5 rounded text-xs outline-none focus:border-yellow-500">
-                                            <select name="action" class="bg-black border border-gray-700 text-white rounded text-xs outline-none focus:border-yellow-500"><option value="add">Add (+)</option><option value="set">Set (=)</option></select>
-                                            <button type="submit" class="bg-gray-800 text-yellow-500 px-3 py-1.5 rounded hover:bg-yellow-500 hover:text-black font-bold transition">Update</button>
-                                        </form>
-                                    </td>
-                                    <td class="px-4 py-3 text-right">
-                                        <form onsubmit="if(confirm('Delete customer?')) submitAjax(event, '/api/store/delete_customer'); else event.preventDefault();">
-                                            <input type="hidden" name="email" value="{{ c.email }}"><button type="submit" class="text-red-600 hover:text-red-400 p-2 rounded bg-red-600/10 transition"><i class="fas fa-trash"></i></button>
-                                        </form>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
                 </div>
             </div>
         </div>
 
         <div id="tab-orders" class="tab-content hidden fade-in">
             <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden h-[750px] flex flex-col">
-                <div class="p-5 border-b border-gray-800 flex justify-between items-center bg-[#111]">
-                    <h3 class="font-bold text-white uppercase text-sm"><i class="fas fa-list text-szgreen mr-2"></i> All Orders Log</h3>
-                    <input type="text" id="order-search" onkeyup="filterOrders()" placeholder="Search Order ID, Name or Email..." class="bg-[#050505] border border-gray-700 text-white px-3 py-1.5 rounded-lg text-sm outline-none focus:border-szgreen w-64 transition">
+                <div class="p-4 border-b border-gray-800 bg-[#111] flex justify-between items-center">
+                    <h3 class="font-bold text-white uppercase text-sm"><i class="fas fa-list text-szgreen mr-2"></i> Store Sales</h3>
+                    <input type="text" id="order-search" onkeyup="filterTable('order-search','order-row')" placeholder="Search Orders..." class="bg-[#050505] border border-gray-700 text-white px-3 py-1.5 rounded-lg text-sm outline-none focus:border-szgreen w-64">
                 </div>
                 <div class="overflow-y-auto flex-1 p-2">
-                    <table class="w-full text-left text-sm whitespace-nowrap" id="orders-table">
-                        <thead class="bg-[#151515] text-gray-500 uppercase text-[10px] sticky top-0">
-                            <tr><th class="px-5 py-3">Order ID</th><th class="px-5 py-3">Date</th><th class="px-5 py-3">Customer Info</th><th class="px-5 py-3">Package</th><th class="px-5 py-3">Amount Paid</th><th class="px-5 py-3">Delivered Code</th></tr>
-                        </thead>
+                    <table class="w-full text-left text-sm whitespace-nowrap">
+                        <thead class="bg-[#151515] text-gray-500 uppercase text-[10px] sticky top-0"><tr><th class="px-5 py-3">Order ID</th><th class="px-5 py-3">Customer</th><th class="px-5 py-3">Item</th><th class="px-5 py-3">Paid</th><th class="px-5 py-3">Code</th></tr></thead>
                         <tbody class="divide-y divide-gray-900">
                             {% for o in store_orders %}
-                            <tr class="hover:bg-gray-900/50 transition order-row">
-                                <td class="px-5 py-3 font-mono text-szcyan font-bold order-id">#{{ o._id }}</td>
-                                <td class="px-5 py-3 text-xs text-gray-500">{{ o.date }}</td>
-                                <td class="px-5 py-3"><div class="font-bold text-white order-name">{{ o.name }}</div><div class="text-[10px] text-gray-500 order-email">{{ o.email }}</div></td>
-                                <td class="px-5 py-3"><span class="bg-gray-800 text-white px-2 py-1 rounded text-xs font-bold border border-gray-700">{{ o.category }}</span></td>
-                                <td class="px-5 py-3 font-bold text-yellow-500">{{ o.price }} EGP</td>
-                                <td class="px-5 py-3"><div class="bg-black text-szgreen font-mono px-3 py-1 rounded border border-gray-800 text-xs inline-block cursor-pointer hover:bg-gray-800 transition" onclick="copyText('{{ o.code }}')" title="Click to copy">{{ o.code }}</div></td>
+                            <tr class="hover:bg-gray-900/50 order-row">
+                                <td class="px-5 py-3 font-mono text-szcyan font-bold">#{{ o._id }}</td>
+                                <td class="px-5 py-3"><div class="font-bold text-white">{{ o.name }}</div><div class="text-[10px] text-gray-500">{{ o.email }}</div></td>
+                                <td class="px-5 py-3"><span class="bg-gray-800 text-white px-2 py-1 rounded text-xs">{{ o.category }}</span></td>
+                                <td class="px-5 py-3 font-bold text-yellow-500">{{ o.price }} <span class="text-[9px]">{{ o.currency|default('EGP') }}</span></td>
+                                <td class="px-5 py-3"><div class="bg-black text-szgreen font-mono px-3 py-1 rounded border border-gray-800 text-xs cursor-pointer hover:bg-gray-800" onclick="navigator.clipboard.writeText('{{ o.code }}'); showToast('Copied!')">{{ o.code }}</div></td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -209,73 +92,36 @@
                 </div>
             </div>
         </div>
-
     </main>
 
     <script>
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.getElementById('tab-' + tabId).classList.remove('hidden');
-            document.querySelectorAll('.nav-btn').forEach(el => { el.className = 'nav-btn text-gray-500 hover:text-white px-4 py-3 rounded-lg text-sm font-bold text-left transition-colors'; });
-            document.getElementById('btn-' + tabId).className = 'nav-btn bg-yellow-500/10 border-l-2 border-yellow-500 text-yellow-500 px-4 py-3 rounded-r-lg text-sm font-bold text-left transition-colors';
-            window.history.replaceState({}, '', '/store-admin?tab=' + tabId);
+            document.querySelectorAll('.nav-btn').forEach(el => { el.className = 'nav-btn text-gray-500 hover:text-white px-4 py-3 rounded-lg text-sm font-bold text-left'; });
+            document.getElementById('btn-' + tabId).className = 'nav-btn bg-yellow-500/10 border-l-2 border-yellow-500 text-yellow-500 px-4 py-3 rounded-r-lg text-sm font-bold text-left';
         }
-
-        document.addEventListener("DOMContentLoaded", () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const tab = urlParams.get('tab') || 'dashboard';
-            switchTab(tab);
-        });
 
         function showToast(msg, type='success') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
             toast.className = `toast ${type === 'error' ? 'error' : ''}`;
-            toast.innerHTML = `<i class="fas ${type === 'error' ? 'fa-times-circle text-red-500' : 'fa-check-circle text-szgreen'} text-xl"></i> <span>${msg}</span>`;
-            container.appendChild(toast);
-            setTimeout(() => { toast.remove(); }, 3000);
+            toast.innerHTML = `<span>${msg}</span>`;
+            container.appendChild(toast); setTimeout(() => toast.remove(), 3000);
         }
 
         async function submitAjax(e, url) {
-            e.preventDefault();
-            const form = e.target;
-            const btn = form.querySelector('button[type="submit"]') || form.querySelector('button');
-            const originalHtml = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; btn.disabled = true;
-
-            const fd = new FormData(form);
+            e.preventDefault(); const form = e.target; const btn = form.querySelector('button'); const orig = btn.innerHTML;
+            btn.innerHTML = '...'; btn.disabled = true;
             try {
-                const res = await fetch(url, {method: 'POST', body: fd});
-                const data = await res.json();
-                if(data.success) {
-                    showToast(data.msg, 'success');
-                    setTimeout(() => { location.reload(); }, 800);
-                } else {
-                    showToast(data.msg || "Error", 'error');
-                    btn.innerHTML = originalHtml; btn.disabled = false;
-                }
-            } catch(err) { showToast("Connection error!", 'error'); btn.innerHTML = originalHtml; btn.disabled = false; }
+                const res = await fetch(url, {method: 'POST', body: new FormData(form)}); const data = await res.json();
+                if(data.success) { showToast(data.msg); setTimeout(() => location.reload(), 800); } else { showToast(data.msg, 'error'); btn.innerHTML = orig; btn.disabled = false; }
+            } catch(err) { showToast("Error", 'error'); btn.innerHTML = orig; btn.disabled = false; }
         }
 
-        function filterCustomers() {
-            const query = document.getElementById('customer-search').value.toLowerCase();
-            document.querySelectorAll('.customer-row').forEach(row => {
-                const text = row.innerText.toLowerCase();
-                row.style.display = text.includes(query) ? '' : 'none';
-            });
-        }
-
-        function filterOrders() {
-            const query = document.getElementById('order-search').value.toLowerCase();
-            document.querySelectorAll('.order-row').forEach(row => {
-                const text = row.innerText.toLowerCase();
-                row.style.display = text.includes(query) ? '' : 'none';
-            });
-        }
-
-        function copyText(text) {
-            navigator.clipboard.writeText(text);
-            showToast("Code copied to clipboard!", 'success');
+        function filterTable(inputId, rowClass) {
+            const q = document.getElementById(inputId).value.toLowerCase();
+            document.querySelectorAll('.' + rowClass).forEach(row => { row.style.display = row.innerText.toLowerCase().includes(q) ? '' : 'none'; });
         }
     </script>
 </body>
