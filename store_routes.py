@@ -133,3 +133,7 @@ async def customer_buy_uc(request: Request, phone: str = Form(...), category: st
     })
     
     return JSONResponse({"success": True, "code": code_str, "new_balance": user["balance"] - price, "msg": "تم الشراء بنجاح!"})
+
+@router.get("/store-login", response_class=HTMLResponse)
+async def store_login_page(request: Request):
+    return templates.TemplateResponse("store_login.html", {"request": request})
