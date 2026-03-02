@@ -57,7 +57,7 @@
                 <h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-robot text-szgreen mr-2"></i> Bot Operations (Staff)</h3>
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                     <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center hover:border-gray-600 transition"><div class="text-gray-500 text-[10px] font-bold uppercase mb-1">Total Staff/Users</div><div class="text-2xl font-black text-white">{{ users_count }}</div></div>
-                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center relative overflow-hidden hover:border-szgreen transition"><div class="text-szgreen text-[10px] font-bold uppercase mb-1">UC Stock Available</div><div class="text-2xl font-black text-white">{{ stock_count }}</div><div class="absolute bottom-0 left-0 w-full h-1 bg-szgreen"></div></div>
+                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center relative overflow-hidden hover:border-szgreen transition"><div class="text-szgreen text-[10px] font-bold uppercase mb-1">Total Stock Pulled</div><div class="text-2xl font-black text-white">{{ global_stats.stock_month }}</div><div class="absolute bottom-0 left-0 w-full h-1 bg-szgreen"></div></div>
                     <div class="bg-[#0a0a0a] border border-szcyan/30 p-4 rounded-xl text-center"><div class="text-szcyan text-[10px] font-bold uppercase mb-1">Codes Pulled (Today/Month)</div><div class="text-2xl font-black text-szcyan">{{ global_stats.stock_today }} <span class="text-sm text-gray-500">/ {{ global_stats.stock_month }}</span></div></div>
                     <div class="bg-[#0a0a0a] border border-purple-500/30 p-4 rounded-xl text-center"><div class="text-purple-400 text-[10px] font-bold uppercase mb-1">API Pulled (Today/Month)</div><div class="text-2xl font-black text-purple-400">{{ global_stats.api_today }} <span class="text-sm text-gray-500">/ {{ global_stats.api_month }}</span></div></div>
                 </div>
@@ -166,9 +166,9 @@
                 <h2 class="text-2xl font-bold text-white mb-6">Advanced <span class="text-szgreen">Tools</span></h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="bg-panelbg border border-gray-800 p-6 rounded-xl">
-                        <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-search text-szgreen mr-2"></i> Global Search</h3>
+                        <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-search text-szgreen mr-2"></i> Unified Search (Bot & Web)</h3>
                         <div class="flex gap-2 mb-4">
-                            <input type="text" id="search-input" placeholder="Order ID, User ID, or Code..." class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-szgreen transition">
+                            <input type="text" id="search-input" placeholder="Order ID (e.g. 1005 or 1005S), User ID, or Code..." class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-szgreen transition">
                             <button onclick="performSearch()" class="bg-szgreen text-black font-bold px-6 rounded-lg btn-glow"><i class="fas fa-search"></i></button>
                         </div>
                         <div id="search-result" class="bg-black border border-gray-800 rounded-lg p-4 text-sm font-mono text-szcyan whitespace-pre-wrap hidden h-48 overflow-y-auto leading-relaxed fade-in"></div>
@@ -181,9 +181,9 @@
                             <button onclick="toggleMaintenance()" class="py-3 px-8 w-full rounded-lg font-bold transition {% if maintenance %}bg-red-900 text-red-300 border border-red-900{% else %}bg-gray-800 text-white hover:bg-szgreen hover:text-black{% endif %}">{% if maintenance %}TURN MAINTENANCE OFF{% else %}TURN MAINTENANCE ON{% endif %}</button>
                         </div>
                         <div class="bg-panelbg border border-gray-800 p-6 rounded-xl">
-                            <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-undo text-yellow-500 mr-2"></i> Return Order</h3>
+                            <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-undo text-yellow-500 mr-2"></i> Return Order (Bot or Web)</h3>
                             <form action="/api/return_order" method="POST" class="flex gap-2" onsubmit="return confirm('Return this order?');">
-                                <input type="number" name="order_id" placeholder="Order ID" required class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-yellow-500">
+                                <input type="text" name="order_id" placeholder="Order ID (1001 or 1001S)" required class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-yellow-500">
                                 <button class="bg-yellow-500 text-black font-bold px-6 rounded-lg hover:bg-white transition">Return</button>
                             </form>
                         </div>
@@ -212,15 +212,15 @@
             </div>
             
             <div id="tab-stock" class="tab-content hidden">
-                <h2 class="text-2xl font-bold text-white mb-6">Stock <span class="text-szcyan">Management</span></h2>
+                <h2 class="text-2xl font-bold text-white mb-6">Dynamic <span class="text-szcyan">Stock Management</span></h2>
                 <div class="grid grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
                     {% for cat, count in stock_details.items() %}
                     <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center relative group overflow-hidden">
-                        <div class="text-xl font-black text-white mb-1">{{ cat }}</div>
-                        <div class="text-xs text-gray-500 uppercase">Count: <span class="text-szgreen font-bold">{{ count }}</span></div>
+                        <div class="text-lg font-black text-white mb-1">{{ cat }}</div>
+                        <div class="text-[10px] text-gray-500 uppercase">Stock: <span class="text-szgreen font-bold text-sm">{{ count }}</span></div>
                         <div class="absolute top-0 left-0 w-full h-full bg-black/80 flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
                             <button onclick="openStockModal('{{ cat }}')" class="text-szcyan bg-szcyan/10 p-2 rounded hover:bg-szcyan hover:text-black transition" title="View Codes"><i class="fas fa-eye"></i></button>
-                            <form action="/api/clear_stock" method="POST" onsubmit="return confirm('Clear ALL {{ cat }} UC stock?');">
+                            <form action="/api/clear_stock" method="POST" onsubmit="return confirm('Clear ALL {{ cat }} stock?');">
                                 <input type="hidden" name="category" value="{{ cat }}"><button class="text-red-500 bg-red-500/10 p-2 rounded hover:bg-red-500 hover:text-white transition" title="Clear Stock"><i class="fas fa-trash"></i></button>
                             </form>
                         </div>
@@ -229,11 +229,12 @@
                 </div>
                 
                 <div class="bg-panelbg border border-gray-800 rounded-xl p-6 max-w-2xl">
-                    <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-magic text-szgreen mr-2"></i> Smart Upload</h3>
+                    <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-magic text-szgreen mr-2"></i> Smart Database Upload</h3>
                     <form id="smart-stock-form" onsubmit="submitSmartStock(event)">
                         <select name="category" id="smart-cat" class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-szcyan mb-4 transition">
-                            <option value="60">60 UC</option><option value="325">325 UC</option><option value="660">660 UC</option>
-                            <option value="1800">1800 UC</option><option value="3850">3850 UC</option><option value="8100">8100 UC</option>
+                            {% for sk in dynamic_stock_keys %}
+                            <option value="{{ sk }}">{{ sk }}</option>
+                            {% endfor %}
                         </select>
                         <textarea name="codes" id="smart-codes" rows="6" class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-szcyan font-mono text-sm mb-4 transition" placeholder="Paste your codes here..."></textarea>
                         <button type="submit" id="smart-btn" class="bg-szgreen text-black font-bold py-3 px-6 rounded-lg w-full text-lg btn-glow flex justify-center items-center gap-2">
@@ -321,7 +322,7 @@
 
         async function openStockModal(cat) {
             document.getElementById('stock-modal').classList.remove('hidden');
-            document.getElementById('modal-title').innerText = cat + " UC - Current Stock";
+            document.getElementById('modal-title').innerText = cat + " Current Stock";
             document.getElementById('modal-codes-list').value = "Loading...";
             const res = await fetch('/api/view_stock/' + cat);
             const data = await res.json();
