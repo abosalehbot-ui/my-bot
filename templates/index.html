@@ -16,8 +16,8 @@
         .text-gradient-animate { background-size: 200% 200%; animation: gradientX 3s ease infinite; }
         @keyframes gradientX { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
         
-        /* كلاسات القائمة الجانبية الجديدة */
-        .nav-btn { width: 100%; display: flex; align-items: center; padding: 0.75rem; border-radius: 0.5rem; transition: all 0.2s; font-weight: bold; }
+        /* كلاسات القائمة الجانبية (Flowbite Themed) */
+        .nav-btn { width: 100%; display: flex; align-items: center; transition: all 0.2s; font-weight: bold; }
         .nav-inactive { color: #9ca3af; }
         .nav-inactive:hover { background-color: #111827; color: #ffffff; }
         .nav-inactive:hover i { color: #7dfc89; }
@@ -48,11 +48,36 @@
             </div>
 
             <ul class="space-y-2">
-                <li><button onclick="switchTab('overview')" id="btn-overview" class="nav-btn nav-active"><i class="fas fa-chart-pie w-6 text-lg transition duration-75"></i><span class="ml-3">Overview & Logs</span></button></li>
-                <li><button onclick="switchTab('catalog')" id="btn-catalog" class="nav-btn nav-inactive"><i class="fas fa-layer-group w-6 text-lg transition duration-75"></i><span class="ml-3">System Catalog</span></button></li>
-                <li><button onclick="switchTab('stock')" id="btn-stock" class="nav-btn nav-inactive"><i class="fas fa-box-open w-6 text-lg transition duration-75"></i><span class="ml-3">Stock Manager</span></button></li>
-                <li><button onclick="switchTab('users')" id="btn-users" class="nav-btn nav-inactive"><i class="fas fa-user-tie w-6 text-lg transition duration-75"></i><span class="ml-3">Staff & Tokens</span></button></li>
-                <li><button onclick="switchTab('tools')" id="btn-tools" class="nav-btn nav-inactive"><i class="fas fa-tools w-6 text-lg transition duration-75"></i><span class="ml-3">Advanced Tools</span></button></li>
+                <li>
+                    <button onclick="switchTab('overview')" id="btn-overview" class="nav-btn nav-active p-2 rounded-lg">
+                        <i class="fas fa-chart-pie w-6 text-lg transition duration-75"></i>
+                        <span class="ml-3">Overview & Logs</span>
+                    </button>
+                </li>
+                
+                <li>
+                    <button type="button" onclick="document.getElementById('dropdown-db').classList.toggle('hidden')" class="flex items-center p-2 w-full text-base font-bold text-gray-400 rounded-lg transition duration-75 hover:bg-gray-900 hover:text-white">
+                        <i class="fas fa-database w-6 text-lg text-gray-500 transition duration-75"></i>
+                        <span class="flex-1 ml-3 text-left whitespace-nowrap">Database</span>
+                        <i class="fas fa-chevron-down w-4 text-xs"></i>
+                    </button>
+                    <ul id="dropdown-db" class="hidden py-2 space-y-1">
+                        <li><button onclick="switchTab('catalog')" id="btn-catalog" class="nav-btn nav-inactive p-2 pl-11 rounded-lg text-sm"><i class="fas fa-layer-group w-5 mr-2"></i> System Catalog</button></li>
+                        <li><button onclick="switchTab('stock')" id="btn-stock" class="nav-btn nav-inactive p-2 pl-11 rounded-lg text-sm"><i class="fas fa-box-open w-5 mr-2"></i> Stock Manager</button></li>
+                    </ul>
+                </li>
+
+                <li>
+                    <button type="button" onclick="document.getElementById('dropdown-admin').classList.toggle('hidden')" class="flex items-center p-2 w-full text-base font-bold text-gray-400 rounded-lg transition duration-75 hover:bg-gray-900 hover:text-white">
+                        <i class="fas fa-users-cog w-6 text-lg text-gray-500 transition duration-75"></i>
+                        <span class="flex-1 ml-3 text-left whitespace-nowrap">Administration</span>
+                        <i class="fas fa-chevron-down w-4 text-xs"></i>
+                    </button>
+                    <ul id="dropdown-admin" class="hidden py-2 space-y-1">
+                        <li><button onclick="switchTab('users')" id="btn-users" class="nav-btn nav-inactive p-2 pl-11 rounded-lg text-sm"><i class="fas fa-user-tie w-5 mr-2"></i> Staff & Tokens</button></li>
+                        <li><button onclick="switchTab('tools')" id="btn-tools" class="nav-btn nav-inactive p-2 pl-11 rounded-lg text-sm"><i class="fas fa-tools w-5 mr-2"></i> Advanced Tools</button></li>
+                    </ul>
+                </li>
             </ul>
 
             <ul class="pt-5 mt-5 space-y-2 border-t border-gray-800">
@@ -64,10 +89,20 @@
             </ul>
         </div>
 
-        <div class="absolute bottom-0 left-0 w-full flex justify-center p-4 bg-[#0a0a0a] z-20 border-t border-r border-gray-800">
-            <a href="/logout" class="flex items-center justify-center w-full p-2 text-sm font-bold text-red-500 rounded hover:bg-red-900/20 hover:text-red-400 transition cursor-pointer">
-                <i class="fas fa-power-off mr-2"></i> LOGOUT
-            </a>
+        <div class="absolute bottom-0 left-0 w-full flex justify-center items-center gap-6 p-4 bg-[#0a0a0a] z-20 border-t border-r border-gray-800">
+            <a href="/logout" class="text-gray-500 hover:text-red-500 transition" title="Logout"><i class="fas fa-power-off text-xl"></i></a>
+            
+            <a href="#" class="text-gray-500 hover:text-white transition" title="Settings"><i class="fas fa-cog text-xl"></i></a>
+
+            <div class="relative">
+                <button type="button" onclick="document.getElementById('lang-drop').classList.toggle('hidden')" class="text-gray-500 hover:text-szcyan transition focus:outline-none" title="Language">
+                    <i class="fas fa-globe text-xl"></i>
+                </button>
+                <div id="lang-drop" class="hidden absolute bottom-10 -right-4 bg-black border border-gray-800 rounded-lg shadow-xl w-32 py-2 z-50">
+                    <a href="#" onclick="document.getElementById('lang-drop').classList.add('hidden')" class="block px-4 py-2 text-sm font-bold text-gray-400 hover:text-szcyan hover:bg-gray-900 transition">English (US)</a>
+                    <a href="#" onclick="document.getElementById('lang-drop').classList.add('hidden')" class="block px-4 py-2 text-sm font-bold text-gray-400 hover:text-szcyan hover:bg-gray-900 transition">العربية</a>
+                </div>
+            </div>
         </div>
     </aside>
 
@@ -79,6 +114,7 @@
         </header>
 
         <div class="p-4 md:p-10 fade-in pb-20">
+            
             <div id="tab-overview" class="tab-content block">
                 <h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-robot text-szgreen mr-2"></i> Bot Operations (Staff)</h3>
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -162,7 +198,6 @@
                                     </div>
                                 </div>
                                 {% endfor %}
-                                
                                 <div class="border border-dashed border-gray-700 p-4 rounded-lg bg-white/5 flex flex-col justify-center">
                                     <form onsubmit="submitAjax(event, '/api/catalog/product/add', 'catalog')" class="space-y-2">
                                         <input type="hidden" name="cat_id" value="{{ cat._id }}">
@@ -287,7 +322,6 @@
             <div id="tab-tools" class="tab-content hidden">
                 <h2 class="text-2xl font-bold text-white mb-6">Advanced <span class="text-szgreen">Tools</span></h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    
                     <div class="bg-panelbg border border-gray-800 p-6 rounded-xl">
                         <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-search text-szgreen mr-2"></i> Unified Search (Bot & Web)</h3>
                         <div class="flex gap-2 mb-4">
