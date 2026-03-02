@@ -10,13 +10,21 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
         body { font-family: 'Cairo', sans-serif; background-color: #050505; color: #d1d5db; scroll-behavior: smooth; overflow: hidden; }
-        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #050505; } ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; transition: 0.3s; } ::-webkit-scrollbar-thumb:hover { background: #7dfc89; box-shadow: 0 0 10px #7dfc89; }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #050505; } ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; transition: 0.3s; } ::-webkit-scrollbar-thumb:hover { background: #eab308; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } } .fade-in { animation: fadeIn 0.5s ease-out forwards; }
-        @keyframes gradientX { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } } .text-gradient-animate { background-size: 200% 200%; animation: gradientX 3s ease infinite; }
-        input:focus, select:focus, textarea:focus { box-shadow: 0 0 15px rgba(125,252,137,0.15); transition: box-shadow 0.3s ease; outline: none; border-color: #7dfc89;}
-        .nav-active { background: linear-gradient(90deg, rgba(250,204,21,0.15) 0%, transparent 100%); border-left: 3px solid #eab308; color: #eab308; text-shadow: 0 0 10px rgba(250,204,21,0.3); }
+        .text-gradient-animate { background-size: 200% 200%; animation: gradientX 3s ease infinite; }
+        @keyframes gradientX { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        
+        /* كلاسات القائمة الجانبية (ثيم أصفر للـ CRM) */
+        .nav-btn { width: 100%; display: flex; align-items: center; padding: 0.75rem; border-radius: 0.5rem; transition: all 0.2s; font-weight: bold; }
+        .nav-inactive { color: #9ca3af; }
+        .nav-inactive:hover { background-color: #111827; color: #ffffff; }
+        .nav-inactive:hover i { color: #eab308; }
+        .nav-active { background-color: #111827; color: #ffffff; border-left: 3px solid #eab308; }
+        .nav-active i { color: #eab308; text-shadow: 0 0 10px rgba(234,179,8,0.5); }
+
         #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
-        .toast { background: #111; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-left: 4px solid #7dfc89; animation: slideIn 0.3s ease-out, fadeOut 0.3s ease-in 2.7s forwards; font-weight: bold; font-size: 14px; display: flex; align-items: center; gap: 10px; }
+        .toast { background: #111; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-left: 4px solid #eab308; animation: slideIn 0.3s ease-out, fadeOut 0.3s ease-in 2.7s forwards; font-weight: bold; font-size: 14px; display: flex; align-items: center; gap: 10px; }
         .toast.error { border-left-color: #ef4444; }
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes fadeOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
@@ -25,27 +33,48 @@
 <body class="selection:bg-yellow-500 selection:text-black flex h-screen">
 
     <div id="toast-container"></div>
-    <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black/70 z-30 hidden md:hidden transition-opacity"></div>
+    <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black/80 z-30 hidden md:hidden transition-opacity backdrop-blur-sm"></div>
 
-    <aside id="sidebar" class="w-64 bg-panelbg border-r border-gray-900 flex flex-col h-full z-40 shadow-2xl absolute md:relative transition-transform transform -translate-x-full md:translate-x-0 flex-shrink-0">
-        <div class="h-20 flex items-center px-6 border-b border-gray-900 justify-between">
-            <div class="flex items-center">
-                <div class="bg-yellow-500/10 p-2 rounded-lg text-yellow-500 mr-3 shadow-[0_0_10px_rgba(250,204,21,0.2)]"><i class="fas fa-users text-xl"></i></div>
-                <span class="text-xl font-black tracking-wider text-yellow-500 text-gradient-animate">STORE CRM</span>
+    <aside id="sz-sidebar" class="fixed top-0 left-0 z-40 w-64 h-screen transition-transform -translate-x-full md:translate-x-0 shadow-2xl" aria-label="Sidenav">
+        <div class="overflow-y-auto py-5 px-3 h-full bg-panelbg border-r border-gray-800 pb-24">
+            
+            <div class="flex items-center justify-between px-2 mb-6 pb-6 border-b border-gray-800">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-yellow-500/10 rounded-lg flex items-center justify-center text-yellow-500"><i class="fas fa-users"></i></div>
+                    <span class="text-xl font-black tracking-wider text-yellow-500 text-gradient-animate">STORE CRM</span>
+                </div>
+                <button onclick="toggleSidebar()" class="md:hidden text-gray-500 hover:text-white transition"><i class="fas fa-times text-xl"></i></button>
             </div>
-            <button onclick="toggleSidebar()" class="md:hidden text-gray-500 hover:text-white"><i class="fas fa-times text-xl"></i></button>
+
+            <ul class="space-y-2">
+                <li><button onclick="switchTab('customers')" id="btn-customers" class="nav-btn nav-active"><i class="fas fa-wallet w-6 text-lg transition duration-75"></i><span class="ml-3">Client Balances</span></button></li>
+                <li><button onclick="switchTab('orders')" id="btn-orders" class="nav-btn nav-inactive"><i class="fas fa-receipt w-6 text-lg transition duration-75"></i><span class="ml-3">Sales Log</span></button></li>
+            </ul>
+
+            <ul class="pt-5 mt-5 space-y-2 border-t border-gray-800">
+                <li>
+                    <a href="/admin" class="flex items-center p-2 text-base font-bold text-gray-400 rounded-lg hover:bg-gray-900 hover:text-white transition group">
+                        <i class="fas fa-arrow-left w-6 text-lg transition duration-75 group-hover:-translate-x-1"></i><span class="ml-3">Master Panel</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/" target="_blank" class="flex items-center p-2 text-base font-bold text-szcyan rounded-lg hover:bg-szcyan/10 transition group">
+                        <i class="fas fa-external-link-alt w-6 text-lg transition duration-75 group-hover:scale-110"></i><span class="ml-3">Live Storefront</span>
+                    </a>
+                </li>
+            </ul>
         </div>
-        <nav class="mt-6 flex flex-col gap-2 px-3 overflow-y-auto flex-1">
-            <a href="/admin" class="text-gray-400 hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition flex items-center bg-black border border-gray-800 mb-2"><i class="fas fa-arrow-left w-6"></i> Master Panel</a>
-            <button onclick="switchTab('customers')" id="btn-customers" class="nav-active text-left px-4 py-3 rounded-r-lg text-sm font-bold transition-colors"><i class="fas fa-users w-6"></i> Client Balances</button>
-            <button onclick="switchTab('orders')" id="btn-orders" class="text-gray-500 hover:text-white text-left px-4 py-3 rounded-r-lg text-sm font-bold transition-colors"><i class="fas fa-receipt w-6"></i> Sales Log</button>
-            <a href="/" target="_blank" class="text-szcyan hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition flex items-center mt-auto bg-szcyan/10 border border-szcyan/20"><i class="fas fa-external-link-alt w-6"></i> Live Storefront</a>
-        </nav>
+        
+        <div class="absolute bottom-0 left-0 w-full flex justify-center p-4 bg-[#0a0a0a] z-20 border-t border-r border-gray-800">
+            <a href="/logout" class="flex items-center justify-center w-full p-2 text-sm font-bold text-red-500 rounded hover:bg-red-900/20 hover:text-red-400 transition cursor-pointer">
+                <i class="fas fa-power-off mr-2"></i> LOGOUT
+            </a>
+        </div>
     </aside>
 
     <main class="flex-1 p-8 overflow-y-auto bg-[#0a0a0a] relative">
         <header class="h-16 bg-panelbg border-b border-gray-900 flex items-center justify-between px-6 md:hidden absolute top-0 left-0 w-full z-20 shadow-md">
-            <button onclick="toggleSidebar()" class="text-white text-xl"><i class="fas fa-bars"></i></button>
+            <button onclick="toggleSidebar()" class="text-gray-400 hover:text-white"><i class="fas fa-bars text-xl"></i></button>
             <span class="text-lg font-black tracking-wider text-yellow-500 text-gradient-animate">STORE CRM</span>
             <div class="w-6"></div>
         </header>
@@ -132,16 +161,18 @@
             document.getElementById('tab-' + tabId).classList.remove('hidden');
             
             document.querySelectorAll('.nav-btn').forEach(el => { 
-                el.className = 'nav-btn text-gray-500 hover:text-white text-left px-4 py-3 rounded-r-lg text-sm font-bold transition-colors'; 
+                el.classList.remove('nav-active'); 
+                el.classList.add('nav-inactive'); 
             });
-            document.getElementById('btn-' + tabId).className = 'nav-btn nav-active text-left px-4 py-3 rounded-r-lg text-sm font-bold transition-colors';
+            document.getElementById('btn-' + tabId).classList.remove('nav-inactive');
+            document.getElementById('btn-' + tabId).classList.add('nav-active');
             
-            const sidebar = document.getElementById('sidebar');
+            const sidebar = document.getElementById('sz-sidebar');
             if(window.innerWidth < 768 && !sidebar.classList.contains('-translate-x-full')) toggleSidebar();
         }
 
         function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('-translate-x-full');
+            document.getElementById('sz-sidebar').classList.toggle('-translate-x-full');
             document.getElementById('sidebar-backdrop').classList.toggle('hidden');
         }
 
@@ -149,7 +180,7 @@
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
             toast.className = `toast ${type === 'error' ? 'error' : ''}`;
-            toast.innerHTML = `<i class="fas ${type === 'error' ? 'fa-times-circle text-red-500' : 'fa-check-circle text-szgreen'} text-xl"></i> <span>${msg}</span>`;
+            toast.innerHTML = `<i class="fas ${type === 'error' ? 'fa-times-circle text-red-500' : 'fa-check-circle text-eab308'} text-xl"></i> <span>${msg}</span>`;
             container.appendChild(toast);
             setTimeout(() => { toast.remove(); }, 3000);
         }
