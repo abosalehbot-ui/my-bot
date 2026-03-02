@@ -54,7 +54,7 @@ async def public_storefront(request: Request):
 # 2. أنظمة التسجيل والمصادقة الموحدة
 # ==========================================
 def get_user_data(user):
-    return {"email": user["email"], "name": user["name"], "balance_egp": user.get("balance_egp", 0), "balance_usd": user.get("balance_usd", 0)}
+    return {"email": user["email"], "name": user["name"], "username": user.get("username", ""), "balance_egp": user.get("balance_egp", 0), "balance_usd": user.get("balance_usd", 0)}
 
 @router.post("/api/store/login-manual")
 async def login_manual(request: Request, email: str = Form(...), password: str = Form(...)):
@@ -77,14 +77,14 @@ async def signup_request(request: Request, name: str = Form(...), username: str 
     
     code = str(random.randint(100000, 999999))
     hashed_pw = hash_password(password)
-    await db.otps.update_one({"email": email}, {"$set": {"code": code, "name": name, "username": username.lower(), "password": hashed_pw, "created_at": datetime.now()}}, upsert=True)
+    await db.otps.update_one({"email": email}, {"$set": {"code": code, "name": name, "username": username.lower(), "password": hashed_pw, "type": "signup", "created_at": datetime.now()}}, upsert=True)
     
-    print(f"\n[MOCK EMAIL] To: {email} | OTP CODE: {code}\n")
+    print(f"\n[MOCK EMAIL] To: {email} | SIGNUP OTP: {code}\n")
     return JSONResponse({"success": True, "msg": "OTP sent to your email!"})
 
 @router.post("/api/store/signup-verify")
 async def signup_verify(request: Request, email: str = Form(...), code: str = Form(...)):
-    otp_doc = await db.otps.find_one({"email": email, "code": code})
+    otp_doc = await db.otps.find_one({"email": email, "code": code, "type": "signup"})
     if not otp_doc: return JSONResponse({"success": False, "msg": "Invalid verification code!"})
     if (datetime.now() - otp_doc["created_at"]).total_seconds() > 300: return JSONResponse({"success": False, "msg": "Code expired! Please try again."})
         
@@ -92,7 +92,7 @@ async def signup_verify(request: Request, email: str = Form(...), code: str = Fo
     await db.store_customers.insert_one({"user_id": user_id, "username": otp_doc["username"], "email": email, "name": otp_doc["name"], "password": otp_doc["password"], "balance_egp": 0, "balance_usd": 0, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")})
     await db.otps.delete_one({"_id": otp_doc["_id"]})
     
-    response = JSONResponse({"success": True, "email": email, "name": otp_doc["name"], "balance_egp": 0, "balance_usd": 0})
+    response = JSONResponse({"success": True, "email": email, "name": otp_doc["name"], "username": otp_doc["username"], "balance_egp": 0, "balance_usd": 0})
     response.set_cookie(key="store_session", value=email, httponly=True, max_age=86400 * 30)
     return response
 
@@ -139,7 +139,33 @@ async def store_logout():
     return response
 
 # ==========================================
-# 3. الشراء وتسليم الأكواد
+# 3. نظام استعادة كلمة المرور (جديد)
+# ==========================================
+@router.post("/api/store/forgot-password")
+async def forgot_password(request: Request, email: str = Form(...)):
+    user = await db.store_customers.find_one({"email": email})
+    if not user: return JSONResponse({"success": False, "msg": "Account with this email does not exist."})
+    
+    code = str(random.randint(100000, 999999))
+    await db.otps.update_one({"email": email}, {"$set": {"code": code, "type": "reset", "created_at": datetime.now()}}, upsert=True)
+    
+    print(f"\n[MOCK EMAIL] To: {email} | PASSWORD RESET OTP: {code}\n")
+    return JSONResponse({"success": True, "msg": "Password reset code sent to your email!"})
+
+@router.post("/api/store/reset-password")
+async def reset_password(request: Request, email: str = Form(...), code: str = Form(...), new_password: str = Form(...)):
+    if len(new_password) < 8: return JSONResponse({"success": False, "msg": "Password must be at least 8 characters!"})
+    
+    otp_doc = await db.otps.find_one({"email": email, "code": code, "type": "reset"})
+    if not otp_doc: return JSONResponse({"success": False, "msg": "Invalid or expired reset code!"})
+    
+    await db.store_customers.update_one({"email": email}, {"$set": {"password": hash_password(new_password)}})
+    await db.otps.delete_one({"_id": otp_doc["_id"]})
+    
+    return JSONResponse({"success": True, "msg": "Password updated successfully! You can now login."})
+
+# ==========================================
+# 4. الشراء وجلب سجل الطلبات للعميل
 # ==========================================
 @router.post("/api/store/buy")
 async def customer_buy_uc(request: Request, stock_key: str = Form(...), price: float = Form(...), currency: str = Form(...)):
@@ -177,8 +203,18 @@ async def customer_buy_uc(request: Request, stock_key: str = Form(...), price: f
     
     return JSONResponse({"success": True, "code": code_str, "new_balance": new_bal, "currency": currency.upper(), "msg": "Purchase successful!"})
 
+@router.get("/api/store/my-orders")
+async def get_my_orders(request: Request):
+    email = request.cookies.get("store_session")
+    if not email: return JSONResponse({"success": False, "orders": []})
+    
+    orders = await db.store_orders.find({"email": email}).sort("date", -1).to_list(100)
+    for o in orders:
+        if '_id' in o: o['order_id'] = str(o['_id'])
+    return JSONResponse({"success": True, "orders": orders})
+
 # ==========================================
-# 4. لوحة أدمن الاستور (لإدارة العملاء)
+# 5. لوحة أدمن الاستور (لإدارة العملاء)
 # ==========================================
 @router.get("/store-admin", response_class=HTMLResponse)
 async def store_admin_page(request: Request):
