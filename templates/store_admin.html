@@ -17,12 +17,12 @@
             <span class="text-xl font-black tracking-wider text-yellow-500">STORE ERP</span>
         </div>
         <nav class="mt-6 flex flex-col gap-2 px-3">
-            <a href="/" class="text-gray-400 hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition flex items-center bg-black border border-gray-800"><i class="fas fa-arrow-left w-6"></i> Back to Master</a>
+            <a href="/admin" class="text-gray-400 hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition flex items-center bg-black border border-gray-800"><i class="fas fa-arrow-left w-6"></i> Back to Master</a>
             <div class="my-2 border-t border-gray-800"></div>
             <button onclick="switchTab('dashboard')" id="btn-dashboard" class="nav-btn bg-yellow-500/10 border-l-2 border-yellow-500 text-yellow-500 px-4 py-3 rounded-r-lg text-sm font-bold text-left"><i class="fas fa-chart-line w-6"></i> Overview & Sales</button>
             <button onclick="switchTab('products')" id="btn-products" class="nav-btn text-gray-500 hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition text-left"><i class="fas fa-box w-6"></i> Product Pricing</button>
             <button onclick="switchTab('customers')" id="btn-customers" class="nav-btn text-gray-500 hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition text-left"><i class="fas fa-users w-6"></i> Customers CRM</button>
-            <a href="/shop" target="_blank" class="text-szcyan hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition flex items-center mt-auto bg-szcyan/10 border border-szcyan/20"><i class="fas fa-external-link-alt w-6"></i> Live Storefront</a>
+            <a href="/" target="_blank" class="text-szcyan hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition flex items-center mt-auto bg-szcyan/10 border border-szcyan/20"><i class="fas fa-external-link-alt w-6"></i> Live Storefront</a>
         </nav>
     </aside>
 
@@ -108,7 +108,10 @@
                                         </form>
                                     </td>
                                     <td class="px-4 py-3 text-right">
-                                        <form action="/api/store/delete_customer" method="POST" onsubmit="return confirm('Delete customer?');"><input type="hidden" name="email" value="{{ c.email }}"><button class="text-red-600 hover:text-red-400 p-2 rounded bg-red-600/10 transition"><i class="fas fa-trash"></i></button></form>
+                                        <form action="/api/store/delete_customer" method="POST" onsubmit="return confirm('Delete customer?');">
+                                            <input type="hidden" name="email" value="{{ c.email }}">
+                                            <button class="text-red-600 hover:text-red-400 p-2 rounded bg-red-600/10 transition"><i class="fas fa-trash"></i></button>
+                                        </form>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -126,7 +129,17 @@
             document.getElementById('tab-' + tabId).classList.remove('hidden');
             document.querySelectorAll('.nav-btn').forEach(el => { el.className = 'nav-btn text-gray-500 hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition text-left'; });
             document.getElementById('btn-' + tabId).className = 'nav-btn bg-yellow-500/10 border-l-2 border-yellow-500 text-yellow-500 px-4 py-3 rounded-r-lg text-sm font-bold text-left';
+            
+            // تم التعديل ليصبح التوجيه الصحيح
+            window.history.replaceState({}, '', '/store-admin?tab=' + tabId);
         }
+
+        // قراءة التاب المفتوح من الرابط
+        document.addEventListener("DOMContentLoaded", () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const tab = urlParams.get('tab') || 'dashboard';
+            switchTab(tab);
+        });
     </script>
 </body>
 </html>
