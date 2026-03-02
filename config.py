@@ -9,7 +9,6 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ADMIN_ID = 1635871816
 API_BASE_URL = "https://buzzmaster.shop" 
 PRODUCT_ID = "24h-nongmail"
-UC_CATEGORIES = ["60", "325", "660", "1800", "3850", "8100"]
 
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb+srv://abosalehlt_db_user:7_RvkParzvUeC_v@abosaleh.yhuwfdt.mongodb.net/?appName=abosaleh")
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL") 
