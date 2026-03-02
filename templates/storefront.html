@@ -1,55 +1,23 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>متجر صالح زون | Saleh Zone</title>
+    <title>Saleh Zone | Storefront</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script>tailwind.config={theme:{extend:{colors:{szgreen:'#7dfc89',szcyan:'#5eead4',darkbg:'#050505',panelbg:'#111'}}}}</script>
     <style>
-        /* الخطوط والخلفية الأساسية */
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
         body { font-family: 'Cairo', sans-serif; background-color: #050505; color: #d1d5db; scroll-behavior: smooth; }
-        
-        /* شريط التمرير (Scrollbar) المضيء */
-        ::-webkit-scrollbar { width: 6px; } 
-        ::-webkit-scrollbar-track { background: #050505; } 
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; transition: 0.3s; }
-        ::-webkit-scrollbar-thumb:hover { background: #7dfc89; box-shadow: 0 0 10px #7dfc89; }
-
-        /* 1. تأثير الدخول الناعم (Fade In) */
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
-        .fade-in-delayed { animation: fadeIn 0.5s ease-out 0.2s forwards; opacity: 0; }
-
-        /* 2. تأثير الطيران (Floating) لصور الشدات واللوجو */
-        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-8px); } 100% { transform: translateY(0px); } }
-        .floating { animation: float 3s ease-in-out infinite; }
-
-        /* 3. تأثير النبض المضيء (Pulse Glow) للزراير */
-        @keyframes pulseGlow { 
-            0% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } 
-            50% { box-shadow: 0 0 25px rgba(125,252,137,0.6); transform: scale(1.02); } 
-            100% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } 
-        }
-        .btn-glow { transition: all 0.3s ease; }
-        .btn-glow:hover { animation: pulseGlow 1.5s infinite; border-color: #7dfc89; }
-
-        /* 4. تأثير حركة الألوان في النصوص (Gradient Flow) */
-        @keyframes gradientX { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-        .text-gradient-animate { background-size: 200% 200%; animation: gradientX 3s ease infinite; }
-
-        /* 5. تصميم الكروت الزجاجية (Glass & Hover Cards) */
-        .glass-panel { background: rgba(17, 17, 17, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #050505; } ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; transition: 0.3s; } ::-webkit-scrollbar-thumb:hover { background: #7dfc89; box-shadow: 0 0 10px #7dfc89; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } } .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-8px); } 100% { transform: translateY(0px); } } .floating { animation: float 3s ease-in-out infinite; }
+        @keyframes pulseGlow { 0% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } 50% { box-shadow: 0 0 25px rgba(125,252,137,0.6); transform: scale(1.02); } 100% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } } .btn-glow { transition: all 0.3s ease; } .btn-glow:hover { animation: pulseGlow 1.5s infinite; border-color: #7dfc89; }
+        @keyframes gradientX { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } } .text-gradient-animate { background-size: 200% 200%; animation: gradientX 3s ease infinite; }
+        .glass-nav { background: rgba(17, 17, 17, 0.85); backdrop-filter: blur(12px); border-bottom: 1px solid #1f2937; }
         .uc-card { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         .uc-card:hover { transform: translateY(-8px); box-shadow: 0 15px 35px rgba(94, 234, 212, 0.15); border-color: #5eead4; }
-
-        /* 6. توهج عند الكتابة في الخانات (Input Focus) */
-        input:focus, select:focus, textarea:focus { box-shadow: 0 0 15px rgba(125,252,137,0.15); transition: box-shadow 0.3s ease; }
-        
-        /* تأثيرات القائمة الجانبية للأدمن */
-        .nav-active { background: linear-gradient(90deg, rgba(125,252,137,0.15) 0%, transparent 100%); border-left: 3px solid #7dfc89; color: #7dfc89; text-shadow: 0 0 10px rgba(125,252,137,0.3); }
     </style>
 </head>
 <body class="selection:bg-szgreen selection:text-black">
@@ -58,62 +26,64 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-20 items-center">
                 <div class="flex items-center gap-3">
-                    <img src="/static/logo.png" alt="SZ" class="h-10 drop-shadow-[0_0_8px_rgba(125,252,137,0.5)]" onerror="this.style.display='none'">
-                    <span class="text-2xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan">SALEH ZONE</span>
+                    <div class="inline-flex items-center justify-center w-10 h-10 bg-black rounded-full border border-szgreen/50 shadow-[0_0_15px_rgba(125,252,137,0.3)] floating">
+                        <span class="text-lg font-black text-szgreen tracking-tighter">SZ</span>
+                    </div>
+                    <span class="text-2xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">SALEH ZONE</span>
                 </div>
                 
                 <div id="auth-section">
                     <a href="/store-login" class="border border-szgreen text-szgreen px-6 py-2 rounded-lg font-bold hover:bg-szgreen hover:text-black transition flex items-center gap-2">
-                        تسجيل الدخول <i class="fab fa-google"></i>
+                        <i class="fab fa-google"></i> Login
                     </a>
                 </div>
                 
                 <div id="user-section" class="hidden flex items-center gap-4">
-                    <div class="text-left hidden md:block">
-                        <div class="text-xs text-gray-500 font-bold" id="ui-name">مرحباً بك</div>
-                        <div class="font-black text-szcyan tracking-wide">رصيدك: <span id="ui-balance" class="text-white">0</span> EGP</div>
+                    <div class="text-right hidden md:block">
+                        <div class="text-xs text-gray-500 font-bold uppercase tracking-widest" id="ui-name">Welcome</div>
+                        <div class="font-black text-szcyan tracking-wide">Balance: <span id="ui-balance" class="text-white">0</span> EGP</div>
                     </div>
-                    <button onclick="logout()" class="text-red-500 bg-red-500/10 p-2 rounded-lg hover:bg-red-500 hover:text-white transition border border-red-500/20" title="تسجيل الخروج"><i class="fas fa-power-off"></i></button>
+                    <button onclick="logout()" class="text-red-500 bg-red-500/10 p-2 rounded-lg hover:bg-red-500 hover:text-white transition border border-red-500/20" title="Logout"><i class="fas fa-power-off"></i></button>
                 </div>
             </div>
         </div>
     </nav>
 
-    <div class="pt-32 pb-12 text-center px-4">
-        <h1 class="text-4xl md:text-5xl font-black mb-4 text-white">متجر شحن <span class="text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan">ببجي موبايل</span></h1>
-        <p class="text-gray-400 max-w-xl mx-auto mb-8 text-sm">استلم كود الشحن الخاص بك فوراً بعد الدفع! نظام آلي متكامل لخدمتك.</p>
+    <div class="pt-32 pb-12 text-center px-4 fade-in">
+        <h1 class="text-4xl md:text-5xl font-black mb-4 text-white uppercase tracking-widest">PUBG Mobile <span class="text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">Top-Up</span></h1>
+        <p class="text-gray-400 max-w-xl mx-auto mb-8 text-sm">Get your UC code instantly after payment! Fully automated service.</p>
     </div>
 
     <div class="max-w-7xl mx-auto px-4 pb-20">
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4 md:gap-6">
             {% for cat in ['60', '325', '660', '1800', '3850', '8100'] %}
-            <div class="uc-card bg-panelbg border border-gray-800 rounded-2xl p-6 flex flex-col items-center text-center relative overflow-hidden">
+            <div class="uc-card bg-panelbg border border-gray-800 rounded-2xl p-6 flex flex-col items-center text-center relative overflow-hidden fade-in">
                 {% if stock.get(cat, 0) > 0 %}
-                <div class="absolute top-3 right-3 bg-szgreen/20 text-szgreen text-[10px] font-bold px-2 py-1 rounded border border-szgreen/30">متوفر</div>
+                <div class="absolute top-3 right-3 bg-szgreen/20 text-szgreen text-[10px] font-bold px-2 py-1 rounded border border-szgreen/30">IN STOCK</div>
                 {% else %}
-                <div class="absolute top-3 right-3 bg-red-900/50 text-red-400 text-[10px] font-bold px-2 py-1 rounded border border-red-900/50">نفذت الكمية</div>
+                <div class="absolute top-3 right-3 bg-red-900/50 text-red-400 text-[10px] font-bold px-2 py-1 rounded border border-red-900/50">OUT OF STOCK</div>
                 {% endif %}
 
-                <div class="w-24 h-24 mb-4 flex items-center justify-center">
-                    <img src="/static/uc-gold.jpg" alt="UC" class="w-full h-full object-contain rounded-lg drop-shadow-[0_0_10px_rgba(255,215,0,0.3)]" onerror="this.style.display='none'">
+                <div class="w-24 h-24 mb-4 rounded-full bg-gradient-to-br from-yellow-600/10 to-yellow-900/20 border border-yellow-500/40 flex items-center justify-center shadow-[0_0_20px_rgba(250,204,21,0.15)] floating">
+                    <span class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-yellow-600 tracking-tighter">UC</span>
                 </div>
                 
-                <h3 class="text-2xl font-black text-white mb-1" dir="ltr">{{ cat }} UC</h3>
+                <h3 class="text-2xl font-black text-white mb-1">{{ cat }} UC</h3>
                 
                 <div class="mt-2 mb-6 bg-black w-full py-2 rounded-lg border border-gray-800">
                     {% if prices.get(cat, 0)|int > 0 %}
-                    <span class="text-2xl font-black text-szcyan">{{ prices.get(cat, 0) }}</span> <span class="text-xs text-gray-500 font-bold">ج.م</span>
+                    <span class="text-2xl font-black text-szcyan">{{ prices.get(cat, 0) }}</span> <span class="text-xs text-gray-500 font-bold">EGP</span>
                     {% else %}
-                    <span class="text-sm font-bold text-gray-600">غير مسعر</span>
+                    <span class="text-sm font-bold text-gray-600">Unpriced</span>
                     {% endif %}
                 </div>
 
                 {% if stock.get(cat, 0) > 0 and prices.get(cat, 0)|int > 0 %}
-                <button id="btn-buy-{{ cat }}" onclick="buyUC('{{ cat }}', '{{ prices.get(cat, 0) }}')" class="w-full bg-szgreen text-black font-bold py-3 rounded-xl hover:bg-white transition flex justify-center items-center gap-2">
-                    <span>شراء الآن</span> <i class="fas fa-shopping-cart"></i>
+                <button id="btn-buy-{{ cat }}" onclick="buyUC('{{ cat }}', '{{ prices.get(cat, 0) }}')" class="w-full bg-szgreen text-black font-bold py-3 rounded-xl btn-glow flex justify-center items-center gap-2">
+                    <span>BUY NOW</span> <i class="fas fa-shopping-cart"></i>
                 </button>
                 {% else %}
-                <button disabled class="w-full bg-gray-900 text-gray-600 font-bold py-3 rounded-xl cursor-not-allowed border border-gray-800">غير متاح حالياً</button>
+                <button disabled class="w-full bg-gray-900 text-gray-600 font-bold py-3 rounded-xl cursor-not-allowed border border-gray-800">UNAVAILABLE</button>
                 {% endif %}
             </div>
             {% endfor %}
@@ -121,17 +91,17 @@
     </div>
 
     <div id="success-modal" class="fixed inset-0 bg-black/90 z-[60] hidden flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-panelbg border border-szgreen w-full max-w-md rounded-2xl p-8 text-center relative overflow-hidden shadow-[0_0_40px_rgba(125,252,137,0.15)]">
+        <div class="bg-panelbg border border-szgreen w-full max-w-md rounded-2xl p-8 text-center relative overflow-hidden shadow-[0_0_40px_rgba(125,252,137,0.15)] fade-in">
             <div class="inline-block bg-szgreen/20 text-szgreen p-4 rounded-full mb-4"><i class="fas fa-check-circle text-4xl"></i></div>
-            <h2 class="text-2xl font-bold text-white mb-2">تم الشراء بنجاح!</h2>
-            <p class="text-xs text-gray-400 mb-6">تم خصم المبلغ من رصيدك. إليك كود الشحن الخاص بك:</p>
+            <h2 class="text-2xl font-bold text-white mb-2">Purchase Successful!</h2>
+            <p class="text-xs text-gray-400 mb-6">Amount deducted from your balance. Here is your code:</p>
             <div class="bg-[#050505] border border-gray-800 p-4 rounded-xl mb-6 relative group">
-                <p id="purchased-code" class="text-lg font-mono text-szgreen tracking-wider select-all" dir="ltr">LOADING...</p>
+                <p id="purchased-code" class="text-lg font-mono text-szgreen tracking-wider select-all">LOADING...</p>
             </div>
-            <button onclick="copyPurchasedCode()" class="w-full bg-gray-800 text-white font-bold py-3 rounded-xl mb-3 hover:bg-szcyan hover:text-black transition flex justify-center items-center gap-2">
-                <span>نسخ الكود</span> <i class="fas fa-copy"></i>
+            <button onclick="copyPurchasedCode()" class="w-full bg-gray-800 text-white font-bold py-3 rounded-xl mb-3 hover:bg-szcyan hover:text-black transition flex justify-center items-center gap-2 btn-glow">
+                <span>Copy Code</span> <i class="fas fa-copy"></i>
             </button>
-            <button onclick="closeModal('success-modal')" class="w-full text-gray-500 font-bold py-2 hover:text-white transition">إغلاق النافذة</button>
+            <button onclick="closeModal('success-modal')" class="w-full text-gray-500 font-bold py-2 hover:text-white transition">Close</button>
         </div>
     </div>
 
@@ -146,7 +116,7 @@
         function updateUI(name, balance) {
             document.getElementById('auth-section').classList.add('hidden');
             document.getElementById('user-section').classList.remove('hidden');
-            document.getElementById('ui-name').innerText = "مرحباً، " + name;
+            document.getElementById('ui-name').innerText = name;
             document.getElementById('ui-balance').innerText = balance;
             localStorage.setItem('store_balance', balance);
         }
@@ -157,14 +127,13 @@
 
         async function buyUC(cat, price) {
             const email = localStorage.getItem('store_email');
-            // لو مش مسجل دخول يحوله فوراً لصفحة اللوجن
             if(!email) { window.location.href = '/store-login'; return; }
 
-            if(!confirm(`هل أنت متأكد من شراء ${cat} شدة بسعر ${price} ج.م؟`)) return;
+            if(!confirm(`Are you sure you want to buy ${cat} UC for ${price} EGP?`)) return;
 
             const btn = document.getElementById('btn-buy-'+cat);
             const originalHtml = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري التنفيذ...';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
             btn.disabled = true;
 
             const fd = new FormData(); fd.append('email', email); fd.append('category', cat);
@@ -179,15 +148,15 @@
                     openModal('success-modal');
                 } else { 
                     alert(data.msg); 
-                    if(data.msg.includes("رصيدك") || data.msg.includes("نفذت")) location.reload();
+                    if(data.msg.includes("balance") || data.msg.includes("stock")) location.reload();
                 }
-            } catch(err) { alert("حدث خطأ أثناء إتمام الشراء!"); }
+            } catch(err) { alert("An error occurred during purchase!"); }
             btn.innerHTML = originalHtml; btn.disabled = false;
         }
 
         function copyPurchasedCode() {
             navigator.clipboard.writeText(document.getElementById('purchased-code').innerText);
-            alert("تم النسخ بنجاح!");
+            alert("Copied successfully!");
         }
     </script>
 </body>
