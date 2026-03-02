@@ -19,6 +19,7 @@ async def log_important_action(user_id, user_name, action, details=""):
         "details": details, "time": time_str, "timestamp": datetime.now()
     })
 
+# العداد الموحد للموقع والبوت
 async def get_next_order_id():
     stat = await db.stats.find_one_and_update({"_id": "global_stats"}, {"$inc": {"last_order_id": 1}}, upsert=True, return_document=True)
     return stat["last_order_id"]
@@ -36,6 +37,15 @@ async def get_tracked_users():
     tracked = cfg.get("tracked_users", [])
     if ADMIN_ID not in tracked: tracked.append(ADMIN_ID)
     return tracked
+
+# دالة قراءة الفئات الديناميكية للبوت
+async def get_dynamic_categories():
+    cats = await db.store_categories.find().to_list(None)
+    stock_keys = []
+    for c in cats:
+        for p in c.get("products", []):
+            stock_keys.append(p["stock_key"])
+    return stock_keys if stock_keys else ["60", "325", "660", "1800", "3850", "8100"]
 
 async def analyze_codes(codes):
     unique_input, dupes_in_input, seen = [], [], set()
