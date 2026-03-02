@@ -16,7 +16,6 @@
         @keyframes pulseGlow { 0% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } 50% { box-shadow: 0 0 25px rgba(125,252,137,0.6); transform: scale(1.02); } 100% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } } .btn-glow { transition: all 0.3s ease; } .btn-glow:hover { animation: pulseGlow 1.5s infinite; border-color: #7dfc89; }
         @keyframes gradientX { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } } .text-gradient-animate { background-size: 200% 200%; animation: gradientX 3s ease infinite; }
         
-        /* إشعارات الأجاكس (Toast) */
         #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
         .toast { background: #111; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-left: 4px solid #7dfc89; animation: slideIn 0.3s ease-out, fadeOut 0.3s ease-in 2.7s forwards; font-weight: bold; font-size: 14px; display: flex; items-center gap: 10px; }
         .toast.error { border-left-color: #ef4444; }
@@ -35,22 +34,17 @@
         </div>
         <nav class="mt-6 flex flex-col gap-2 px-3 overflow-y-auto flex-1 pb-6">
             <a href="/admin" class="text-gray-400 hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition flex items-center bg-black border border-gray-800 mb-2"><i class="fas fa-arrow-left w-6"></i> Master Panel</a>
-            
             <button onclick="switchTab('dashboard')" id="btn-dashboard" class="nav-btn bg-yellow-500/10 border-l-2 border-yellow-500 text-yellow-500 px-4 py-3 rounded-r-lg text-sm font-bold text-left transition-colors"><i class="fas fa-chart-pie w-6"></i> Dashboard</button>
-            
-            <button onclick="switchTab('products')" id="btn-products" class="nav-btn text-gray-500 hover:text-white px-4 py-3 rounded-lg text-sm font-bold text-left transition-colors"><i class="fas fa-tags w-6"></i> Pricing & Stock</button>
-            
+            <button onclick="switchTab('categories')" id="btn-categories" class="nav-btn text-gray-500 hover:text-white px-4 py-3 rounded-lg text-sm font-bold text-left transition-colors"><i class="fas fa-layer-group w-6"></i> Categories Manager</button>
             <button onclick="switchTab('customers')" id="btn-customers" class="nav-btn text-gray-500 hover:text-white px-4 py-3 rounded-lg text-sm font-bold text-left transition-colors"><i class="fas fa-users w-6"></i> Customers CRM</button>
-
             <button onclick="switchTab('orders')" id="btn-orders" class="nav-btn text-gray-500 hover:text-white px-4 py-3 rounded-lg text-sm font-bold text-left transition-colors"><i class="fas fa-receipt w-6"></i> All Orders</button>
-            
             <a href="/" target="_blank" class="text-szcyan hover:text-white px-4 py-3 rounded-lg text-sm font-bold transition flex items-center mt-auto bg-szcyan/10 border border-szcyan/20"><i class="fas fa-external-link-alt w-6"></i> Live Storefront</a>
         </nav>
     </aside>
 
     <main class="flex-1 p-8 overflow-y-auto bg-[#0a0a0a] relative">
         <div class="flex justify-between items-end mb-8 fade-in">
-            <div><h2 class="text-3xl font-black text-white">Store Management</h2><p class="text-sm text-gray-500 mt-1">Real-time control over sales, customers, and pricing.</p></div>
+            <div><h2 class="text-3xl font-black text-white">Store Management</h2><p class="text-sm text-gray-500 mt-1">Real-time control over categories, sales, and customers.</p></div>
         </div>
 
         <div id="tab-dashboard" class="tab-content block fade-in">
@@ -69,7 +63,7 @@
                             <tr class="hover:bg-gray-900/50 transition">
                                 <td class="px-5 py-3 font-mono text-gray-400">#{{ o._id }}</td><td class="px-5 py-3 text-xs text-gray-500">{{ o.date }}</td>
                                 <td class="px-5 py-3"><div class="font-bold text-white">{{ o.name }}</div><div class="text-[10px] text-gray-500">{{ o.email }}</div></td>
-                                <td class="px-5 py-3"><span class="bg-gray-800 text-white px-2 py-1 rounded text-xs font-bold border border-gray-700">{{ o.category }} UC</span></td>
+                                <td class="px-5 py-3"><span class="bg-gray-800 text-white px-2 py-1 rounded text-xs font-bold border border-gray-700">{{ o.category }}</span></td>
                                 <td class="px-5 py-3 font-bold text-yellow-500">+{{ o.price }} EGP</td>
                             </tr>
                             {% endfor %}
@@ -79,41 +73,72 @@
             </div>
         </div>
 
-        <div id="tab-products" class="tab-content hidden fade-in">
-            <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden">
-                <form onsubmit="submitAjax(event, '/api/store/update_prices')" class="p-6">
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {% for cat in ['60', '325', '660', '1800', '3850', '8100'] %}
-                        <div class="bg-[#050505] border border-gray-800 p-5 rounded-xl flex items-center justify-between group hover:border-yellow-500/50 transition">
-                            <div class="flex items-center gap-4">
-                                <div class="w-12 h-12 bg-yellow-500/10 rounded-full flex items-center justify-center border border-yellow-500/30 text-yellow-500 font-black text-xs shadow-[0_0_10px_rgba(250,204,21,0.2)]">UC</div>
-                                <div><h4 class="font-bold text-white text-lg">{{ cat }} UC</h4><span class="text-[10px] uppercase font-bold {% if stock.get(cat, 0) > 0 %}text-szgreen{% else %}text-red-500{% endif %}">Stock: {{ stock.get(cat, 0) }}</span></div>
+        <div id="tab-categories" class="tab-content hidden fade-in">
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <div class="bg-panelbg border border-gray-800 p-6 rounded-xl h-fit">
+                    <h3 class="font-bold text-white uppercase text-sm mb-4 border-b border-gray-800 pb-3"><i class="fas fa-folder-plus text-szcyan mr-2"></i> Create Main Category</h3>
+                    <form onsubmit="submitAjax(event, '/api/store/category/add')" class="space-y-4">
+                        <div><label class="text-xs text-gray-500 mb-1 block">Category ID (e.g. pubg_mobile)</label><input type="text" name="cat_id" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-szcyan font-mono text-sm"></div>
+                        <div><label class="text-xs text-gray-500 mb-1 block">Display Name</label><input type="text" name="name" required placeholder="PUBG Mobile" class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-szcyan"></div>
+                        <div><label class="text-xs text-gray-500 mb-1 block">Icon Class (FontAwesome)</label><input type="text" name="icon" value="fa-gamepad" class="w-full bg-[#050505] border border-gray-800 text-gray-400 p-3 rounded-lg outline-none focus:border-szcyan font-mono text-sm"></div>
+                        <button type="submit" class="w-full bg-szcyan text-black font-bold py-3 rounded-lg mt-2 btn-glow">Create Category</button>
+                    </form>
+                </div>
+                
+                <div class="lg:col-span-3 space-y-6">
+                    {% for cat in categories %}
+                    <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden">
+                        <div class="bg-[#111] p-4 border-b border-gray-800 flex justify-between items-center">
+                            <div class="flex items-center gap-3">
+                                <i class="fas {{ cat.icon }} text-2xl text-szcyan p-2 bg-szcyan/10 rounded-lg"></i>
+                                <div><h3 class="font-bold text-white text-lg">{{ cat.name }}</h3><p class="text-xs text-gray-500 font-mono">ID: {{ cat._id }}</p></div>
                             </div>
-                            <div class="text-right">
-                                <label class="text-[10px] text-gray-500 uppercase block mb-1">Price (EGP)</label>
-                                <input type="number" name="p_{{ cat }}" value="{{ store_prices.get(cat, 0) }}" class="w-24 bg-[#111] border border-gray-700 text-yellow-500 font-black px-3 py-2 rounded-lg text-right outline-none focus:border-yellow-500 transition">
+                            <form onsubmit="if(confirm('Delete entire category?')) submitAjax(event, '/api/store/category/delete'); else event.preventDefault();">
+                                <input type="hidden" name="cat_id" value="{{ cat._id }}"><button class="text-red-500 hover:bg-red-500 hover:text-white p-2 rounded transition"><i class="fas fa-trash"></i></button>
+                            </form>
+                        </div>
+                        <div class="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {% for p in cat.products %}
+                            <div class="bg-black border border-gray-800 p-4 rounded-lg relative group">
+                                <form onsubmit="if(confirm('Delete product?')) submitAjax(event, '/api/store/product/delete'); else event.preventDefault();" class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition">
+                                    <input type="hidden" name="cat_id" value="{{ cat._id }}"><input type="hidden" name="stock_key" value="{{ p.stock_key }}"><button class="text-red-500"><i class="fas fa-times"></i></button>
+                                </form>
+                                <div class="font-bold text-white mb-1">{{ p.name }}</div>
+                                <div class="flex justify-between items-center mt-2">
+                                    <div class="text-xs font-mono text-gray-500">Key: <span class="text-szgreen">{{ p.stock_key }}</span></div>
+                                    <div class="font-black text-yellow-500">{{ p.price }} <span class="text-[10px] text-gray-500">EGP</span></div>
+                                </div>
+                                <div class="text-[10px] uppercase font-bold mt-2 {% if stock.get(p.stock_key, 0) > 0 %}text-szcyan{% else %}text-red-500{% endif %}">Stock: {{ stock.get(p.stock_key, 0) }}</div>
+                            </div>
+                            {% endfor %}
+                            
+                            <div class="border border-dashed border-gray-700 p-4 rounded-lg bg-white/5 flex flex-col justify-center">
+                                <form onsubmit="submitAjax(event, '/api/store/product/add')" class="space-y-2">
+                                    <input type="hidden" name="cat_id" value="{{ cat._id }}">
+                                    <input type="text" name="stock_key" required placeholder="Stock Key (e.g. 60_uc)" class="w-full bg-black border border-gray-800 text-white px-2 py-1.5 rounded text-xs outline-none focus:border-szgreen">
+                                    <input type="text" name="name" required placeholder="Display Name (e.g. 60 UC)" class="w-full bg-black border border-gray-800 text-white px-2 py-1.5 rounded text-xs outline-none focus:border-szgreen">
+                                    <input type="number" name="price" required placeholder="Price (EGP)" class="w-full bg-black border border-gray-800 text-white px-2 py-1.5 rounded text-xs outline-none focus:border-szgreen">
+                                    <button class="w-full bg-gray-800 hover:bg-szgreen hover:text-black text-white text-xs font-bold py-1.5 rounded transition">Add Product</button>
+                                </form>
                             </div>
                         </div>
-                        {% endfor %}
                     </div>
-                    <div class="mt-8 border-t border-gray-800 pt-6 text-right">
-                        <button type="submit" class="bg-yellow-500 text-black font-bold py-3 px-10 rounded-xl transition hover:shadow-[0_0_20px_rgba(250,204,21,0.4)]">
-                            <i class="fas fa-save mr-2"></i> Save Catalog Prices
-                        </button>
-                    </div>
-                </form>
+                    {% else %}
+                    <div class="bg-panelbg border border-gray-800 rounded-xl p-10 text-center text-gray-500"><i class="fas fa-folder-open text-4xl mb-3"></i><p>No categories found. Create one to start.</p></div>
+                    {% endfor %}
+                </div>
             </div>
         </div>
 
         <div id="tab-customers" class="tab-content hidden fade-in">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="bg-panelbg border border-gray-800 p-6 rounded-xl h-fit">
-                    <h3 class="font-bold text-white uppercase text-sm mb-4 border-b border-gray-800 pb-3"><i class="fas fa-user-plus text-yellow-500 mr-2"></i> Add Customer Manually</h3>
+                    <h3 class="font-bold text-white uppercase text-sm mb-4 border-b border-gray-800 pb-3"><i class="fas fa-user-plus text-yellow-500 mr-2"></i> Add Customer</h3>
                     <form onsubmit="submitAjax(event, '/api/store/add_customer')" class="space-y-4">
-                        <div><label class="text-xs text-gray-500 mb-1 block">Full Name</label><input type="text" name="name" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500 transition"></div>
-                        <div><label class="text-xs text-gray-500 mb-1 block">Email Address</label><input type="email" name="email" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500 font-mono transition"></div>
-                        <div><label class="text-xs text-gray-500 mb-1 block">Initial Wallet Balance (EGP)</label><input type="number" name="balance" value="0" class="w-full bg-[#050505] border border-gray-800 text-yellow-500 font-bold p-3 rounded-lg outline-none focus:border-yellow-500 transition"></div>
-                        <button type="submit" class="w-full bg-yellow-500 text-black font-bold py-3 rounded-lg mt-2 transition hover:shadow-[0_0_20px_rgba(250,204,21,0.4)]">Create Account</button>
+                        <div><label class="text-xs text-gray-500 mb-1 block">Full Name</label><input type="text" name="name" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500"></div>
+                        <div><label class="text-xs text-gray-500 mb-1 block">Email Address</label><input type="email" name="email" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500 font-mono"></div>
+                        <div><label class="text-xs text-gray-500 mb-1 block">Balance (EGP)</label><input type="number" name="balance" value="0" class="w-full bg-[#050505] border border-gray-800 text-yellow-500 font-bold p-3 rounded-lg outline-none focus:border-yellow-500"></div>
+                        <button type="submit" class="w-full bg-yellow-500 text-black font-bold py-3 rounded-lg mt-2 btn-glow">Create Account</button>
                     </form>
                 </div>
                 
@@ -138,15 +163,14 @@
                                     <td class="px-4 py-3">
                                         <form onsubmit="submitAjax(event, '/api/store/manage_balance')" class="flex gap-2">
                                             <input type="hidden" name="email" value="{{ c.email }}">
-                                            <input type="number" name="amount" placeholder="Amt" required class="w-20 bg-black border border-gray-700 text-white px-2 py-1.5 rounded text-xs outline-none focus:border-yellow-500 transition">
-                                            <select name="action" class="bg-black border border-gray-700 text-white rounded text-xs outline-none focus:border-yellow-500 transition"><option value="add">Add (+)</option><option value="set">Set (=)</option></select>
+                                            <input type="number" name="amount" placeholder="Amt" required class="w-20 bg-black border border-gray-700 text-white px-2 py-1.5 rounded text-xs outline-none focus:border-yellow-500">
+                                            <select name="action" class="bg-black border border-gray-700 text-white rounded text-xs outline-none focus:border-yellow-500"><option value="add">Add (+)</option><option value="set">Set (=)</option></select>
                                             <button type="submit" class="bg-gray-800 text-yellow-500 px-3 py-1.5 rounded hover:bg-yellow-500 hover:text-black font-bold transition">Update</button>
                                         </form>
                                     </td>
                                     <td class="px-4 py-3 text-right">
                                         <form onsubmit="if(confirm('Delete customer?')) submitAjax(event, '/api/store/delete_customer'); else event.preventDefault();">
-                                            <input type="hidden" name="email" value="{{ c.email }}">
-                                            <button type="submit" class="text-red-600 hover:text-red-400 p-2 rounded bg-red-600/10 transition"><i class="fas fa-trash"></i></button>
+                                            <input type="hidden" name="email" value="{{ c.email }}"><button type="submit" class="text-red-600 hover:text-red-400 p-2 rounded bg-red-600/10 transition"><i class="fas fa-trash"></i></button>
                                         </form>
                                     </td>
                                 </tr>
@@ -175,7 +199,7 @@
                                 <td class="px-5 py-3 font-mono text-szcyan font-bold order-id">#{{ o._id }}</td>
                                 <td class="px-5 py-3 text-xs text-gray-500">{{ o.date }}</td>
                                 <td class="px-5 py-3"><div class="font-bold text-white order-name">{{ o.name }}</div><div class="text-[10px] text-gray-500 order-email">{{ o.email }}</div></td>
-                                <td class="px-5 py-3"><span class="bg-gray-800 text-white px-2 py-1 rounded text-xs font-bold border border-gray-700">{{ o.category }} UC</span></td>
+                                <td class="px-5 py-3"><span class="bg-gray-800 text-white px-2 py-1 rounded text-xs font-bold border border-gray-700">{{ o.category }}</span></td>
                                 <td class="px-5 py-3 font-bold text-yellow-500">{{ o.price }} EGP</td>
                                 <td class="px-5 py-3"><div class="bg-black text-szgreen font-mono px-3 py-1 rounded border border-gray-800 text-xs inline-block cursor-pointer hover:bg-gray-800 transition" onclick="copyText('{{ o.code }}')" title="Click to copy">{{ o.code }}</div></td>
                             </tr>
@@ -189,16 +213,11 @@
     </main>
 
     <script>
-        // إعدادات التابات
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.getElementById('tab-' + tabId).classList.remove('hidden');
-            
-            document.querySelectorAll('.nav-btn').forEach(el => { 
-                el.className = 'nav-btn text-gray-500 hover:text-white px-4 py-3 rounded-lg text-sm font-bold text-left transition-colors'; 
-            });
+            document.querySelectorAll('.nav-btn').forEach(el => { el.className = 'nav-btn text-gray-500 hover:text-white px-4 py-3 rounded-lg text-sm font-bold text-left transition-colors'; });
             document.getElementById('btn-' + tabId).className = 'nav-btn bg-yellow-500/10 border-l-2 border-yellow-500 text-yellow-500 px-4 py-3 rounded-r-lg text-sm font-bold text-left transition-colors';
-            
             window.history.replaceState({}, '', '/store-admin?tab=' + tabId);
         }
 
@@ -208,7 +227,6 @@
             switchTab(tab);
         });
 
-        // نظام الإشعارات (Toasts)
         function showToast(msg, type='success') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -218,14 +236,12 @@
             setTimeout(() => { toast.remove(); }, 3000);
         }
 
-        // إرسال الفورم بنظام AJAX لمنع تحديث الصفحة المزعج
         async function submitAjax(e, url) {
             e.preventDefault();
             const form = e.target;
-            const btn = form.querySelector('button[type="submit"]');
+            const btn = form.querySelector('button[type="submit"]') || form.querySelector('button');
             const originalHtml = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; btn.disabled = true;
 
             const fd = new FormData(form);
             try {
@@ -233,46 +249,30 @@
                 const data = await res.json();
                 if(data.success) {
                     showToast(data.msg, 'success');
-                    // تحديث ناعم للصفحة مع الاحتفاظ بالتاب المفتوح
-                    setTimeout(() => {
-                        const currentTab = document.querySelector('.tab-content:not(.hidden)').id.replace('tab-', '');
-                        window.location.href = '/store-admin?tab=' + currentTab;
-                    }, 800);
+                    setTimeout(() => { location.reload(); }, 800);
                 } else {
-                    showToast(data.msg || "Error processing request", 'error');
+                    showToast(data.msg || "Error", 'error');
                     btn.innerHTML = originalHtml; btn.disabled = false;
                 }
-            } catch(err) {
-                showToast("Connection error!", 'error');
-                btn.innerHTML = originalHtml; btn.disabled = false;
-            }
+            } catch(err) { showToast("Connection error!", 'error'); btn.innerHTML = originalHtml; btn.disabled = false; }
         }
 
-        // الفلترة الفورية للزباين
         function filterCustomers() {
             const query = document.getElementById('customer-search').value.toLowerCase();
             document.querySelectorAll('.customer-row').forEach(row => {
-                const name = row.querySelector('.customer-name').innerText.toLowerCase();
-                const username = row.querySelector('.customer-username').innerText.toLowerCase();
-                const email = row.querySelector('.customer-email').innerText.toLowerCase();
-                if(name.includes(query) || username.includes(query) || email.includes(query)) row.style.display = '';
-                else row.style.display = 'none';
+                const text = row.innerText.toLowerCase();
+                row.style.display = text.includes(query) ? '' : 'none';
             });
         }
 
-        // الفلترة الفورية للطلبات
         function filterOrders() {
             const query = document.getElementById('order-search').value.toLowerCase();
             document.querySelectorAll('.order-row').forEach(row => {
-                const id = row.querySelector('.order-id').innerText.toLowerCase();
-                const name = row.querySelector('.order-name').innerText.toLowerCase();
-                const email = row.querySelector('.order-email').innerText.toLowerCase();
-                if(id.includes(query) || name.includes(query) || email.includes(query)) row.style.display = '';
-                else row.style.display = 'none';
+                const text = row.innerText.toLowerCase();
+                row.style.display = text.includes(query) ? '' : 'none';
             });
         }
 
-        // نسخ الكود بسرعة
         function copyText(text) {
             navigator.clipboard.writeText(text);
             showToast("Code copied to clipboard!", 'success');
