@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Saleh Zone - Admin</title>
+    <title>Saleh Zone - Master Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script>tailwind.config={theme:{extend:{colors:{szgreen:'#7dfc89',szcyan:'#5eead4',darkbg:'#050505',panelbg:'#111'}}}}</script>
@@ -16,11 +16,11 @@
 
     <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black/70 z-30 hidden md:hidden transition-opacity"></div>
 
-    <aside id="sidebar" class="w-64 bg-panelbg border-r border-gray-900 flex flex-col justify-between fixed md:relative z-40 h-full transition-transform transform -translate-x-full md:translate-x-0">
+    <aside id="sidebar" class="w-64 bg-panelbg border-r border-gray-900 flex flex-col justify-between fixed md:relative z-40 h-full transition-transform transform -translate-x-full md:translate-x-0 shadow-2xl">
         <div>
             <div class="h-20 flex items-center px-6 border-b border-gray-900 justify-between">
                 <div class="flex items-center">
-                    <img src="/static/logo.png" alt="9S" class="h-10 mr-3 drop-shadow-[0_0_8px_rgba(125,252,137,0.5)]">
+                    <img src="/static/logo.png" alt="SZ" class="h-10 mr-3 drop-shadow-[0_0_8px_rgba(125,252,137,0.5)]" onerror="this.style.display='none'">
                     <span class="text-xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan">SALEH ZONE</span>
                 </div>
                 <button onclick="toggleSidebar()" class="md:hidden text-gray-500 hover:text-white"><i class="fas fa-times text-xl"></i></button>
@@ -28,9 +28,12 @@
             <nav class="mt-6 flex flex-col gap-1 px-3">
                 <button onclick="switchTab('overview')" id="btn-overview" class="nav-active text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-chart-pie w-6"></i> Overview & Logs</button>
                 <button onclick="switchTab('stock')" id="btn-stock" class="text-gray-500 text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-box-open w-6"></i> Stock Manage</button>
-                <button onclick="switchTab('users')" id="btn-users" class="text-gray-500 text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-users w-6"></i> Users & Tokens</button>
+                <button onclick="switchTab('users')" id="btn-users" class="text-gray-500 text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-user-tie w-6"></i> Staff & Tokens</button>
+                
                 <div class="my-4 border-t border-gray-800"></div>
-<a href="/store-admin" class="text-yellow-500 text-left px-4 py-3 rounded-lg text-sm font-bold hover:bg-yellow-500 hover:text-black transition border border-yellow-500/30 flex items-center"><i class="fas fa-shopping-cart w-6"></i> B2C Store Admin</a>
+                <a href="/store-admin" class="text-yellow-500 text-left px-4 py-3 rounded-lg text-sm font-bold hover:bg-yellow-500 hover:text-black transition border border-yellow-500/30 flex items-center"><i class="fas fa-shopping-cart w-6"></i> B2C Store Admin</a>
+                <div class="my-4 border-t border-gray-800"></div>
+                
                 <button onclick="switchTab('tools')" id="btn-tools" class="text-gray-500 text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-tools w-6"></i> Advanced Tools</button>
             </nav>
         </div>
@@ -48,19 +51,26 @@
 
         <div class="p-4 md:p-10">
             <div id="tab-overview" class="tab-content block">
-                <h2 class="text-2xl font-bold text-white mb-6">System <span class="text-szgreen">Overview</span></h2>
-                <div class="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
-                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center"><div class="text-gray-500 text-[10px] font-bold uppercase mb-1">Users</div><div class="text-2xl font-black text-white">{{ users_count }}</div></div>
-                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center relative overflow-hidden"><div class="text-szgreen text-[10px] font-bold uppercase mb-1">UC Stock</div><div class="text-2xl font-black text-white">{{ stock_count }}</div><div class="absolute bottom-0 left-0 w-full h-1 bg-szgreen"></div></div>
-                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center relative"><div class="text-szcyan text-[10px] font-bold uppercase mb-1">Total Tokens</div><div class="text-2xl font-black text-white">{{ total_system_tokens }}</div><div class="absolute bottom-0 left-0 w-full h-1 bg-szcyan"></div></div>
-                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center"><div class="text-purple-400 text-[10px] font-bold uppercase mb-1">API Cache</div><div class="text-2xl font-black text-white">{{ cached_count }}</div></div>
-                    <div class="bg-gray-900 border border-szgreen/30 p-4 rounded-xl text-center"><div class="text-szgreen text-[10px] font-bold uppercase mb-1">Pulls Today</div><div class="text-2xl font-black text-szgreen">{{ global_today }}</div></div>
-                    <div class="bg-gray-900 border border-szcyan/30 p-4 rounded-xl text-center"><div class="text-szcyan text-[10px] font-bold uppercase mb-1">Pulls Month</div><div class="text-2xl font-black text-szcyan">{{ global_month }}</div></div>
-                </div>
                 
+                <h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-robot text-szgreen mr-2"></i> Bot Operations (Staff)</h3>
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center"><div class="text-gray-500 text-[10px] font-bold uppercase mb-1">Total Staff/Users</div><div class="text-2xl font-black text-white">{{ users_count }}</div></div>
+                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center relative overflow-hidden"><div class="text-szgreen text-[10px] font-bold uppercase mb-1">UC Stock Available</div><div class="text-2xl font-black text-white">{{ stock_count }}</div><div class="absolute bottom-0 left-0 w-full h-1 bg-szgreen"></div></div>
+                    <div class="bg-[#0a0a0a] border border-szcyan/30 p-4 rounded-xl text-center"><div class="text-szcyan text-[10px] font-bold uppercase mb-1">Codes Pulled (Today/Month)</div><div class="text-2xl font-black text-szcyan">{{ global_stats.stock_today }} <span class="text-sm text-gray-500">/ {{ global_stats.stock_month }}</span></div></div>
+                    <div class="bg-[#0a0a0a] border border-purple-500/30 p-4 rounded-xl text-center"><div class="text-purple-400 text-[10px] font-bold uppercase mb-1">API Pulled (Today/Month)</div><div class="text-2xl font-black text-purple-400">{{ global_stats.api_today }} <span class="text-sm text-gray-500">/ {{ global_stats.api_month }}</span></div></div>
+                </div>
+
+                <h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-shopping-cart text-yellow-500 mr-2"></i> Storefront Sales (B2C)</h3>
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <div class="bg-panelbg border border-yellow-500/30 p-4 rounded-xl text-center"><div class="text-yellow-500 text-[10px] font-bold uppercase mb-1">Revenue Today</div><div class="text-2xl font-black text-yellow-500">+{{ store_stats.rev_today }} <span class="text-xs">EGP</span></div></div>
+                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center"><div class="text-gray-500 text-[10px] font-bold uppercase mb-1">Revenue Month</div><div class="text-2xl font-black text-white">+{{ store_stats.rev_month }} <span class="text-xs text-gray-600">EGP</span></div></div>
+                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center"><div class="text-gray-500 text-[10px] font-bold uppercase mb-1">Orders Today</div><div class="text-2xl font-black text-white">{{ store_stats.sales_today }}</div></div>
+                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center"><div class="text-gray-500 text-[10px] font-bold uppercase mb-1">Orders Month</div><div class="text-2xl font-black text-white">{{ store_stats.sales_month }}</div></div>
+                </div>
+
+                <h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-terminal text-gray-500 mr-2"></i> Live Detailed Logs</h3>
                 <div class="bg-black border border-gray-800 rounded-xl p-6 relative overflow-hidden">
-                    <h3 class="text-white font-bold mb-4 uppercase text-xs tracking-widest text-szcyan"><i class="fas fa-terminal mr-2"></i> Live Detailed Logs</h3>
-                    <div class="h-96 overflow-y-auto space-y-3 pb-10 pr-2">
+                    <div class="h-80 overflow-y-auto space-y-3 pb-10 pr-2">
                         {% for log in logs %}
                         <div class="border-l-2 border-szgreen pl-4 py-3 bg-white/5 rounded-r">
                             <div class="flex justify-between items-center mb-1">
@@ -80,10 +90,10 @@
             </div>
 
             <div id="tab-users" class="tab-content hidden">
-                <h2 class="text-2xl font-bold text-white mb-6">Users & <span class="text-szcyan">Tokens Pool</span></h2>
+                <h2 class="text-2xl font-bold text-white mb-6">Staff & <span class="text-szcyan">Tokens Pool</span></h2>
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                     <div class="bg-panelbg border border-gray-800 p-6 rounded-xl">
-                        <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-user-plus text-szgreen mr-2"></i> Add User</h3>
+                        <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-user-plus text-szgreen mr-2"></i> Add Staff</h3>
                         <form action="/api/add_user" method="POST">
                             <input type="number" name="user_id" placeholder="Telegram ID" required class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg mb-3 text-sm focus:border-szgreen outline-none">
                             <input type="text" name="name" placeholder="Name" required class="w-full bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg mb-3 text-sm focus:border-szgreen outline-none">
@@ -109,10 +119,10 @@
                     </div>
                     
                     <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden lg:col-span-2 flex flex-col h-[700px]">
-                        <div class="px-6 py-4 border-b border-gray-800"><h3 class="font-bold text-white uppercase text-sm">User Management & Stats</h3></div>
+                        <div class="px-6 py-4 border-b border-gray-800"><h3 class="font-bold text-white uppercase text-sm">Staff Management & Individual Stats</h3></div>
                         <div class="overflow-x-auto flex-1 p-2">
                             <table class="w-full text-left text-sm whitespace-nowrap">
-                                <thead class="bg-[#151515] text-gray-500"><tr><th class="px-4 py-3">User</th><th class="px-4 py-3">Pulls (T/W/M)</th><th class="px-4 py-3">Smart Tokens</th><th class="px-4 py-3">Actions</th></tr></thead>
+                                <thead class="bg-[#151515] text-gray-500"><tr><th class="px-4 py-3">User</th><th class="px-4 py-3">Detailed Pulls (T/M)</th><th class="px-4 py-3">Smart Tokens</th><th class="px-4 py-3">Actions</th></tr></thead>
                                 <tbody class="divide-y divide-gray-900">
                                     {% for u in all_users %}
                                     <tr class="hover:bg-gray-900/50">
@@ -120,7 +130,18 @@
                                             <div class="font-bold text-white flex items-center gap-2">{{ u.name }} <span class="px-2 py-0.5 rounded text-[10px] {% if u.role == 'admin' %}bg-red-900 text-red-300{% elif u.role == 'employee' %}bg-szcyan/20 text-szcyan{% else %}bg-gray-800 text-gray-400{% endif %} uppercase tracking-wider">{{ u.role }}</span></div>
                                             <div class="text-[10px] text-gray-500 font-mono mt-1">{{ u._id }} | 🔑 Tokens: <span class="text-white">{{ u.tokens|length }}</span></div>
                                         </td>
-                                        <td class="px-4 py-3 text-xs font-mono"><span class="text-szgreen font-bold" title="Today">{{ u.pull_stats.today }}</span> / <span class="text-szcyan" title="This Week">{{ u.pull_stats.week }}</span> / <span class="text-gray-500" title="This Month">{{ u.pull_stats.month }}</span></td>
+                                        
+                                        <td class="px-4 py-3 text-xs font-mono">
+                                            <div class="mb-1 bg-black px-2 py-1 rounded inline-block border border-gray-800">
+                                                <span class="text-[9px] text-gray-500 uppercase mr-1">API:</span>
+                                                <span class="text-purple-400 font-bold" title="API Today">{{ u.stats_details.api_today }}</span> / <span class="text-gray-500" title="API Month">{{ u.stats_details.api_month }}</span>
+                                            </div>
+                                            <div class="bg-black px-2 py-1 rounded inline-block border border-gray-800">
+                                                <span class="text-[9px] text-gray-500 uppercase mr-1">Codes:</span>
+                                                <span class="text-szcyan font-bold" title="Codes Today">{{ u.stats_details.stock_today }}</span> / <span class="text-gray-500" title="Codes Month">{{ u.stats_details.stock_month }}</span>
+                                            </div>
+                                        </td>
+
                                         <td class="px-4 py-3">
                                             <form action="/api/add_user_tokens" method="POST" class="flex gap-2">
                                                 <input type="hidden" name="user_id" value="{{ u._id }}">
@@ -128,7 +149,7 @@
                                                 <button class="bg-gray-800 text-white px-2 py-1 rounded hover:bg-szgreen hover:text-black transition" title="Extract Tokens">+</button>
                                             </form>
                                         </td>
-                                        <td class="px-4 py-3 flex gap-2">
+                                        <td class="px-4 py-3 flex gap-2 items-center h-full pt-4">
                                             <form action="/api/user_action" method="POST" title="Toggle Role"><input type="hidden" name="user_id" value="{{ u._id }}"><input type="hidden" name="action" value="toggle_role"><button class="text-gray-400 hover:text-white p-1"><i class="fas fa-user-cog"></i></button></form>
                                             <form action="/api/user_action" method="POST" title="Clear Tokens" onsubmit="return confirm('Clear tokens?');"><input type="hidden" name="user_id" value="{{ u._id }}"><input type="hidden" name="action" value="clear_tokens"><button class="text-yellow-500 hover:text-yellow-400 p-1"><i class="fas fa-eraser"></i></button></form>
                                             <form action="/api/user_action" method="POST" title="Clear Logs" onsubmit="return confirm('Clear logs?');"><input type="hidden" name="user_id" value="{{ u._id }}"><input type="hidden" name="action" value="clear_logs"><button class="text-purple-500 hover:text-purple-400 p-1"><i class="fas fa-history"></i></button></form>
@@ -269,7 +290,9 @@
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.getElementById('tab-' + tabId).classList.remove('hidden');
             document.querySelectorAll('[id^="btn-"]').forEach(el => { el.classList.remove('nav-active', 'text-white'); el.classList.add('text-gray-500'); });
-            document.getElementById('btn-' + tabId).classList.add('nav-active', 'text-white');
+            
+            if(tabId !== 'store') { document.getElementById('btn-' + tabId).classList.add('nav-active', 'text-white'); } 
+            
             window.history.replaceState({}, '', '/?tab=' + tabId);
             const sidebar = document.getElementById('sidebar');
             if(window.innerWidth < 768 && !sidebar.classList.contains('-translate-x-full')) toggleSidebar();
@@ -309,7 +332,6 @@
             document.getElementById('modal-codes-list').value = data.codes.length > 0 ? data.codes.join('\n') : "Empty stock.";
         }
 
-        // دالة فتح التوكنات المشتركة
         async function openSharedTokensModal() {
             document.getElementById('shared-tokens-modal').classList.remove('hidden');
             document.getElementById('modal-shared-tokens-list').value = "Loading...";
@@ -362,4 +384,3 @@
     </script>
 </body>
 </html>
-
