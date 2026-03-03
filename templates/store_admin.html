@@ -1,249 +1,220 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" data-theme="default">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Store CRM - Saleh Zone</title>
+    <title>Saleh Zone | Storefront</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script>tailwind.config={theme:{extend:{colors:{szgreen:'#7dfc89',szcyan:'#5eead4',darkbg:'#050505',panelbg:'#111'}}}}</script>
+    
+    <script src="/static/js/core.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        szgreen: 'var(--theme-primary)',
+                        szcyan: 'var(--theme-secondary)',
+                        darkbg: '#050505',
+                        panelbg: '#111'
+                    }
+                }
+            }
+        }
+    </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
+        
+        :root { --theme-primary: #7dfc89; --theme-secondary: #5eead4; }
+        html[data-theme="synthwave"] { --theme-primary: #a855f7; --theme-secondary: #f97316; }
+        html[data-theme="sith"] { --theme-primary: #ef4444; --theme-secondary: #dc2626; }
+        html[data-theme="vip"] { --theme-primary: #eab308; --theme-secondary: #facc15; }
+
         body { font-family: 'Cairo', sans-serif; background-color: #050505; color: #d1d5db; scroll-behavior: smooth; overflow: hidden; }
-        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #050505; } ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; transition: 0.3s; } ::-webkit-scrollbar-thumb:hover { background: #eab308; }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #050505; } ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; transition: 0.3s; } ::-webkit-scrollbar-thumb:hover { background: var(--theme-primary); box-shadow: 0 0 10px var(--theme-primary); }
+        
         @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } } .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-8px); } 100% { transform: translateY(0px); } } .floating { animation: float 3s ease-in-out infinite; }
+        
+        .btn-glow { transition: all 0.3s ease; } 
+        .btn-glow:hover { border-color: var(--theme-primary); box-shadow: 0 0 15px var(--theme-primary); }
         .text-gradient-animate { background-size: 200% 200%; animation: gradientX 3s ease infinite; }
         @keyframes gradientX { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
         
-        /* كلاسات القائمة الجانبية (Flowbite Themed - لون أصفر لتمييز ה- CRM) */
-        .nav-btn { width: 100%; display: flex; align-items: center; transition: all 0.2s; font-weight: bold; }
-        .nav-inactive { color: #9ca3af; }
-        .nav-inactive:hover { background-color: #111827; color: #ffffff; }
-        .nav-inactive:hover i { color: #eab308; }
-        .nav-active { background-color: #111827; color: #ffffff; border-left: 3px solid #eab308; }
-        .nav-active i { color: #eab308; text-shadow: 0 0 10px rgba(234,179,8,0.5); }
-
-        #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
-        .toast { background: #111; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-left: 4px solid #eab308; animation: slideIn 0.3s ease-out, fadeOut 0.3s ease-in 2.7s forwards; font-weight: bold; font-size: 14px; display: flex; align-items: center; gap: 10px; }
-        .toast.error { border-left-color: #ef4444; }
-        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        @keyframes fadeOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+        .uc-card { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .uc-card:hover { transform: translateY(-8px); box-shadow: 0 15px 35px rgba(0,0,0,0.5); border-color: var(--theme-secondary); }
+        
+        .social-btn svg { width: 22px; height: 22px; fill: #9ca3af; transition: fill 0.3s, transform 0.3s; pointer-events: none; }
+        .social-btn.google:hover svg { fill: var(--theme-primary); transform: scale(1.1); }
+        .social-btn.telegram:hover svg { fill: var(--theme-secondary); transform: scale(1.1); }
     </style>
 </head>
-<body class="selection:bg-yellow-500 selection:text-black flex h-screen">
+<body class="selection:bg-szgreen selection:text-black flex h-screen">
 
     <div id="toast-container"></div>
-    <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black/80 z-30 hidden md:hidden transition-opacity backdrop-blur-sm"></div>
 
-    <aside id="sz-sidebar" class="fixed top-0 left-0 z-40 w-64 h-screen transition-transform -translate-x-full md:translate-x-0 shadow-2xl" aria-label="Sidenav">
-        <div class="overflow-y-auto py-5 px-3 h-full bg-panelbg border-r border-gray-800 pb-24">
-            
+    {% if maintenance %}
+    <div class="flex flex-col items-center justify-center w-full h-full p-4 text-center bg-darkbg">
+        <div class="inline-flex items-center justify-center w-24 h-24 bg-black rounded-full border-2 border-szgreen/50 shadow-[0_0_30px_rgba(125,252,137,0.4)] mb-8 floating">
+            <span class="text-4xl font-black text-szgreen">SZ</span>
+        </div>
+        <h1 class="text-4xl md:text-6xl font-black text-white mb-4 uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">System Maintenance</h1>
+        <p class="text-gray-400 max-w-xl mb-10 text-lg">Upgrading servers for a better experience. Back online shortly!</p>
+        <button onclick="location.reload()" class="px-8 py-3 bg-szgreen text-black rounded-xl font-bold transition btn-glow"><i class="fas fa-sync-alt mr-2"></i> Refresh Status</button>
+    </div>
+    {% else %}
+
+    <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black/80 z-40 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
+
+    <aside id="sz-sidebar" class="fixed top-0 left-0 z-50 w-64 h-screen transition-transform -translate-x-full md:translate-x-0 shadow-2xl flex-shrink-0">
+        <div class="overflow-y-auto py-5 px-3 h-full bg-panelbg border-r border-gray-800 pb-20">
             <div class="flex items-center justify-between px-2 mb-6 pb-6 border-b border-gray-800">
                 <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 bg-yellow-500/10 rounded-lg flex items-center justify-center text-yellow-500"><i class="fas fa-users"></i></div>
-                    <span class="text-xl font-black tracking-wider text-yellow-500 text-gradient-animate">STORE CRM</span>
+                    <div class="inline-flex items-center justify-center w-8 h-8 bg-black rounded-full border border-szgreen/50 shadow-[0_0_10px_rgba(125,252,137,0.3)] floating">
+                        <span class="text-xs font-black text-szgreen">SZ</span>
+                    </div>
+                    <span class="text-xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">SALEH ZONE</span>
                 </div>
                 <button onclick="toggleSidebar()" class="md:hidden text-gray-500 hover:text-white transition"><i class="fas fa-times text-xl"></i></button>
             </div>
 
-            <ul class="space-y-2">
+            <ul class="space-y-4">
+                <li id="sidebar-guest">
+                    <button onclick="openAuthModal('signin'); toggleSidebarMobile();" class="flex items-center justify-center w-full p-3 text-sm font-bold text-szgreen bg-szgreen/10 rounded-lg hover:bg-szgreen hover:text-black transition border border-szgreen/20">
+                        <i class="fas fa-sign-in-alt mr-2"></i> Login / Sign Up
+                    </button>
+                </li>
+                
+                <li id="sidebar-user" class="hidden bg-[#050505] p-4 rounded-lg border border-gray-800 fade-in cursor-pointer hover:border-szgreen transition" onclick="openProfileModal(); toggleSidebarMobile();">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-gray-900 rounded-full flex items-center justify-center text-szgreen border border-gray-700"><i class="fas fa-user"></i></div>
+                            <div class="font-bold text-white truncate" id="sidebar-ui-name">Name</div>
+                        </div>
+                        <i class="fas fa-chevron-right text-gray-600 text-xs"></i>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="bg-black border border-yellow-500/30 rounded p-2 text-center">
+                            <div class="text-[9px] text-gray-500 uppercase">EGP</div><div class="text-yellow-500 font-black text-sm" id="sidebar-ui-bal-egp">0</div>
+                        </div>
+                        <div class="bg-black border border-szcyan/30 rounded p-2 text-center">
+                            <div class="text-[9px] text-gray-500 uppercase">USD</div><div class="text-szcyan font-black text-sm" id="sidebar-ui-bal-usd">0</div>
+                        </div>
+                    </div>
+                </li>
+                
+                <li><hr class="border-gray-800"></li>
+                
                 <li>
-                    <button type="button" onclick="document.getElementById('dropdown-crm').classList.toggle('hidden')" class="flex items-center p-2 w-full text-base font-bold text-gray-400 rounded-lg transition duration-75 hover:bg-gray-900 hover:text-white">
-                        <i class="fas fa-chart-line w-6 text-lg text-gray-500 transition duration-75"></i>
-                        <span class="flex-1 ml-3 text-left whitespace-nowrap">CRM & Sales</span>
+                    <a href="#" onclick="document.getElementById('main-scroll').scrollTo({top:0, behavior:'smooth'}); toggleSidebarMobile();" class="flex items-center p-3 text-base font-bold text-white rounded-lg bg-gray-900 group">
+                        <i class="fas fa-store w-6 text-szgreen"></i><span class="ml-3">Store Home</span>
+                    </a>
+                </li>
+                
+                <li>
+                    <button type="button" onclick="document.getElementById('dropdown-cats').classList.toggle('hidden')" class="flex items-center p-3 w-full text-base font-bold text-gray-400 rounded-lg transition group hover:bg-gray-900 hover:text-white">
+                        <i class="fas fa-layer-group w-6 text-gray-500 group-hover:text-szcyan transition"></i>
+                        <span class="flex-1 ml-3 text-left whitespace-nowrap">Categories</span>
                         <i class="fas fa-chevron-down w-4 text-xs"></i>
                     </button>
-                    <ul id="dropdown-crm" class="py-2 space-y-1">
-                        <li><button onclick="switchTab('customers')" id="btn-customers" class="nav-btn nav-active p-2 pl-11 rounded-lg text-sm"><i class="fas fa-wallet w-5 mr-2"></i> Client Balances</button></li>
-                        <li><button onclick="switchTab('orders')" id="btn-orders" class="nav-btn nav-inactive p-2 pl-11 rounded-lg text-sm"><i class="fas fa-receipt w-5 mr-2"></i> Sales Log</button></li>
+                    <ul id="dropdown-cats" class="py-2 space-y-1">
+                        {% for cat in categories %}
+                        <li><a href="#cat-{{ cat._id }}" onclick="toggleSidebarMobile()" class="flex items-center p-2 pl-11 w-full text-sm font-bold text-gray-500 rounded-lg hover:bg-gray-900 hover:text-white transition"><i class="fas {{ cat.icon }} w-5 text-szcyan"></i> {{ cat.name }}</a></li>
+                        {% endfor %}
                     </ul>
-                </li>
-            </ul>
-
-            <ul class="pt-5 mt-5 space-y-2 border-t border-gray-800">
-                <li>
-                    <a href="/admin" class="flex items-center p-2 text-base font-bold text-gray-400 rounded-lg hover:bg-gray-900 hover:text-white transition group">
-                        <i class="fas fa-arrow-left w-6 text-lg transition duration-75 group-hover:-translate-x-1"></i><span class="ml-3">Master Panel</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="/" target="_blank" class="flex items-center p-2 text-base font-bold text-szcyan rounded-lg hover:bg-szcyan/10 transition group">
-                        <i class="fas fa-external-link-alt w-6 text-lg transition duration-75 group-hover:scale-110"></i><span class="ml-3">Live Storefront</span>
-                    </a>
                 </li>
             </ul>
         </div>
         
-        <div class="absolute bottom-0 left-0 w-full flex justify-center items-center gap-6 p-4 bg-[#0a0a0a] z-20 border-t border-r border-gray-800">
-            <a href="/logout" class="text-gray-500 hover:text-red-500 transition" title="Logout"><i class="fas fa-power-off text-xl"></i></a>
-            <a href="#" class="text-gray-500 hover:text-white transition" title="Settings"><i class="fas fa-cog text-xl"></i></a>
+        <div class="absolute bottom-0 left-0 flex items-center justify-between p-4 w-full bg-[#0a0a0a] z-20 border-t border-r border-gray-800">
+            <select id="currency-toggle" onchange="toggleCurrency()" class="bg-gray-900 border border-gray-700 text-white text-xs font-bold py-2 px-3 rounded outline-none focus:border-szgreen">
+                <option value="EGP">🇪🇬 EGP</option><option value="USD">🇺🇸 USD</option>
+            </select>
+            <div class="flex items-center gap-2 relative">
+                <button onclick="document.getElementById('theme-drop').classList.toggle('hidden')" class="text-gray-500 hover:text-szgreen p-2 transition"><i class="fas fa-paint-roller text-lg"></i></button>
+                <div id="theme-drop" class="hidden absolute bottom-12 -right-2 bg-black border border-gray-800 rounded-lg shadow-2xl w-36 py-2 z-50">
+                    <a href="#" onclick="setTheme('default')" class="flex items-center px-4 py-2 text-sm font-bold text-white hover:bg-gray-900"><span class="w-3 h-3 rounded-full bg-[#7dfc89] mr-2"></span> Cyberpunk</a>
+                    <a href="#" onclick="setTheme('synthwave')" class="flex items-center px-4 py-2 text-sm font-bold text-white hover:bg-gray-900"><span class="w-3 h-3 rounded-full bg-[#a855f7] mr-2"></span> Synthwave</a>
+                    <a href="#" onclick="setTheme('sith')" class="flex items-center px-4 py-2 text-sm font-bold text-white hover:bg-gray-900"><span class="w-3 h-3 rounded-full bg-[#ef4444] mr-2"></span> Sith Red</a>
+                    <a href="#" onclick="setTheme('vip')" class="flex items-center px-4 py-2 text-sm font-bold text-white hover:bg-gray-900"><span class="w-3 h-3 rounded-full bg-[#eab308] mr-2"></span> VIP Gold</a>
+                </div>
+                <button id="sidebar-logout-btn" onclick="logout()" class="hidden text-red-500 p-2 transition"><i class="fas fa-power-off text-lg"></i></button>
+            </div>
         </div>
     </aside>
 
-    <main class="flex-1 p-8 overflow-y-auto bg-[#0a0a0a] relative">
-        <header class="h-16 bg-panelbg border-b border-gray-900 flex items-center justify-between px-6 md:hidden absolute top-0 left-0 w-full z-20 shadow-md">
-            <button onclick="toggleSidebar()" class="text-gray-400 hover:text-white"><i class="fas fa-bars text-xl"></i></button>
-            <span class="text-lg font-black tracking-wider text-yellow-500 text-gradient-animate">STORE CRM</span>
-            <div class="w-6"></div>
+    <main id="main-scroll" class="flex-1 flex flex-col h-screen overflow-y-auto bg-darkbg relative">
+        <header class="h-16 bg-panelbg/80 backdrop-blur-md border-b border-gray-800 flex items-center justify-between px-4 md:hidden sticky top-0 z-30">
+            <button onclick="toggleSidebar()" class="text-white text-xl p-2"><i class="fas fa-bars"></i></button>
+            <span class="text-lg font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">SALEH ZONE</span>
+            <button onclick="openProfileModal()" class="text-szgreen text-xl p-2"><i class="fas fa-user-circle"></i></button>
         </header>
 
-        <div class="flex justify-between items-end mb-8 mt-12 md:mt-0 fade-in">
-            <div><h2 class="text-3xl font-black text-white">Client Management</h2><p class="text-sm text-gray-500 mt-1">Multi-currency wallet and customer CRM.</p></div>
-        </div>
+        <div class="p-6 md:p-10 max-w-6xl mx-auto w-full flex-1">
+            <div class="text-center md:text-left mb-12 fade-in">
+                <h1 class="text-3xl md:text-5xl font-black mb-3 text-white uppercase tracking-widest">Instant <span class="text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">Delivery</span></h1>
+                <p class="text-gray-400 max-w-xl text-sm">Select your package. Codes are delivered instantly after payment.</p>
+            </div>
 
-        <div id="tab-customers" class="tab-content block fade-in">
-            <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden flex flex-col h-[750px]">
-                <div class="p-4 border-b border-gray-800 bg-[#111] flex justify-between items-center">
-                    <h3 class="font-bold text-white uppercase text-sm"><i class="fas fa-wallet text-yellow-500 mr-2"></i> User Wallets</h3>
-                    <input type="text" id="customer-search" onkeyup="filterCustomers()" placeholder="Search Name, Username or Email..." class="bg-[#050505] border border-gray-700 text-white px-3 py-1.5 rounded-lg text-sm outline-none focus:border-yellow-500 w-64 transition">
-                </div>
-                <div class="overflow-y-auto flex-1 p-2">
-                    <table class="w-full text-left text-sm whitespace-nowrap" id="customers-table">
-                        <thead class="bg-[#151515] text-gray-500 uppercase text-[10px] sticky top-0 z-10">
-                            <tr><th class="px-4 py-3">Player Info</th><th class="px-4 py-3">EGP Wallet</th><th class="px-4 py-3">USD Wallet</th><th class="px-4 py-3">Fund Manager</th></tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-900">
-                            {% for c in store_customers %}
-                            <tr class="hover:bg-gray-900/50 transition customer-row">
-                                <td class="px-4 py-3">
-                                    <div class="font-bold text-white text-base customer-name">{{ c.name }}</div>
-                                    <div class="text-[10px] text-szcyan font-mono mt-0.5 customer-username">@{{ c.username }}</div>
-                                    <div class="text-[10px] text-gray-500 font-mono mt-0.5 customer-email"><i class="fas fa-envelope mr-1"></i> {{ c.email }}</div>
-                                </td>
-                                <td class="px-4 py-3"><span class="text-yellow-500 font-black text-xl">{{ c.balance_egp|default(0) }}</span> <span class="text-[10px] text-gray-500">EGP</span></td>
-                                <td class="px-4 py-3"><span class="text-szcyan font-black text-xl">{{ c.balance_usd|default(0) }}</span> <span class="text-[10px] text-gray-500">USD</span></td>
-                                <td class="px-4 py-3">
-                                    <form onsubmit="submitAjax(event, '/api/store/manage_balance')" class="flex gap-2">
-                                        <input type="hidden" name="email" value="{{ c.email }}">
-                                        <select name="currency" class="bg-black border border-gray-700 text-white rounded text-xs outline-none focus:border-yellow-500 cursor-pointer">
-                                            <option value="EGP">EGP</option><option value="USD">USD</option>
-                                        </select>
-                                        <input type="number" step="0.01" name="amount" placeholder="Amt" required class="w-20 bg-black border border-gray-700 text-white px-2 py-1.5 rounded text-xs outline-none focus:border-yellow-500">
-                                        <select name="action" class="bg-black border border-gray-700 text-white rounded text-xs outline-none focus:border-yellow-500 cursor-pointer">
-                                            <option value="add">Add (+)</option><option value="set">Set (=)</option>
-                                        </select>
-                                        <button type="submit" class="bg-gray-800 text-yellow-500 px-3 py-1.5 rounded hover:bg-yellow-500 hover:text-black font-bold transition">Execute</button>
-                                    </form>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+            {% for cat in categories %}
+            <div id="cat-{{ cat._id }}" class="mb-16 scroll-mt-20 fade-in">
+                <h2 class="text-2xl font-black text-white mb-6 flex items-center gap-3 border-b border-gray-800 pb-2"><i class="fas {{ cat.icon }} text-szcyan"></i> {{ cat.name }}</h2>
+                <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                    {% for p in cat.products %}
+                    <div class="uc-card bg-panelbg border border-gray-800 rounded-2xl p-5 flex flex-col items-center text-center relative overflow-hidden">
+                        <div class="absolute top-3 right-3 bg-{{ 'szgreen/20 text-szgreen' if stock.get(p.stock_key, 0) > 0 else 'red-900/50 text-red-400' }} text-[10px] font-bold px-2 py-1 rounded border">
+                            {{ 'INSTANT' if stock.get(p.stock_key, 0) > 0 else 'OUT OF STOCK' }}
+                        </div>
+                        <div class="w-20 h-20 mb-4 rounded-full bg-szcyan/10 flex items-center justify-center floating text-szcyan text-3xl"><i class="fas {{ cat.icon }}"></i></div>
+                        <h3 class="text-lg md:text-xl font-black text-white">{{ p.name }}</h3>
+                        <div class="mt-2 mb-6 bg-black w-full py-2 rounded-lg border border-gray-800">
+                            <div class="price-display egp-price text-xl font-black text-yellow-500">{{ p.price_egp }} <span class="text-[10px] text-gray-500 uppercase">EGP</span></div>
+                            <div class="price-display usd-price hidden text-xl font-black text-szcyan">{{ p.price_usd }} <span class="text-[10px] text-gray-500 uppercase">USD</span></div>
+                        </div>
+                        <button onclick="buyProduct('{{ p.stock_key }}', {{ p.price_egp }}, {{ p.price_usd }}, '{{ p.name }}', '{{ cat.icon }}')" {{ 'disabled' if stock.get(p.stock_key, 0) == 0 }} class="w-full bg-{{ 'szgreen text-black' if stock.get(p.stock_key, 0) > 0 else 'gray-900 text-gray-600' }} font-bold py-2.5 rounded-xl btn-glow uppercase text-sm">
+                            {{ 'Buy Now' if stock.get(p.stock_key, 0) > 0 else 'Unavailable' }}
+                        </button>
+                    </div>
+                    {% endfor %}
                 </div>
             </div>
+            {% endfor %}
         </div>
 
-        <div id="tab-orders" class="tab-content hidden fade-in">
-            <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden h-[750px] flex flex-col">
-                <div class="p-5 border-b border-gray-800 flex justify-between items-center bg-[#111]">
-                    <h3 class="font-bold text-white uppercase text-sm"><i class="fas fa-list text-szgreen mr-2"></i> Store Sales Log</h3>
-                    <input type="text" id="order-search" onkeyup="filterOrders()" placeholder="Search Order ID, Name or Email..." class="bg-[#050505] border border-gray-700 text-white px-3 py-1.5 rounded-lg text-sm outline-none focus:border-szgreen w-64 transition">
-                </div>
-                <div class="overflow-y-auto flex-1 p-2">
-                    <table class="w-full text-left text-sm whitespace-nowrap" id="orders-table">
-                        <thead class="bg-[#151515] text-gray-500 uppercase text-[10px] sticky top-0 z-10">
-                            <tr><th class="px-5 py-3">Order ID</th><th class="px-5 py-3">Date</th><th class="px-5 py-3">Customer Info</th><th class="px-5 py-3">Item</th><th class="px-5 py-3">Amount Paid</th><th class="px-5 py-3">Delivered Code</th></tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-900">
-                            {% for o in store_orders %}
-                            <tr class="hover:bg-gray-900/50 transition order-row">
-                                <td class="px-5 py-3 font-mono text-szcyan font-bold order-id">#{{ o._id }}</td>
-                                <td class="px-5 py-3 text-xs text-gray-500">{{ o.date }}</td>
-                                <td class="px-5 py-3"><div class="font-bold text-white order-name">{{ o.name }}</div><div class="text-[10px] text-gray-500 order-email">{{ o.email }}</div></td>
-                                <td class="px-5 py-3"><span class="bg-gray-800 text-white px-2 py-1 rounded text-xs font-bold border border-gray-700">{{ o.category }}</span></td>
-                                <td class="px-5 py-3 font-bold text-yellow-500">{{ o.price }} <span class="text-[10px]">{{ o.currency|default('EGP') }}</span></td>
-                                <td class="px-5 py-3"><div class="bg-black text-szgreen font-mono px-3 py-1 rounded border border-gray-800 text-xs inline-block cursor-pointer hover:bg-gray-800 transition" onclick="copyText('{{ o.code }}')" title="Click to copy">{{ o.code }}</div></td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
+        <footer class="border-t border-gray-800 bg-[#0a0a0a] py-8 text-center"><p class="text-gray-500 text-sm font-bold">© 2026 Saleh Zone. All rights reserved.</p></footer>
+        <button id="scrollToTopBtn" class="fixed bottom-6 right-6 bg-szcyan text-black w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold transition-all duration-300 opacity-0 btn-glow"><i class="fas fa-arrow-up"></i></button>
     </main>
 
     <script>
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-            document.getElementById('tab-' + tabId).classList.remove('hidden');
+        // دمج الدوال الجديدة مع المحرك المركزي Core
+        const savedTheme = localStorage.getItem('sz_theme') || 'default';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+
+        function setTheme(t) { document.documentElement.setAttribute('data-theme', t); localStorage.setItem('sz_theme', t); Core.closeModal('theme-drop'); }
+        function openModal(id) { Core.openModal(id); }
+        function closeModal(id) { Core.closeModal(id); }
+        function toggleSidebar() { document.getElementById('sz-sidebar').classList.toggle('-translate-x-full'); document.getElementById('sidebar-backdrop').classList.toggle('hidden'); }
+        function toggleSidebarMobile() { if(window.innerWidth < 768) toggleSidebar(); }
+
+        // تهيئة المتجر عند التحميل
+        document.addEventListener("DOMContentLoaded", () => {
+            const email = localStorage.getItem('store_email');
+            if(email) updateUI(localStorage.getItem('store_name'), localStorage.getItem('bal_egp'), localStorage.getItem('bal_usd'));
             
-            document.querySelectorAll('.nav-btn').forEach(el => { 
-                el.classList.remove('nav-active'); 
-                el.classList.add('nav-inactive'); 
-            });
-            document.getElementById('btn-' + tabId).classList.remove('nav-inactive');
-            document.getElementById('btn-' + tabId).classList.add('nav-active');
-            
-            const sidebar = document.getElementById('sz-sidebar');
-            if(window.innerWidth < 768 && !sidebar.classList.contains('-translate-x-full')) toggleSidebar();
-        }
+            // تفعيل زر الصعود
+            const mainScroll = document.getElementById('main-scroll');
+            mainScroll.onscroll = () => {
+                const btn = document.getElementById('scrollToTopBtn');
+                if (mainScroll.scrollTop > 300) btn.classList.replace('opacity-0', 'opacity-100');
+                else btn.classList.replace('opacity-100', 'opacity-0');
+            };
+            document.getElementById('scrollToTopBtn').onclick = () => mainScroll.scrollTo({top: 0, behavior: 'smooth'});
+        });
 
-        function toggleSidebar() {
-            document.getElementById('sz-sidebar').classList.toggle('-translate-x-full');
-            document.getElementById('sidebar-backdrop').classList.toggle('hidden');
-        }
-
-        function showToast(msg, type='success') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = `toast ${type === 'error' ? 'error' : ''}`;
-            toast.innerHTML = `<i class="fas ${type === 'error' ? 'fa-times-circle text-red-500' : 'fa-check-circle text-eab308'} text-xl"></i> <span>${msg}</span>`;
-            container.appendChild(toast);
-            setTimeout(() => { toast.remove(); }, 3000);
-        }
-
-        async function submitAjax(e, url) {
-            e.preventDefault();
-            const form = e.target;
-            const btn = form.querySelector('button[type="submit"]');
-            const originalHtml = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            btn.disabled = true;
-
-            const fd = new FormData(form);
-            try {
-                const res = await fetch(url, {method: 'POST', body: fd});
-                const data = await res.json();
-                if(data.success) {
-                    showToast(data.msg, 'success');
-                    setTimeout(() => { location.reload(); }, 800);
-                } else {
-                    showToast(data.msg || "Error processing request", 'error');
-                    btn.innerHTML = originalHtml; btn.disabled = false;
-                }
-            } catch(err) {
-                showToast("Connection error!", 'error');
-                btn.innerHTML = originalHtml; btn.disabled = false;
-            }
-        }
-
-        function filterCustomers() {
-            const query = document.getElementById('customer-search').value.toLowerCase();
-            document.querySelectorAll('.customer-row').forEach(row => {
-                const name = row.querySelector('.customer-name').innerText.toLowerCase();
-                const username = row.querySelector('.customer-username').innerText.toLowerCase();
-                const email = row.querySelector('.customer-email').innerText.toLowerCase();
-                if(name.includes(query) || username.includes(query) || email.includes(query)) row.style.display = '';
-                else row.style.display = 'none';
-            });
-        }
-
-        function filterOrders() {
-            const query = document.getElementById('order-search').value.toLowerCase();
-            document.querySelectorAll('.order-row').forEach(row => {
-                const id = row.querySelector('.order-id').innerText.toLowerCase();
-                const name = row.querySelector('.order-name').innerText.toLowerCase();
-                const email = row.querySelector('.order-email').innerText.toLowerCase();
-                if(id.includes(query) || name.includes(query) || email.includes(query)) row.style.display = '';
-                else row.style.display = 'none';
-            });
-        }
-
-        function copyText(text) {
-            navigator.clipboard.writeText(text);
-            showToast("Code copied to clipboard!", 'success');
-        }
+        // (باقي دوال تسجيل الدخول والشراء مشابهة للسابق ولكن باستخدام Core.showToast و Core.switchTab)
+        // ... سأقوم بإرسال دوال الـ JavaScript المحدثة بالكامل في الخطوة التالية لضمان عدم القص ...
     </script>
+    {% endif %}
 </body>
 </html>
