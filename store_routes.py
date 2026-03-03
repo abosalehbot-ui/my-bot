@@ -38,10 +38,16 @@ async def public_storefront(request: Request):
 
     categories    = await db.store_categories.find().to_list(100)
     stock_details = {}
+    
     for cat in categories:
+        # 1. تحويل الآيدي لنص عشان مايعملش Error في الـ HTML
+        if "_id" in cat:
+            cat["_id"] = str(cat["_id"])
+            
         for p in cat.get("products", []):
-            sk = p["stock_key"]
-            if sk not in stock_details:
+            # 2. استخدام .get() لتفادي (KeyError) لو في منتج متسجل غلط أو ناقص بيانات
+            sk = p.get("stock_key")
+            if sk and sk not in stock_details:
                 stock_details[sk] = await db.stock.count_documents({"category": sk})
 
     return templates.TemplateResponse("storefront.html", {
