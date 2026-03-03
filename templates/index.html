@@ -375,6 +375,35 @@
         </div>
     </div>
 
+    <div id="stock-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-panelbg border border-gray-800 w-full max-w-lg rounded-xl shadow-2xl flex flex-col max-h-[80vh] fade-in">
+            <div class="p-4 border-b border-gray-800 flex justify-between items-center"><h3 class="font-bold text-white" id="modal-title">Category Codes</h3><button onclick="closeModal('stock-modal')" class="text-gray-500 hover:text-red-500"><i class="fas fa-times text-xl"></i></button></div>
+            <div class="p-4 flex-1 overflow-hidden flex flex-col"><textarea id="modal-codes-list" class="w-full flex-1 bg-[#0a0a0a] border border-gray-800 text-szgreen p-3 rounded-lg focus:outline-none font-mono text-xs" readonly></textarea></div>
+            <div class="p-4 border-t border-gray-800 flex justify-end"><button onclick="copyModalCodes('modal-codes-list')" class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-szcyan hover:text-black font-bold"><i class="fas fa-copy mr-2"></i>Copy All</button></div>
+        </div>
+    </div>
+
+    <div id="shared-tokens-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-panelbg border border-gray-800 w-full max-w-lg rounded-xl shadow-2xl flex flex-col max-h-[80vh] fade-in">
+            <div class="p-4 border-b border-gray-800 flex justify-between items-center"><h3 class="font-bold text-white"><i class="fas fa-users mr-2 text-szcyan"></i>Shared Tokens Pool</h3><button onclick="closeModal('shared-tokens-modal')" class="text-gray-500 hover:text-red-500"><i class="fas fa-times text-xl"></i></button></div>
+            <div class="p-4 flex-1 overflow-hidden flex flex-col"><textarea id="modal-shared-tokens-list" class="w-full flex-1 bg-[#0a0a0a] border border-gray-800 text-szcyan p-3 rounded-lg focus:outline-none font-mono text-xs" readonly></textarea></div>
+            <div class="p-4 border-t border-gray-800 flex justify-end"><button onclick="copyModalCodes('modal-shared-tokens-list')" class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-szcyan hover:text-black font-bold"><i class="fas fa-copy mr-2"></i>Copy All</button></div>
+        </div>
+    </div>
+
+    <div id="report-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-panelbg border border-gray-800 w-full max-w-md rounded-xl shadow-2xl overflow-hidden fade-in">
+            <div class="p-6 text-center border-b border-gray-800"><div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-szgreen/20 text-szgreen mb-4"><i class="fas fa-check-circle text-3xl"></i></div><h3 class="text-xl font-bold text-white">Upload Complete</h3></div>
+            <div class="p-6 space-y-4">
+                <div class="flex justify-between text-sm"><span class="text-gray-400">Total Processed:</span> <span class="font-bold text-white" id="rep-total">0</span></div>
+                <div class="flex justify-between text-sm"><span class="text-gray-400">Successfully Added:</span> <span class="font-bold text-szgreen" id="rep-added">0</span></div>
+                <div class="flex justify-between text-sm"><span class="text-gray-400">Duplicates Rejected:</span> <span class="font-bold text-red-500" id="rep-dupes">0</span></div>
+                <div id="dupes-container" class="hidden mt-4 pt-4 border-t border-gray-800"><p class="text-xs text-red-400 mb-2">Rejected Codes:</p><textarea id="rep-dupes-list" class="w-full h-24 bg-[#0a0a0a] border border-red-900/50 text-red-500 p-2 rounded-lg text-xs font-mono" readonly></textarea></div>
+            </div>
+            <div class="p-4 bg-gray-900/50 text-center"><button onclick="closeReportModal()" class="bg-szgreen text-black font-bold px-8 py-2 rounded-lg transition hover:opacity-90">Done</button></div>
+        </div>
+    </div>
+
     <script>
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
@@ -385,7 +414,7 @@
         }
 
         document.addEventListener("DOMContentLoaded", () => {
-            const urlParams = new URLSearchParams(window.location.search);
+            const urlParams = newSearchParams(window.location.search);
             switchTab(urlParams.get('tab') || 'overview');
             if(document.querySelector("#stockChart")) renderStockChart();
         });
@@ -416,6 +445,72 @@
         }
 
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        function copyModalCodes(elementId) {
+            const copyText = document.getElementById(elementId);
+            copyText.select(); document.execCommand("copy");
+            showToast("Copied successfully!");
+        }
+
+        async function openStockModal(cat) {
+            document.getElementById('stock-modal').classList.remove('hidden');
+            document.getElementById('modal-title').innerText = cat + " Current Stock";
+            document.getElementById('modal-codes-list').value = "Loading...";
+            const res = await fetch('/api/view_stock/' + cat);
+            const data = await res.json();
+            document.getElementById('modal-codes-list').value = data.codes.length > 0 ? data.codes.join('\n') : "Empty stock.";
+        }
+
+        async function openSharedTokensModal() {
+            document.getElementById('shared-tokens-modal').classList.remove('hidden');
+            document.getElementById('modal-shared-tokens-list').value = "Loading...";
+            const res = await fetch('/api/view_shared_tokens');
+            const data = await res.json();
+            document.getElementById('modal-shared-tokens-list').value = data.tokens.length > 0 ? data.tokens.join('\n') : "Empty.";
+        }
+
+        async function toggleMaintenance() { await fetch('/api/toggle_maintenance', {method: 'POST'}); location.reload(); }
+
+        async function performSearch() {
+            const query = document.getElementById('search-input').value;
+            if(!query) return;
+            const resBox = document.getElementById('search-result');
+            resBox.classList.remove('hidden'); resBox.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Searching...';
+            const fd = new FormData(); fd.append("query", query);
+            const res = await fetch('/api/search', {method: 'POST', body: fd});
+            const data = await res.json();
+            resBox.innerText = data.result;
+        }
+
+        async function submitSmartStock(e) {
+            e.preventDefault();
+            const btn = document.getElementById('smart-btn');
+            const cat = document.getElementById('smart-cat').value;
+            const codes = document.getElementById('smart-codes').value;
+            if(!codes.trim()) return alert("Please enter codes!");
+            
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scan'; btn.disabled = true;
+            const fd = new FormData(); fd.append("category", cat); fd.append("codes", codes);
+
+            try {
+                const res = await fetch('/api/add_stock_smart', {method: 'POST', body: fd});
+                const data = await res.json();
+                document.getElementById('rep-total').innerText = data.total;
+                document.getElementById('rep-added').innerText = data.added;
+                document.getElementById('rep-dupes').innerText = data.dupes;
+                
+                if(data.dupes > 0) {
+                    document.getElementById('dupes-container').classList.remove('hidden');
+                    document.getElementById('rep-dupes-list').value = data.dupes_list.join('\n');
+                } else { document.getElementById('dupes-container').classList.add('hidden'); }
+                
+                document.getElementById('report-modal').classList.remove('hidden');
+                document.getElementById('smart-codes').value = ""; 
+            } catch(err) { showToast("Error connecting.", "error"); }
+            btn.innerHTML = '<span>Scan & Add Codes</span> <i class="fas fa-upload"></i>'; btn.disabled = false;
+        }
+
+        function closeReportModal() { closeModal('report-modal'); location.reload(); }
 
         function editCategory(id, name, icon, image) {
             document.getElementById('edit-cat-id').value = id; 
