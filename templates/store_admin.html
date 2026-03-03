@@ -6,6 +6,7 @@
     <title>Store CRM - Saleh Zone</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <script>tailwind.config={theme:{extend:{colors:{szgreen:'#7dfc89',szcyan:'#5eead4',darkbg:'#050505',panelbg:'#111'}}}}</script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
@@ -15,7 +16,7 @@
         .text-gradient-animate { background-size: 200% 200%; animation: gradientX 3s ease infinite; }
         @keyframes gradientX { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
         
-        /* كلاسات القائمة الجانبية (Flowbite Themed - لون أصفر لتمييز ה- CRM) */
+        /* كلاسات القائمة الجانبية (الثيم الذهبي) */
         .nav-btn { width: 100%; display: flex; align-items: center; transition: all 0.2s; font-weight: bold; }
         .nav-inactive { color: #9ca3af; }
         .nav-inactive:hover { background-color: #111827; color: #ffffff; }
@@ -28,6 +29,11 @@
         .toast.error { border-left-color: #ef4444; }
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes fadeOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+
+        /* ستايلات أزرار الترقيم (Pagination) */
+        .pagination-btn { background-color: #111; border: 1px solid #1f2937; color: #9ca3af; padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+        .pagination-btn:hover:not(:disabled) { background-color: #eab308; color: #000; }
+        .pagination-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     </style>
 </head>
 <body class="selection:bg-yellow-500 selection:text-black flex h-screen">
@@ -80,22 +86,22 @@
         </div>
     </aside>
 
-    <main class="flex-1 p-8 overflow-y-auto bg-[#0a0a0a] relative">
+    <main class="flex-1 p-4 md:p-8 overflow-y-auto bg-[#0a0a0a] relative">
         <header class="h-16 bg-panelbg border-b border-gray-900 flex items-center justify-between px-6 md:hidden absolute top-0 left-0 w-full z-20 shadow-md">
             <button onclick="toggleSidebar()" class="text-gray-400 hover:text-white"><i class="fas fa-bars text-xl"></i></button>
             <span class="text-lg font-black tracking-wider text-yellow-500 text-gradient-animate">STORE CRM</span>
             <div class="w-6"></div>
         </header>
 
-        <div class="flex justify-between items-end mb-8 mt-12 md:mt-0 fade-in">
+        <div class="flex justify-between items-end mb-8 mt-16 md:mt-0 fade-in">
             <div><h2 class="text-3xl font-black text-white">Client Management</h2><p class="text-sm text-gray-500 mt-1">Multi-currency wallet and customer CRM.</p></div>
         </div>
 
         <div id="tab-customers" class="tab-content block fade-in">
-            <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden flex flex-col h-[750px]">
-                <div class="p-4 border-b border-gray-800 bg-[#111] flex justify-between items-center">
+            <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden flex flex-col h-[750px] shadow-2xl">
+                <div class="p-4 border-b border-gray-800 bg-[#111] flex flex-col sm:flex-row gap-4 sm:justify-between sm:items-center">
                     <h3 class="font-bold text-white uppercase text-sm"><i class="fas fa-wallet text-yellow-500 mr-2"></i> User Wallets</h3>
-                    <input type="text" id="customer-search" onkeyup="filterCustomers()" placeholder="Search Name, Username or Email..." class="bg-[#050505] border border-gray-700 text-white px-3 py-1.5 rounded-lg text-sm outline-none focus:border-yellow-500 w-64 transition">
+                    <input type="text" id="customer-search" onkeyup="filterCustomers()" placeholder="Search Name, Username or Email..." class="bg-[#050505] border border-gray-700 text-white px-4 py-2 rounded-lg text-sm outline-none focus:border-yellow-500 w-full sm:w-72 transition">
                 </div>
                 <div class="overflow-y-auto flex-1 p-2">
                     <table class="w-full text-left text-sm whitespace-nowrap" id="customers-table">
@@ -134,29 +140,48 @@
         </div>
 
         <div id="tab-orders" class="tab-content hidden fade-in">
-            <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden h-[750px] flex flex-col">
-                <div class="p-5 border-b border-gray-800 flex justify-between items-center bg-[#111]">
-                    <h3 class="font-bold text-white uppercase text-sm"><i class="fas fa-list text-szgreen mr-2"></i> Store Sales Log</h3>
-                    <input type="text" id="order-search" onkeyup="filterOrders()" placeholder="Search Order ID, Name or Email..." class="bg-[#050505] border border-gray-700 text-white px-3 py-1.5 rounded-lg text-sm outline-none focus:border-szgreen w-64 transition">
+            
+            <div class="bg-panelbg border border-gray-800 rounded-xl p-6 shadow-2xl mb-6 relative overflow-hidden">
+                <div class="flex items-center justify-between mb-4 relative z-10">
+                    <h3 class="font-bold text-white uppercase text-sm"><i class="fas fa-chart-area text-yellow-500 mr-2"></i> Revenue Overview</h3>
+                    <span class="bg-yellow-500/10 text-yellow-500 text-[10px] font-bold px-2 py-1 rounded border border-yellow-500/20">Live Sync</span>
                 </div>
-                <div class="overflow-y-auto flex-1 p-2">
-                    <table class="w-full text-left text-sm whitespace-nowrap" id="orders-table">
-                        <thead class="bg-[#151515] text-gray-500 uppercase text-[10px] sticky top-0 z-10">
-                            <tr><th class="px-5 py-3">Order ID</th><th class="px-5 py-3">Date</th><th class="px-5 py-3">Customer Info</th><th class="px-5 py-3">Item</th><th class="px-5 py-3">Amount Paid</th><th class="px-5 py-3">Delivered Code</th></tr>
+                <div id="salesChart" class="w-full h-64 relative z-10"></div>
+                <div class="absolute -bottom-20 left-1/2 transform -translate-x-1/2 w-96 h-32 bg-yellow-500/10 rounded-full blur-[60px] pointer-events-none"></div>
+            </div>
+
+            <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden flex flex-col shadow-2xl">
+                <div class="p-5 border-b border-gray-800 flex flex-col sm:flex-row sm:justify-between sm:items-center bg-[#111] gap-4">
+                    <h3 class="font-bold text-white uppercase text-sm"><i class="fas fa-list text-szgreen mr-2"></i> Store Sales Log</h3>
+                    <input type="text" id="order-search" onkeyup="filterOrders()" placeholder="Search Order ID, Name or Email..." class="bg-[#050505] border border-gray-700 text-white px-4 py-2 rounded-lg text-sm outline-none focus:border-szgreen w-full sm:w-72 transition">
+                </div>
+                
+                <div class="overflow-x-auto p-2">
+                    <table class="w-full text-left text-sm whitespace-nowrap">
+                        <thead class="bg-[#151515] text-gray-500 uppercase text-[10px]">
+                            <tr><th class="px-5 py-3">Order ID</th><th class="px-5 py-3">Date</th><th class="px-5 py-3">Customer Info</th><th class="px-5 py-3">Item</th><th class="px-5 py-3">Amount Paid</th><th class="px-5 py-3">Code</th></tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-900">
+                        <tbody id="orders-tbody" class="divide-y divide-gray-900">
                             {% for o in store_orders %}
                             <tr class="hover:bg-gray-900/50 transition order-row">
-                                <td class="px-5 py-3 font-mono text-szcyan font-bold order-id">#{{ o._id }}</td>
-                                <td class="px-5 py-3 text-xs text-gray-500">{{ o.date }}</td>
-                                <td class="px-5 py-3"><div class="font-bold text-white order-name">{{ o.name }}</div><div class="text-[10px] text-gray-500 order-email">{{ o.email }}</div></td>
-                                <td class="px-5 py-3"><span class="bg-gray-800 text-white px-2 py-1 rounded text-xs font-bold border border-gray-700">{{ o.category }}</span></td>
-                                <td class="px-5 py-3 font-bold text-yellow-500">{{ o.price }} <span class="text-[10px]">{{ o.currency|default('EGP') }}</span></td>
-                                <td class="px-5 py-3"><div class="bg-black text-szgreen font-mono px-3 py-1 rounded border border-gray-800 text-xs inline-block cursor-pointer hover:bg-gray-800 transition" onclick="copyText('{{ o.code }}')" title="Click to copy">{{ o.code }}</div></td>
+                                <td class="px-5 py-4 font-mono text-szcyan font-bold order-id">#{{ o._id }}</td>
+                                <td class="px-5 py-4 text-xs text-gray-500">{{ o.date }}</td>
+                                <td class="px-5 py-4"><div class="font-bold text-white order-name">{{ o.name }}</div><div class="text-[10px] text-gray-500 order-email">{{ o.email }}</div></td>
+                                <td class="px-5 py-4"><span class="bg-gray-800 text-white px-2 py-1 rounded text-xs font-bold border border-gray-700">{{ o.category }}</span></td>
+                                <td class="px-5 py-4 font-bold text-yellow-500 order-price" data-currency="{{ o.currency|default('EGP') }}">{{ o.price }} <span class="text-[10px]">{{ o.currency|default('EGP') }}</span></td>
+                                <td class="px-5 py-4"><button onclick="copyText('{{ o.code }}')" class="bg-black text-szgreen font-mono px-3 py-1.5 rounded-lg border border-gray-700 text-xs hover:bg-gray-800 hover:border-szgreen transition" title="Click to copy"><i class="fas fa-copy mr-1"></i> Copy</button></td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
+                </div>
+
+                <div class="p-4 border-t border-gray-800 bg-[#111] flex items-center justify-between">
+                    <span class="text-xs text-gray-500 font-bold" id="page-info">Showing 1 to 10 of 0 entries</span>
+                    <div class="flex gap-2">
+                        <button onclick="prevPage()" id="btn-prev" class="pagination-btn"><i class="fas fa-chevron-left"></i></button>
+                        <button onclick="nextPage()" id="btn-next" class="pagination-btn"><i class="fas fa-chevron-right"></i></button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -164,6 +189,7 @@
     </main>
 
     <script>
+        // ================ التبديل بين الشاشات ================
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.getElementById('tab-' + tabId).classList.remove('hidden');
@@ -177,6 +203,12 @@
             
             const sidebar = document.getElementById('sz-sidebar');
             if(window.innerWidth < 768 && !sidebar.classList.contains('-translate-x-full')) toggleSidebar();
+
+            // رسم التشارت لو فتحنا صفحة الطلبات لأول مرة
+            if(tabId === 'orders' && !window.chartRendered) {
+                renderSalesChart();
+                window.chartRendered = true;
+            }
         }
 
         function toggleSidebar() {
@@ -193,6 +225,7 @@
             setTimeout(() => { toast.remove(); }, 3000);
         }
 
+        // ================ البحث وإدارة العملاء ================
         async function submitAjax(e, url) {
             e.preventDefault();
             const form = e.target;
@@ -229,20 +262,116 @@
             });
         }
 
-        function filterOrders() {
-            const query = document.getElementById('order-search').value.toLowerCase();
-            document.querySelectorAll('.order-row').forEach(row => {
-                const id = row.querySelector('.order-id').innerText.toLowerCase();
-                const name = row.querySelector('.order-name').innerText.toLowerCase();
-                const email = row.querySelector('.order-email').innerText.toLowerCase();
-                if(id.includes(query) || name.includes(query) || email.includes(query)) row.style.display = '';
-                else row.style.display = 'none';
-            });
-        }
-
         function copyText(text) {
             navigator.clipboard.writeText(text);
             showToast("Code copied to clipboard!", 'success');
+        }
+
+        // ================ نظام الترقيم (Pagination) ================
+        let currentPage = 1;
+        const rowsPerPage = 10;
+        let allOrderRows = [];
+        let filteredOrderRows = [];
+
+        document.addEventListener("DOMContentLoaded", () => {
+            allOrderRows = Array.from(document.querySelectorAll('.order-row'));
+            filteredOrderRows = [...allOrderRows];
+            updatePagination();
+        });
+
+        function filterOrders() {
+            const query = document.getElementById('order-search').value.toLowerCase();
+            filteredOrderRows = allOrderRows.filter(row => {
+                const id = row.querySelector('.order-id').innerText.toLowerCase();
+                const name = row.querySelector('.order-name').innerText.toLowerCase();
+                const email = row.querySelector('.order-email').innerText.toLowerCase();
+                return (id.includes(query) || name.includes(query) || email.includes(query));
+            });
+            currentPage = 1;
+            updatePagination();
+        }
+
+        function updatePagination() {
+            const totalRows = filteredOrderRows.length;
+            const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
+            
+            // إخفاء كل الصفوف أولاً
+            allOrderRows.forEach(row => row.style.display = 'none');
+            
+            // إظهار صفوف الصفحة الحالية فقط
+            const start = (currentPage - 1) * rowsPerPage;
+            const end = start + rowsPerPage;
+            filteredOrderRows.slice(start, end).forEach(row => row.style.display = '');
+
+            // تحديث النصوص والأزرار
+            document.getElementById('page-info').innerText = `Showing ${totalRows === 0 ? 0 : start + 1} to ${Math.min(end, totalRows)} of ${totalRows} entries`;
+            document.getElementById('btn-prev').disabled = currentPage === 1;
+            document.getElementById('btn-next').disabled = currentPage === totalPages;
+        }
+
+        function prevPage() { if (currentPage > 1) { currentPage--; updatePagination(); } }
+        function nextPage() { const totalPages = Math.ceil(filteredOrderRows.length / rowsPerPage); if (currentPage < totalPages) { currentPage++; updatePagination(); } }
+
+        // ================ الرسم البياني (ApexCharts - Area Chart) ================
+        function renderSalesChart() {
+            // استخراج آخر 10 مبيعات من الجدول لرسم المنحنى
+            let prices = [];
+            let categories = [];
+            
+            // هناخد أول 15 طلب (الأحدث) عشان نعمل بيهم الشكل
+            const recentOrders = allOrderRows.slice(0, 15).reverse();
+            
+            if(recentOrders.length === 0) {
+                document.getElementById('salesChart').innerHTML = "<p class='text-gray-500 text-center mt-20 font-bold'>No sales data to display.</p>";
+                return;
+            }
+
+            recentOrders.forEach((row, index) => {
+                const priceText = row.querySelector('.order-price').innerText;
+                const val = parseFloat(priceText.replace(/[^0-9.]/g, ''));
+                prices.push(val || 0);
+                categories.push(`Order ${index + 1}`);
+            });
+
+            var options = {
+                series: [{ name: 'Revenue', data: prices }],
+                chart: { 
+                    type: 'area', 
+                    height: 250, 
+                    toolbar: { show: false }, 
+                    foreColor: '#9ca3af', 
+                    fontFamily: 'Cairo, sans-serif',
+                    background: 'transparent'
+                },
+                colors: ['#eab308'], // اللون الذهبي
+                fill: { 
+                    type: 'gradient', 
+                    gradient: { shadeIntensity: 1, opacityFrom: 0.5, opacityTo: 0.05, stops: [0, 90, 100] } 
+                },
+                dataLabels: { enabled: false },
+                stroke: { curve: 'smooth', width: 3 },
+                xaxis: { 
+                    categories: categories, 
+                    labels: { show: false }, // إخفاء الأسماء عشان الزحمة
+                    axisBorder: { show: false }, 
+                    axisTicks: { show: false } 
+                },
+                yaxis: { show: false }, // إخفاء أرقام المحور الصادي للشياكة
+                grid: { 
+                    borderColor: '#1f2937', 
+                    strokeDashArray: 4, 
+                    yaxis: { lines: { show: true } },
+                    xaxis: { lines: { show: false } }
+                },
+                theme: { mode: 'dark' },
+                tooltip: {
+                    theme: 'dark',
+                    y: { formatter: function (val) { return val + " EGP/USD" } }
+                }
+            };
+
+            var chart = new ApexCharts(document.querySelector("#salesChart"), options);
+            chart.render();
         }
     </script>
 </body>
