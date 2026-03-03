@@ -642,25 +642,65 @@
                 </div>
 
                 <div id="tab-settings" class="prof-tab-panel absolute inset-0 overflow-y-auto p-5 hidden">
-                    <div class="max-w-xl space-y-6">
-                        <div class="bg-black border border-gray-800 rounded-xl p-6">
-                            <h4 class="text-sm text-white font-bold mb-4"><i
-                                    class="fas fa-id-badge text-szcyan mr-2"></i> Update Personal Info</h4>
-                            <form onsubmit="doUpdateProfile(event)" class="space-y-4">
-                                <div><label class="text-xs text-gray-500 mb-1 block">Display Name</label><input
-                                        type="text" id="edit-name" required
-                                        class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-szcyan">
-                                </div>
-                                <div><label class="text-xs text-gray-500 mb-1 block">Avatar (File)</label><input
-                                        type="file" accept="image/*" id="edit-avatar"
-                                        class="w-full bg-[#050505] border border-gray-800 text-white p-2 rounded-lg outline-none focus:border-szcyan text-sm">
-                                </div>
-                                <button type="submit"
-                                    class="bg-szcyan text-black px-6 py-2.5 rounded-lg font-bold text-sm btn-glow">Save
-                                    Changes</button>
-                            </form>
+    <div class="max-w-xl space-y-6">
+        
+        <div class="bg-black border border-gray-800 rounded-xl p-6">
+            <h4 class="text-sm text-white font-bold mb-4"><i class="fas fa-id-badge text-szcyan mr-2"></i> Update Personal Info</h4>
+            <form onsubmit="doUpdateProfile(event)" class="space-y-4">
+                <div class="flex items-center gap-4 mb-4">
+                    <div class="relative w-16 h-16 rounded-full border-2 border-gray-800 overflow-hidden bg-gray-900 flex items-center justify-center shrink-0 group">
+                        <img id="edit-avatar-preview" src="" class="w-full h-full object-cover hidden">
+                        <i id="edit-avatar-icon" class="fas fa-camera text-xl text-gray-500 group-hover:text-szgreen transition"></i>
+                        <div class="absolute inset-0 bg-black/60 hidden group-hover:flex items-center justify-center cursor-pointer" onclick="document.getElementById('edit-avatar').click()">
+                            <i class="fas fa-upload text-white"></i>
                         </div>
+                    </div>
+                    <div class="flex-1">
+                        <label class="text-xs text-gray-500 block mb-1">Profile Picture</label>
+                        <input type="file" accept="image/*" id="edit-avatar" class="hidden" onchange="previewAvatar(this)">
+                        <button type="button" onclick="document.getElementById('edit-avatar').click()" class="bg-gray-900 text-white px-4 py-2 rounded-lg text-xs font-bold border border-gray-700 hover:border-szcyan transition">Choose New Image</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500 mb-1 block">Display Name</label>
+                    <input type="text" id="edit-name" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-szcyan text-sm">
+                </div>
+                <button type="submit" class="bg-szcyan text-black px-6 py-2.5 rounded-lg font-bold text-sm btn-glow">Save Changes</button>
+            </form>
+        </div>
 
+        <div class="bg-black border border-gray-800 rounded-xl p-6">
+            <h4 class="text-sm text-white font-bold mb-4"><i class="fas fa-lock text-szcyan mr-2"></i> Change Password</h4>
+            <form onsubmit="doChangePassword(event)" class="space-y-4">
+                <div>
+                    <input type="password" id="edit-old-pass" required placeholder="Current Password" class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-szcyan text-sm">
+                </div>
+                <div>
+                    <input type="password" id="edit-new-pass" required minlength="8" placeholder="New Password (Min 8 chars)" class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-szcyan text-sm">
+                </div>
+                <button type="submit" class="bg-gray-900 text-white hover:bg-white hover:text-black px-6 py-2.5 rounded-lg font-bold text-sm transition border border-gray-800">Update Password</button>
+            </form>
+        </div>
+
+        <div class="bg-black border border-gray-800 rounded-xl p-6">
+            <h4 class="text-sm text-white font-bold mb-4"><i class="fas fa-envelope text-szcyan mr-2"></i> Change Email Address</h4>
+            <form onsubmit="doChangeEmailRequest(event)" class="space-y-4" id="email-change-form">
+                <div>
+                    <label class="text-[10px] text-gray-500 uppercase mb-1 block">New Email Address</label>
+                    <input type="email" id="edit-new-email" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-szcyan text-sm">
+                </div>
+                <button type="submit" class="bg-gray-900 text-white hover:bg-white hover:text-black px-6 py-2.5 rounded-lg font-bold text-sm transition border border-gray-800">Send Verification Code</button>
+            </form>
+            <form onsubmit="doChangeEmailVerify(event)" class="space-y-4 hidden mt-4 pt-4 border-t border-gray-800" id="email-verify-form">
+                <p class="text-xs text-gray-400 mb-2">We sent a 6-digit code to your new email.</p>
+                <div>
+                    <input type="text" id="edit-email-code" required maxlength="6" placeholder="Enter Code" class="w-full bg-[#050505] border border-gray-800 text-szgreen text-center tracking-[0.5em] font-black p-3 rounded-lg outline-none focus:border-szgreen text-xl">
+                </div>
+                <button type="submit" id="btn-verify-email" onclick="doChangeEmailVerify(event)" class="w-full bg-szgreen text-black py-2.5 rounded-lg font-bold uppercase text-sm hover:opacity-90 transition">Verify & Update Email</button>
+            </form>
+        </div>
+    </div>
+</div>
                         <div class="bg-black border border-gray-800 rounded-xl p-6">
                             <h4 class="text-sm text-white font-bold mb-4"><i
                                     class="fas fa-envelope text-szcyan mr-2"></i> Change Email Address</h4>
