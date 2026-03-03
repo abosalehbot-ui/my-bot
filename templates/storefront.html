@@ -31,6 +31,17 @@
     <div id="toast-container" class="fixed top-5 right-5 z-[9999] flex flex-col gap-2"></div>
     <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black/80 z-40 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
 
+    {% if maintenance %}
+    <div class="flex flex-col items-center justify-center w-full h-full p-4 text-center bg-darkbg z-50">
+        <div class="inline-flex items-center justify-center w-24 h-24 bg-black rounded-full border-2 border-szgreen/50 shadow-[0_0_30px_rgba(125,252,137,0.4)] mb-8 floating">
+            <span class="text-4xl font-black text-szgreen">SZ</span>
+        </div>
+        <h1 class="text-4xl md:text-6xl font-black text-white mb-4 uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan">System Maintenance</h1>
+        <p class="text-gray-400 max-w-xl mb-10 text-lg">We are currently upgrading our servers. We will be back online shortly!</p>
+        <button onclick="location.reload()" class="px-8 py-3 bg-szgreen text-black rounded-xl font-bold transition btn-glow"><i class="fas fa-sync-alt mr-2"></i> Refresh Status</button>
+    </div>
+    {% else %}
+
     <aside id="sz-sidebar" class="fixed top-0 left-0 z-50 w-64 h-screen transition-transform -translate-x-full md:translate-x-0 shadow-[4px_0_24px_rgba(0,0,0,0.5)] flex-shrink-0">
         <div class="overflow-y-auto py-5 px-3 h-full bg-panelbg border-r border-gray-800 pb-20">
             <div class="flex items-center justify-between px-2 mb-6 pb-6 border-b border-gray-800 md:justify-center">
@@ -66,7 +77,7 @@
                 </li>
                 
                 <li><hr class="border-gray-800"></li>
-                <li><a href="#" onclick="document.getElementById('main-scroll').scrollTo({top:0, behavior:'smooth'});" class="flex items-center p-3 text-base font-bold text-white rounded-lg bg-gray-900 group"><i class="fas fa-store w-6 text-szgreen"></i> Store Home</a></li>
+                <li><a href="#" onclick="closeCategory(); toggleSidebarMobile();" class="flex items-center p-3 text-base font-bold text-white rounded-lg bg-gray-900 group"><i class="fas fa-store w-6 text-szgreen"></i> Store Home</a></li>
             </ul>
         </div>
         
@@ -102,48 +113,78 @@
                 <p class="text-gray-400 text-sm">Select your package. Codes are delivered instantly after payment.</p>
             </div>
 
-            {% for cat in categories %}
-            <div id="cat-{{ cat._id }}" class="mb-16 scroll-mt-20 fade-in">
-                <div class="relative w-full h-32 md:h-48 rounded-2xl overflow-hidden mb-8 cat-group shadow-2xl border border-gray-800">
-                    <img src="{{ cat.image|default('https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070') }}" class="absolute inset-0 w-full h-full object-cover cat-card-img opacity-60">
-                    <div class="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent"></div>
-                    <div class="absolute bottom-0 left-0 p-6 md:p-8 flex items-center gap-4 w-full">
-                        <div class="w-14 h-14 bg-black/50 backdrop-blur-md border border-szcyan/50 rounded-xl flex items-center justify-center text-szcyan text-2xl shadow-[0_0_20px_rgba(94,234,212,0.4)]">
-                            <i class="fas {{ cat.icon }}"></i>
-                        </div>
-                        <div>
-                            <h2 class="text-3xl md:text-4xl font-black text-white uppercase tracking-widest drop-shadow-lg">{{ cat.name }}</h2>
-                            <p class="text-szcyan text-xs font-bold uppercase tracking-wider mt-1"><i class="fas fa-bolt"></i> Instant Codes</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-                    {% for p in cat.products %}
-                    <div class="uc-card bg-panelbg border border-gray-800 rounded-2xl p-5 flex flex-col items-center text-center relative overflow-hidden">
-                        <div class="absolute top-3 right-3 bg-{{ 'szgreen/20 text-szgreen' if stock.get(p.stock_key, 0) > 0 else 'red-900/50 text-red-400' }} text-[10px] font-bold px-2 py-1 rounded border">
-                            {{ 'INSTANT' if stock.get(p.stock_key, 0) > 0 else 'OUT OF STOCK' }}
-                        </div>
-                        
-                        <h3 class="text-lg md:text-xl font-black text-white mt-6 mb-2">{{ p.name }}</h3>
-                        
-                        <div class="mt-2 mb-6 bg-black w-full py-3 rounded-xl border border-gray-800">
-                            {% for curr in currencies %}
-                            <div class="price-display price-{{ curr._id }} {{ 'hidden' if loop.index0 > 0 else '' }}">
-                                <span class="text-2xl font-black text-white">{{ p.get('prices', {}).get(curr._id, p.get('price_egp', 0) if curr._id == 'EGP' else p.get('price_usd', 0)) }}</span> 
-                                <span class="text-[10px] text-szcyan font-bold uppercase ml-1">{{ curr.symbol }}</span>
+            <div id="categories-view">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {% for cat in categories %}
+                    <div onclick="openCategory('{{ cat._id }}')" class="relative w-full h-32 md:h-48 rounded-2xl overflow-hidden cursor-pointer cat-group shadow-2xl border border-gray-800 fade-in">
+                        <img src="{{ cat.image|default('https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070') }}" class="absolute inset-0 w-full h-full object-cover cat-card-img opacity-60">
+                        <div class="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent"></div>
+                        <div class="absolute bottom-0 left-0 p-6 md:p-8 flex items-center gap-4 w-full">
+                            {% if cat.logo %}
+                            <img src="{{ cat.logo }}" class="w-14 h-14 rounded-xl object-cover shadow-[0_0_20px_rgba(94,234,212,0.4)]">
+                            {% elif cat.icon %}
+                            <div class="w-14 h-14 bg-black/50 backdrop-blur-md border border-szcyan/50 rounded-xl flex items-center justify-center text-szcyan text-2xl shadow-[0_0_20px_rgba(94,234,212,0.4)]">
+                                <i class="fas {{ cat.icon }}"></i>
                             </div>
-                            {% endfor %}
+                            {% endif %}
+                            <div>
+                                <h2 class="text-3xl md:text-4xl font-black text-white uppercase tracking-widest drop-shadow-lg">{{ cat.name }}</h2>
+                                <p class="text-szcyan text-xs font-bold uppercase tracking-wider mt-1"><i class="fas fa-bolt"></i> Instant Codes</p>
+                            </div>
                         </div>
-
-                        <button onclick="buyProductDynamic('{{ p.stock_key }}', {{ p.get('prices', {'EGP': p.get('price_egp', 0), 'USD': p.get('price_usd', 0)}) | tojson | forceescape }}, '{{ p.name }}', '{{ cat.icon }}')" {{ 'disabled' if stock.get(p.stock_key, 0) == 0 }} class="w-full bg-{{ 'szgreen text-black hover:bg-szcyan' if stock.get(p.stock_key, 0) > 0 else 'gray-900 text-gray-600' }} font-bold py-3 rounded-xl transition uppercase text-sm btn-glow flex justify-center items-center gap-2">
-                            <i class="fas fa-shopping-cart"></i> <span>{{ 'Buy Now' if stock.get(p.stock_key, 0) > 0 else 'Unavailable' }}</span>
-                        </button>
                     </div>
+                    {% else %}
+                    <div class="col-span-full text-center text-gray-500 py-10">Store is empty. Please add categories from Master Panel.</div>
                     {% endfor %}
                 </div>
             </div>
-            {% endfor %}
+
+            <div id="products-view" class="hidden">
+                <button onclick="closeCategory()" class="mb-8 bg-gray-900 text-gray-300 hover:text-white px-4 py-2 rounded-lg font-bold border border-gray-800 hover:border-szgreen transition flex items-center gap-2">
+                    <i class="fas fa-arrow-left"></i> Back to Categories
+                </button>
+
+                {% for cat in categories %}
+                <div id="prod-grid-{{ cat._id }}" class="cat-prod-grid hidden fade-in">
+                    <h2 class="text-2xl font-black text-white mb-6 flex items-center gap-3 border-b border-gray-800 pb-2">
+                        {% if cat.logo %}<img src="{{ cat.logo }}" class="w-8 h-8 rounded object-cover">{% elif cat.icon %}<i class="fas {{ cat.icon }} text-szcyan"></i>{% endif %}
+                        {{ cat.name }} Products
+                    </h2>
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                        {% for p in cat.products %}
+                        <div class="uc-card bg-panelbg border border-gray-800 rounded-2xl p-5 flex flex-col items-center text-center relative overflow-hidden">
+                            <div class="absolute top-3 right-3 bg-{{ 'szgreen/20 text-szgreen' if stock.get(p.stock_key, 0) > 0 else 'red-900/50 text-red-400' }} text-[10px] font-bold px-2 py-1 rounded border">
+                                {{ 'INSTANT' if stock.get(p.stock_key, 0) > 0 else 'OUT OF STOCK' }}
+                            </div>
+                            
+                            {% if p.image %}
+                            <img src="{{ p.image }}" class="w-20 h-20 mt-4 mb-2 rounded-xl object-cover floating shadow-[0_0_20px_rgba(94,234,212,0.2)]">
+                            {% else %}
+                            <div class="w-20 h-20 mt-4 mb-2 rounded-full bg-szcyan/10 flex items-center justify-center floating text-szcyan text-3xl">
+                                <i class="fas {{ cat.icon }}"></i>
+                            </div>
+                            {% endif %}
+                            
+                            <h3 class="text-lg md:text-xl font-black text-white mt-2 mb-2">{{ p.name }}</h3>
+                            
+                            <div class="mt-2 mb-6 bg-black w-full py-3 rounded-xl border border-gray-800">
+                                {% for curr in currencies %}
+                                <div class="price-display price-{{ curr._id }} {{ 'hidden' if loop.index0 > 0 else '' }}">
+                                    <span class="text-2xl font-black text-white">{{ p.get('prices', {}).get(curr._id, p.get('price_egp', 0) if curr._id == 'EGP' else p.get('price_usd', 0)) }}</span> 
+                                    <span class="text-[10px] text-szcyan font-bold uppercase ml-1">{{ curr.symbol }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+
+                            <button onclick="buyProductDynamic('{{ p.stock_key }}', {{ p.get('prices', {'EGP': p.get('price_egp', 0), 'USD': p.get('price_usd', 0)}) | tojson | forceescape }}, '{{ p.name }}', '{{ cat.icon }}')" {{ 'disabled' if stock.get(p.stock_key, 0) == 0 }} class="w-full bg-{{ 'szgreen text-black hover:bg-szcyan' if stock.get(p.stock_key, 0) > 0 else 'gray-900 text-gray-600' }} font-bold py-3 rounded-xl transition uppercase text-sm btn-glow flex justify-center items-center gap-2">
+                                <i class="fas fa-shopping-cart"></i> <span>{{ 'Buy Now' if stock.get(p.stock_key, 0) > 0 else 'Unavailable' }}</span>
+                            </button>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
         </div>
 
         <button id="scrollToTopBtn" class="fixed bottom-6 right-6 md:bottom-8 md:right-8 bg-szcyan text-black w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold transition-all duration-300 opacity-0 pointer-events-none translate-y-4 z-40 btn-glow">
@@ -270,20 +311,63 @@
                                 <button type="submit" class="bg-szcyan text-black px-6 py-2.5 rounded-lg font-bold text-sm btn-glow">Save Changes</button>
                             </form>
                         </div>
+                        
+                        <div class="bg-black border border-gray-800 rounded-xl p-6">
+                            <h4 class="text-sm text-white font-bold mb-4"><i class="fas fa-envelope text-szcyan mr-2"></i> Change Email Address</h4>
+                            <form onsubmit="doChangeEmailRequest(event)" class="space-y-4" id="email-change-form">
+                                <div>
+                                    <label class="text-[10px] text-gray-500 uppercase mb-1 block">New Email Address</label>
+                                    <input type="email" id="edit-new-email" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-szcyan text-sm">
+                                </div>
+                                <button type="submit" class="bg-gray-900 text-white hover:bg-white hover:text-black px-6 py-2.5 rounded-lg font-bold text-sm transition border border-gray-800">Send Verification Code</button>
+                            </form>
+                            
+                            <form onsubmit="doChangeEmailVerify(event)" class="space-y-4 hidden mt-4 pt-4 border-t border-gray-800" id="email-verify-form">
+                                <p class="text-xs text-gray-400 mb-2">We sent a 6-digit code to your new email.</p>
+                                <div>
+                                    <input type="text" id="edit-email-code" required maxlength="6" placeholder="Enter Code" class="w-full bg-[#050505] border border-gray-800 text-szgreen text-center tracking-[0.5em] font-black p-3 rounded-lg outline-none focus:border-szgreen text-xl">
+                                </div>
+                                <button type="submit" class="w-full bg-szgreen text-black py-2.5 rounded-lg font-bold uppercase text-sm hover:opacity-90 transition">Verify & Update Email</button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <script src="/static/js/core.js"></script>
+    <script src="/static/js/store.js"></script>
     <script>
+        function toggleSidebar() {
+            document.getElementById('sz-sidebar').classList.toggle('-translate-x-full');
+            document.getElementById('sidebar-backdrop').classList.toggle('hidden');
+        }
+        function toggleSidebarMobile() {
+            if (window.innerWidth < 768) toggleSidebar();
+        }
+
+        // --- دوال فتح وإغلاق كروت الأقسام ---
+        function openCategory(catId) {
+            document.getElementById('categories-view').classList.add('hidden');
+            document.getElementById('products-view').classList.remove('hidden');
+            document.querySelectorAll('.cat-prod-grid').forEach(el => el.classList.add('hidden'));
+            document.getElementById('prod-grid-' + catId).classList.remove('hidden');
+            window.scrollTo({top:0, behavior: 'smooth'});
+        }
+
+        function closeCategory() {
+            document.getElementById('products-view').classList.add('hidden');
+            document.getElementById('categories-view').classList.remove('hidden');
+            window.scrollTo({top:0, behavior: 'smooth'});
+        }
+
         function toggleCurrency() {
             currentCurrency = document.getElementById('currency-toggle').value;
             document.querySelectorAll('.price-display').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll(`.price-${currentCurrency}`).forEach(el => el.classList.remove('hidden'));
         }
 
-        // دالة الدفع وفتح نافذة الكارت
         function buyProductDynamic(stock_key, prices_json, name, iconClass) {
             const email = localStorage.getItem('store_email');
             if(!email) { Core.openModal('auth-modal'); return; }
@@ -309,13 +393,11 @@
         function updateUIDynamic(name, balances) {
             document.getElementById('sidebar-ui-name').innerText = name;
             
-            // تحديث المحافظ في القائمة الجانبية
             for (const [curr, val] of Object.entries(balances)) {
                 const el = document.getElementById(`sidebar-ui-bal-${curr.toLowerCase()}`);
                 if(el) el.innerText = val;
             }
 
-            // تحديث المحافظ في البروفايل
             const profWalletsContainer = document.getElementById('prof-dynamic-wallets');
             if(profWalletsContainer) {
                 profWalletsContainer.innerHTML = '';
@@ -352,6 +434,42 @@
             } catch(e) { Core.showToast("Error updating profile", "error"); }
         }
 
+        // دوال تغيير الايميل اللي كانت موجودة في كودك الأصلي
+        async function doChangeEmailRequest(e) {
+            e.preventDefault();
+            const newEmail = document.getElementById('edit-new-email').value;
+            const btn = e.target.querySelector('button');
+            const orig = btn.innerHTML; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; btn.disabled = true;
+            const fd = new FormData(); fd.append('new_email', newEmail);
+            try {
+                const res = await (await fetch('/api/store/change-email-request', {method: 'POST', body: fd})).json();
+                if(res.success) {
+                    Core.showToast(res.msg);
+                    document.getElementById('email-change-form').classList.add('hidden');
+                    document.getElementById('email-verify-form').classList.remove('hidden');
+                } else { Core.showToast(res.msg, 'error'); }
+            } catch { Core.showToast('Error!', 'error'); }
+            btn.innerHTML = orig; btn.disabled = false;
+        }
+
+        async function doChangeEmailVerify(e) {
+            e.preventDefault();
+            const newEmail = document.getElementById('edit-new-email').value;
+            const code = document.getElementById('edit-email-code').value;
+            const btn = e.target.querySelector('button');
+            const orig = btn.innerHTML; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; btn.disabled = true;
+            const fd = new FormData(); fd.append('new_email', newEmail); fd.append('code', code);
+            try {
+                const res = await (await fetch('/api/store/change-email-verify', {method: 'POST', body: fd})).json();
+                if(res.success) {
+                    Core.showToast('Email changed successfully!');
+                    localStorage.setItem('store_email', newEmail);
+                    setTimeout(() => location.reload(), 1200);
+                } else { Core.showToast(res.msg, 'error'); }
+            } catch { Core.showToast('Error!', 'error'); }
+            btn.innerHTML = orig; btn.disabled = false;
+        }
+
         function openProfileModal() {
             document.getElementById('prof-name').innerText = localStorage.getItem('store_name');
             document.getElementById('prof-email').innerText = localStorage.getItem('store_email');
@@ -367,6 +485,27 @@
             
             Core.openModal('profile-modal');
         }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const theme = localStorage.getItem('sz_theme') || 'default';
+            document.documentElement.setAttribute('data-theme', theme);
+
+            const mainScroll = document.getElementById('main-scroll');
+            if(mainScroll) {
+                mainScroll.addEventListener('scroll', () => {
+                    const btn = document.getElementById('scrollToTopBtn');
+                    if (mainScroll.scrollTop > 300) {
+                        btn.classList.replace('opacity-0', 'opacity-100');
+                        btn.classList.replace('pointer-events-none', 'pointer-events-auto');
+                    } else {
+                        btn.classList.replace('opacity-100', 'opacity-0');
+                        btn.classList.replace('pointer-events-auto', 'pointer-events-none');
+                    }
+                });
+                document.getElementById('scrollToTopBtn').onclick = () => mainScroll.scrollTo({top: 0, behavior: 'smooth'});
+            }
+        });
     </script>
+    {% endif %}
 </body>
 </html>
