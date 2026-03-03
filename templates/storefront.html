@@ -24,11 +24,10 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
         
-        /* محرك الألوان السحري (Theme Engine) */
-        :root { --theme-primary: #7dfc89; --theme-secondary: #5eead4; } /* Default Cyberpunk */
-        html[data-theme="synthwave"] { --theme-primary: #a855f7; --theme-secondary: #f97316; } /* Purple/Orange */
-        html[data-theme="sith"] { --theme-primary: #ef4444; --theme-secondary: #dc2626; } /* Red/Dark Red */
-        html[data-theme="vip"] { --theme-primary: #eab308; --theme-secondary: #facc15; } /* Gold/Yellow */
+        :root { --theme-primary: #7dfc89; --theme-secondary: #5eead4; } 
+        html[data-theme="synthwave"] { --theme-primary: #a855f7; --theme-secondary: #f97316; } 
+        html[data-theme="sith"] { --theme-primary: #ef4444; --theme-secondary: #dc2626; } 
+        html[data-theme="vip"] { --theme-primary: #eab308; --theme-secondary: #facc15; } 
 
         body { font-family: 'Cairo', sans-serif; background-color: #050505; color: #d1d5db; scroll-behavior: smooth; overflow: hidden; }
         ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #050505; } ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; transition: 0.3s; } ::-webkit-scrollbar-thumb:hover { background: var(--theme-primary); box-shadow: 0 0 10px var(--theme-primary); }
@@ -49,19 +48,14 @@
         .social-btn.telegram:hover svg { fill: var(--theme-secondary); transform: scale(1.1); }
         .click-overlay { position: absolute; inset: 0; z-index: 10; opacity: 0.01; display: flex; justify-content: center; align-items: center; }
         .click-overlay iframe, .click-overlay > div { transform: scale(2.5); cursor: pointer; }
-    </style>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <style>
-        #toast-container .toast { display:flex; align-items:center; gap:10px; background:#111; border-radius:10px; padding:12px 16px; color:#fff; font-weight:bold; font-size:13px; min-width:220px; pointer-events:all; box-shadow:0 4px 20px rgba(0,0,0,0.5); }
 
-        /* Profile tab buttons */
+        #toast-container .toast { display:flex; align-items:center; gap:10px; background:#111; border-radius:10px; padding:12px 16px; color:#fff; font-weight:bold; font-size:13px; min-width:220px; pointer-events:all; box-shadow:0 4px 20px rgba(0,0,0,0.5); }
         .prof-tab-btn.active  { color: var(--theme-primary); border-bottom: 2px solid var(--theme-primary); }
         .prof-tab-btn.inactive{ color: #6b7280; border-bottom: 2px solid transparent; }
         .prof-tab-btn.inactive:hover { color: #d1d5db; }
-        /* Tab panels — absolute so only one shows at a time with no flex conflict */
         .prof-tab-panel { background: var(--panel-bg, #111); }
-        @keyframes fadeOut { to { opacity:0; transform:translateY(-10px); } }
     </style>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body class="selection:bg-szgreen selection:text-black flex h-screen">
 
@@ -85,7 +79,6 @@
 
     <aside id="sz-sidebar" class="fixed top-0 left-0 z-50 w-64 h-screen transition-transform -translate-x-full md:translate-x-0 shadow-[4px_0_24px_rgba(0,0,0,0.5)] flex-shrink-0" aria-label="Sidenav">
         <div class="overflow-y-auto py-5 px-3 h-full bg-panelbg border-r border-gray-800 pb-20">
-            
             <div class="flex items-center justify-between px-2 mb-6 pb-6 border-b border-gray-800 md:justify-center">
                 <div class="flex items-center gap-3">
                     <div class="inline-flex items-center justify-center w-8 h-8 bg-black rounded-full border border-szgreen/50 shadow-[0_0_10px_rgba(125,252,137,0.3)] floating">
@@ -125,7 +118,6 @@
                             <div class="text-[9px] text-gray-500 uppercase">USD</div><div class="text-szcyan font-black text-sm" id="sidebar-ui-bal-usd">0</div>
                         </div>
                     </div>
-                    <div class="mt-3 text-center text-[10px] text-szcyan uppercase font-bold tracking-wider"><i class="fas fa-id-card mr-1"></i> View Profile & Orders</div>
                 </li>
                 
                 <li><hr class="border-gray-800"></li>
@@ -137,11 +129,11 @@
                 </li>
                 
                 <li>
-    <a href="#" onclick="openProfileModal(); toggleSidebarMobile();" class="flex items-center p-3 w-full text-base font-bold text-gray-400 rounded-lg transition group hover:bg-gray-900 hover:text-white">
-        <i class="fas fa-wallet w-6 text-yellow-500 group-hover:text-yellow-400 transition"></i>
-        <span class="flex-1 ml-3 text-left whitespace-nowrap">My Wallet</span>
-    </a>
-</li>
+                    <a href="#" onclick="openProfileModal(); toggleSidebarMobile();" class="flex items-center p-3 w-full text-base font-bold text-gray-400 rounded-lg transition group hover:bg-gray-900 hover:text-white">
+                        <i class="fas fa-wallet w-6 text-yellow-500 group-hover:text-yellow-400 transition"></i>
+                        <span class="flex-1 ml-3 text-left whitespace-nowrap">My Wallet</span>
+                    </a>
+                </li>
                 
                 <li>
                     <button type="button" onclick="document.getElementById('dropdown-cats').classList.toggle('hidden')" class="flex items-center p-3 w-full text-base font-bold text-gray-400 rounded-lg transition group hover:bg-gray-900 hover:text-white">
@@ -165,7 +157,6 @@
             
             <div class="flex items-center gap-2 relative">
                 <button onclick="document.getElementById('theme-drop').classList.toggle('hidden')" class="text-gray-500 hover:text-szgreen p-2 rounded transition" title="Change Theme"><i class="fas fa-paint-roller text-lg"></i></button>
-                
                 <div id="theme-drop" class="hidden absolute bottom-12 -right-2 bg-black border border-gray-800 rounded-lg shadow-2xl w-36 py-2 z-50">
                     <div class="text-[10px] text-gray-500 uppercase px-4 mb-2 font-bold tracking-wider">Neon Colors</div>
                     <a href="#" onclick="setTheme('default')" class="flex items-center px-4 py-2 text-sm font-bold text-white hover:bg-gray-900 transition"><span class="w-3 h-3 rounded-full bg-[#7dfc89] mr-2 shadow-[0_0_5px_#7dfc89]"></span> Cyberpunk</a>
@@ -173,31 +164,31 @@
                     <a href="#" onclick="setTheme('sith')" class="flex items-center px-4 py-2 text-sm font-bold text-white hover:bg-gray-900 transition"><span class="w-3 h-3 rounded-full bg-[#ef4444] mr-2 shadow-[0_0_5px_#ef4444]"></span> Sith Red</a>
                     <a href="#" onclick="setTheme('vip')" class="flex items-center px-4 py-2 text-sm font-bold text-white hover:bg-gray-900 transition"><span class="w-3 h-3 rounded-full bg-[#eab308] mr-2 shadow-[0_0_5px_#eab308]"></span> VIP Gold</a>
                 </div>
-
                 <button id="sidebar-logout-btn" onclick="logout()" class="hidden text-red-500 hover:bg-red-900/20 p-2 rounded transition" title="Logout"><i class="fas fa-power-off text-lg"></i></button>
             </div>
         </div>
     </aside>
 
     <main id="main-scroll" class="flex-1 flex flex-col h-screen overflow-y-auto bg-darkbg relative">
-      <header class="h-16 bg-panelbg/80 backdrop-blur-md border-b border-gray-800 flex items-center justify-between px-4 md:hidden sticky top-0 z-30">
-    <button onclick="toggleSidebar()" class="text-white text-xl p-2"><i class="fas fa-bars"></i></button>
-    <span class="text-lg font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">SALEH ZONE</span>
-    
-    <div class="flex items-center gap-4">
-        <button onclick="openCartModal()" class="text-gray-400 hover:text-szcyan relative transition">
-            <i class="fas fa-shopping-cart text-xl"></i>
-            <span class="absolute -top-1.5 -right-2 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full" id="cart-count-mobile">0</span>
-        </button>
-        <button onclick="openProfileModal()" class="text-szgreen"><i class="fas fa-user-circle text-xl"></i></button>
-    </div>
-</header>
+        <header class="h-16 bg-panelbg/80 backdrop-blur-md border-b border-gray-800 flex items-center justify-between px-4 md:hidden sticky top-0 z-30">
+            <button onclick="toggleSidebar()" class="text-white text-xl p-2"><i class="fas fa-bars"></i></button>
+            <span class="text-lg font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">SALEH ZONE</span>
+            <div class="flex items-center gap-4">
+                <button onclick="openCartModal()" class="text-gray-400 hover:text-szcyan relative transition">
+                    <i class="fas fa-shopping-cart text-xl"></i>
+                    <span class="absolute -top-1.5 -right-2 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full" id="cart-count-mobile">0</span>
+                </button>
+                <button onclick="openProfileModal()" class="text-szgreen"><i class="fas fa-user-circle text-xl"></i></button>
+            </div>
+        </header>
+        
         <div class="hidden md:flex fixed top-6 right-8 z-40 gap-3">
-    <button onclick="openCartModal()" class="bg-panelbg/90 backdrop-blur border border-gray-800 p-3 rounded-xl shadow-lg hover:border-szcyan text-gray-400 hover:text-szcyan transition relative group btn-glow">
-        <i class="fas fa-shopping-cart text-lg"></i>
-        <span class="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full border border-darkbg shadow-sm" id="cart-count-desktop">0</span>
-    </button>
-</div>
+            <button onclick="openCartModal()" class="bg-panelbg/90 backdrop-blur border border-gray-800 p-3 rounded-xl shadow-lg hover:border-szcyan text-gray-400 hover:text-szcyan transition relative group btn-glow">
+                <i class="fas fa-shopping-cart text-lg"></i>
+                <span class="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full border border-darkbg shadow-sm" id="cart-count-desktop">0</span>
+            </button>
+        </div>
+
         <div class="p-6 md:p-10 max-w-6xl mx-auto w-full flex-1">
             <div class="text-center md:text-left mb-12 fade-in">
                 <h1 class="text-3xl md:text-5xl font-black mb-3 text-white uppercase tracking-widest">Instant <span class="text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">Delivery</span></h1>
@@ -281,52 +272,43 @@
         </button>
     </main>
 
+    <div id="cart-modal" class="fixed inset-0 bg-black/95 z-[70] hidden flex flex-col justify-end md:justify-center md:items-center md:p-4 backdrop-blur-sm transition-all">
+        <div class="w-full md:max-w-2xl bg-panelbg border-t md:border border-gray-800 md:rounded-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)] relative flex flex-col h-[85vh] md:h-auto max-h-[90vh] overflow-hidden animate-[fadeIn_0.3s_ease-out]">
+            <div class="flex items-center justify-between p-5 border-b border-gray-800 shrink-0 bg-[#0a0a0a]">
+                <h2 class="text-xl font-black text-white uppercase tracking-widest"><i class="fas fa-shopping-cart text-szcyan mr-2"></i> Your Cart</h2>
+                <button onclick="closeModal('cart-modal')" class="text-gray-500 hover:text-red-500 transition"><i class="fas fa-times text-2xl"></i></button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 md:p-6 bg-darkbg" id="cart-items-container">
+                </div>
+
+            <div class="bg-black border-t border-gray-800 p-5 shrink-0 shadow-[0_-10px_20px_rgba(0,0,0,0.5)] z-10">
+                <dl class="flex items-center justify-between mb-4">
+                    <dt class="text-lg font-black text-gray-400 uppercase">Grand Total</dt>
+                    <dd class="text-2xl font-black text-szcyan" id="cart-total-price">0.00</dd>
+                </dl>
+
+                <div class="flex items-center mb-5">
+                    <input id="cart-terms-checkbox" type="checkbox" checked class="h-5 w-5 rounded border-gray-700 bg-[#050505] text-szgreen focus:ring-2 focus:ring-szgreen accent-szgreen cursor-pointer shrink-0" />
+                    <label for="cart-terms-checkbox" class="ms-3 text-xs md:text-sm font-medium text-gray-400"> I confirm this purchase and agree to the <a href="#" class="text-szcyan hover:underline">Terms of Service</a>. </label>
+                </div>
+
+                <div class="flex gap-3">
+                    <button type="button" onclick="closeModal('cart-modal')" class="hidden md:block w-1/3 rounded-xl border border-gray-700 bg-[#111] px-5 py-3.5 text-sm font-bold text-gray-300 hover:bg-gray-800 hover:text-white transition">Keep Shopping</button>
+                    <button type="button" id="btn-confirm-cart" onclick="confirmCartPurchase()" class="flex-1 flex items-center justify-center rounded-xl bg-gradient-to-r from-szgreen to-szcyan px-5 py-3.5 text-sm md:text-base font-black text-black uppercase tracking-wide btn-glow transition">Pay Now <i class="fas fa-check-circle ml-2"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="checkout-modal" class="fixed inset-0 bg-black/90 z-[60] hidden flex items-center justify-center p-4 backdrop-blur-sm">
         <div class="w-full max-w-2xl bg-panelbg border border-gray-800 rounded-2xl shadow-2xl relative fade-in max-h-[90vh] overflow-y-auto">
             <div class="absolute -top-20 -right-20 w-64 h-64 bg-szcyan/5 rounded-full blur-[80px] pointer-events-none"></div>
             
             <div class="flex items-center justify-between p-5 border-b border-gray-800 sticky top-0 bg-panelbg/95 backdrop-blur z-10">
-                <h2 class="text-xl font-black text-white uppercase tracking-widest"><i class="fas fa-shopping-bag text-szcyan mr-2"></i> Order Summary</h2>
+                <h2 class="text-xl font-black text-white uppercase tracking-widest"><i class="fas fa-bolt text-szgreen mr-2"></i> Buy Now</h2>
                 <button onclick="closeModal('checkout-modal')" class="text-gray-500 hover:text-red-500 transition"><i class="fas fa-times text-xl"></i></button>
             </div>
-<div id="cart-modal" class="fixed inset-0 bg-black/90 z-[60] hidden flex items-center justify-center p-4 backdrop-blur-sm">
-    <div class="w-full max-w-3xl bg-panelbg border border-gray-800 rounded-2xl shadow-2xl relative fade-in max-h-[90vh] flex flex-col overflow-hidden">
-        
-        <div class="flex items-center justify-between p-5 border-b border-gray-800 shrink-0 bg-panelbg">
-            <h2 class="text-xl font-black text-white uppercase tracking-widest"><i class="fas fa-shopping-cart text-szcyan mr-2"></i> Your Cart</h2>
-            <button onclick="closeModal('cart-modal')" class="text-gray-500 hover:text-red-500 transition"><i class="fas fa-times text-xl"></i></button>
-        </div>
-
-        <div class="flex-1 overflow-y-auto p-6">
-            <div class="overflow-x-auto border border-gray-800 rounded-xl bg-[#0a0a0a] mb-6">
-                <table class="w-full text-left text-sm text-gray-300 whitespace-nowrap">
-                    <thead class="bg-[#111] text-gray-500 uppercase text-[10px]">
-                        <tr><th class="p-4">Item</th><th class="p-4">Qty</th><th class="p-4">Total</th><th class="p-4 text-center">Remove</th></tr>
-                    </thead>
-                    <tbody id="cart-tbody" class="divide-y divide-gray-800">
-                        </tbody>
-                </table>
-            </div>
-
-            <div class="bg-black border border-gray-800 p-6 rounded-xl">
-                <dl class="flex items-center justify-between gap-4 mb-6">
-                    <dt class="text-xl font-black text-white uppercase">Grand Total</dt>
-                    <dd class="text-2xl font-black text-szcyan" id="cart-total-price">0.00</dd>
-                </dl>
-
-                <div class="flex items-center mt-4 mb-6">
-                    <input id="cart-terms-checkbox" type="checkbox" checked class="h-4 w-4 rounded border-gray-700 bg-[#050505] text-szgreen focus:ring-2 focus:ring-szgreen accent-szgreen cursor-pointer" />
-                    <label for="cart-terms-checkbox" class="ms-2 text-xs font-medium text-gray-400"> I confirm this purchase and agree to the <a href="#" class="text-szcyan hover:underline">Terms of Service</a>. </label>
-                </div>
-
-                <div class="flex gap-4">
-                    <button type="button" onclick="closeModal('cart-modal')" class="w-1/3 rounded-xl border border-gray-700 bg-[#111] px-5 py-3 text-sm font-bold text-gray-300 hover:bg-gray-800 hover:text-white transition">Keep Shopping</button>
-                    <button type="button" id="btn-confirm-cart" onclick="confirmCartPurchase()" class="w-2/3 flex items-center justify-center rounded-xl bg-gradient-to-r from-szgreen to-szcyan px-5 py-3 text-sm font-black text-black uppercase tracking-wide btn-glow transition">Pay Now <i class="fas fa-check-circle ml-2"></i></button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
             <div class="p-6">
                 <div class="mb-6 pb-6 border-b border-gray-800">
                     <h4 class="text-sm font-bold text-gray-400 uppercase mb-3">Player Information</h4>
@@ -607,11 +589,11 @@
                     </div>
                 </div>
 
-            </div></div>
+            </div>
+        </div>
     </div>
 
     <script src="/static/js/core.js"></script>
     <script src="/static/js/store.js"></script>
-    {% endif %}
 </body>
 </html>
