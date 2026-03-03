@@ -237,9 +237,9 @@
                         </div>
 
                         {% if stock.get(p.stock_key, 0) > 0 %}
-                        <button id="btn-buy-{{ p.stock_key }}" onclick="buyProduct('{{ p.stock_key }}', {{ p.price_egp }}, {{ p.price_usd }}, '{{ p.name }}', '{{ cat.icon }}')" class="w-full bg-szgreen text-black font-bold py-2.5 md:py-3 rounded-xl btn-glow flex justify-center items-center gap-2 text-sm md:text-base">
-                            <span>BUY NOW</span> <i class="fas fa-shopping-cart"></i>
-                        </button>
+                        <button onclick="addToCart('{{ p.stock_key }}', {{ p.price_egp }}, {{ p.price_usd }}, '{{ p.name }}', '{{ cat.icon }}')" class="w-full bg-szcyan text-black font-bold py-2.5 md:py-3 rounded-xl btn-glow flex justify-center items-center gap-2 text-sm md:text-base">
+    <span>ADD TO CART</span> <i class="fas fa-cart-plus"></i>
+</button>
                         {% else %}
                         <button disabled class="w-full bg-gray-900 text-gray-600 font-bold py-2.5 md:py-3 rounded-xl cursor-not-allowed border border-gray-800 text-sm md:text-base">UNAVAILABLE</button>
                         {% endif %}
@@ -277,7 +277,44 @@
                 <h2 class="text-xl font-black text-white uppercase tracking-widest"><i class="fas fa-shopping-bag text-szcyan mr-2"></i> Order Summary</h2>
                 <button onclick="closeModal('checkout-modal')" class="text-gray-500 hover:text-red-500 transition"><i class="fas fa-times text-xl"></i></button>
             </div>
+<div id="cart-modal" class="fixed inset-0 bg-black/90 z-[60] hidden flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="w-full max-w-3xl bg-panelbg border border-gray-800 rounded-2xl shadow-2xl relative fade-in max-h-[90vh] flex flex-col overflow-hidden">
+        
+        <div class="flex items-center justify-between p-5 border-b border-gray-800 shrink-0 bg-panelbg">
+            <h2 class="text-xl font-black text-white uppercase tracking-widest"><i class="fas fa-shopping-cart text-szcyan mr-2"></i> Your Cart</h2>
+            <button onclick="closeModal('cart-modal')" class="text-gray-500 hover:text-red-500 transition"><i class="fas fa-times text-xl"></i></button>
+        </div>
 
+        <div class="flex-1 overflow-y-auto p-6">
+            <div class="overflow-x-auto border border-gray-800 rounded-xl bg-[#0a0a0a] mb-6">
+                <table class="w-full text-left text-sm text-gray-300 whitespace-nowrap">
+                    <thead class="bg-[#111] text-gray-500 uppercase text-[10px]">
+                        <tr><th class="p-4">Item</th><th class="p-4">Qty</th><th class="p-4">Total</th><th class="p-4 text-center">Remove</th></tr>
+                    </thead>
+                    <tbody id="cart-tbody" class="divide-y divide-gray-800">
+                        </tbody>
+                </table>
+            </div>
+
+            <div class="bg-black border border-gray-800 p-6 rounded-xl">
+                <dl class="flex items-center justify-between gap-4 mb-6">
+                    <dt class="text-xl font-black text-white uppercase">Grand Total</dt>
+                    <dd class="text-2xl font-black text-szcyan" id="cart-total-price">0.00</dd>
+                </dl>
+
+                <div class="flex items-center mt-4 mb-6">
+                    <input id="cart-terms-checkbox" type="checkbox" checked class="h-4 w-4 rounded border-gray-700 bg-[#050505] text-szgreen focus:ring-2 focus:ring-szgreen accent-szgreen cursor-pointer" />
+                    <label for="cart-terms-checkbox" class="ms-2 text-xs font-medium text-gray-400"> I confirm this purchase and agree to the <a href="#" class="text-szcyan hover:underline">Terms of Service</a>. </label>
+                </div>
+
+                <div class="flex gap-4">
+                    <button type="button" onclick="closeModal('cart-modal')" class="w-1/3 rounded-xl border border-gray-700 bg-[#111] px-5 py-3 text-sm font-bold text-gray-300 hover:bg-gray-800 hover:text-white transition">Keep Shopping</button>
+                    <button type="button" id="btn-confirm-cart" onclick="confirmCartPurchase()" class="w-2/3 flex items-center justify-center rounded-xl bg-gradient-to-r from-szgreen to-szcyan px-5 py-3 text-sm font-black text-black uppercase tracking-wide btn-glow transition">Pay Now <i class="fas fa-check-circle ml-2"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
             <div class="p-6">
                 <div class="mb-6 pb-6 border-b border-gray-800">
                     <h4 class="text-sm font-bold text-gray-400 uppercase mb-3">Player Information</h4>
