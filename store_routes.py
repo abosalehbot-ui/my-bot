@@ -528,3 +528,40 @@ async def admin_customer_orders(request: Request, email: str):
             o['order_id'] = str(o['_id'])
             o['_id'] = str(o['_id'])
     return JSONResponse({"success": True, "orders": orders})
+    # -------------------------------------------------------------------
+# 👇 دوال إرجاع الطلبات الجديدة (تعمل بصمت بدون Redirect) 👇
+# -------------------------------------------------------------------
+
+@router.post("/api/store/admin/return-order")
+async def admin_return_single_order(request: Request, order_id: str = Form(...)):
+    if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauthorized"})
+    
+    order = await db.store_orders.find_one({"_id": order_id})
+    if not order: return JSONResponse({"success": False, "msg": "Order not found!"})
+    
+    # 1. إرجاع الكود للمخزن
+    await db.stock.insert_one({"code": order["code"], "category": order["category"], "added_at": datetime.now()})
+    
+    # 2. حذف الطلب من خريطة الأكواد ومن سجل الطلبات
+    await db.codes_map.delete_many({"order_id": order_id})
+    await db.store_orders.delete_one({"_id": order_id})
+    
+    return JSONResponse({"success": True, "msg": f"Order #{order_id} returned to stock successfully!"})
+
+@router.post("/api/store/admin/return-all-orders")
+async def admin_return_all_orders(request: Request, email: str = Form(...)):
+    if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauthorized"})
+    
+    orders = await db.store_orders.find({"email": email}).to_list(None)
+    if not orders: return JSONResponse({"success": False, "msg": "No orders found for this user."})
+    
+    # تجهيز الأكواد لإرجاعها للمخزن دفعة واحدة
+    codes_to_return = [{"code": o["code"], "category": o["category"], "added_at": datetime.now()} for o in orders]
+    await db.stock.insert_many(codes_to_return, ordered=False)
+    
+    # حذف جميع الطلبات الخاصة بهذا المستخدم من السجلات
+    order_ids = [o["_id"] for o in orders]
+    await db.codes_map.delete_many({"order_id": {"$in": order_ids}})
+    await db.store_orders.delete_many({"email": email})
+    
+    return JSONResponse({"success": True, "msg": f"Success! {len(orders)} orders returned to stock."})
