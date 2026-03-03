@@ -273,6 +273,12 @@ async def store_admin_page(request: Request):
     maintenance = settings.get("maintenance", False) if settings else False
 
     store_customers = await db.store_customers.find().sort("created_at", -1).to_list(200)
+    
+    # ✅ الحل هنا: تحويل الـ ObjectId لنص عشان الصفحة تفهمه وماتضربش 500
+    for customer in store_customers:
+        if "_id" in customer:
+            customer["_id"] = str(customer["_id"])
+
     store_orders    = await db.store_orders.find().sort("date", -1).to_list(500)
 
     return templates.TemplateResponse("store_admin.html", {
@@ -281,6 +287,7 @@ async def store_admin_page(request: Request):
         "store_orders":    store_orders,
         "maintenance":     maintenance,
     })
+   
 
 @router.post("/api/store/manage_balance")
 async def store_manage_balance(request: Request, email: str = Form(...), amount: float = Form(...), action: str = Form(...), currency: str = Form(...)):
