@@ -367,7 +367,20 @@ async def change_email_verify(request: Request, new_email: str = Form(...), code
     res = JSONResponse({"success": True, "msg": "Email updated successfully!"})
     res.set_cookie(key="store_session", value=new_email, httponly=True, max_age=86400 * 30)
     return res
-
+@router.post("/api/store/change-password")
+async def change_password(request: Request, old_password: str = Form(...), new_password: str = Form(...)):
+    email = request.cookies.get("store_session")
+    if not email: return JSONResponse({"success": False, "msg": "Unauthorized"})
+    
+    user = await db.store_customers.find_one({"email": email})
+    if not user or user.get("password") != hash_password(old_password):
+        return JSONResponse({"success": False, "msg": "Incorrect current password!"})
+        
+    if len(new_password) < 8:
+        return JSONResponse({"success": False, "msg": "New password must be at least 8 characters!"})
+        
+    await db.store_customers.update_one({"email": email}, {"$set": {"password": hash_password(new_password)}})
+    return JSONResponse({"success": True, "msg": "Password updated successfully!"})
 # ==========================================
 # 6. لوحة أدمن الاستور
 # ==========================================
@@ -409,12 +422,23 @@ async def admin_set_avatar(request: Request, email: str = Form(...), avatar: Upl
 async def store_manage_balance(request: Request, email: str = Form(...), amount: float = Form(...), action: str = Form(...), currency: str = Form(...)):
     if not check_auth(request): return JSONResponse({"success": False})
     
+    # حل جذري للمستخدمين القدامى: البحث بالإيميل أو اليوزر نيم أو الـ ID
+    query = [{"email": email}, {"username": email}]
+    try:
+        query.append({"user_id": int(email)})
+    except:
+        pass
+        
+    user = await db.store_customers.find_one({"$or": query})
+    if not user:
+        return JSONResponse({"success": False, "msg": "User not found (Old user record might be corrupted)."})
+        
     bal_field = f"balance_{currency.lower()}"
-    if action == "add": await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: amount}})
-    elif action == "set": await db.store_customers.update_one({"email": email}, {"$set": {bal_field: amount}})
+    # نستخدم الـ _id الحقيقي للمستخدم لضمان تحديث بياناته حتى لو كان حسابه قديماً
+    if action == "add": await db.store_customers.update_one({"_id": user["_id"]}, {"$inc": {bal_field: amount}})
+    elif action == "set": await db.store_customers.update_one({"_id": user["_id"]}, {"$set": {bal_field: amount}})
     
     return JSONResponse({"success": True, "msg": f"{currency.upper()} Balance updated successfully!"})
-
 # ==========================================
 # 7. مسارات التحكم الشاملة للعملاء (Admin Controls)
 # ==========================================
