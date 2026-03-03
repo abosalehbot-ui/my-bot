@@ -4,6 +4,7 @@ from fastapi.templating import Jinja2Templates
 import hashlib
 import random
 import httpx
+import traceback
 from datetime import datetime
 
 # ─── Shared imports (no duplicate connections) ──────────────────────────
@@ -33,22 +34,41 @@ async def generate_unique_id():
 # ==========================================
 @router.get("/", response_class=HTMLResponse)
 async def public_storefront(request: Request):
-    settings    = await db.settings.find_one({"_id": "config"})
-    maintenance = settings.get("maintenance", False) if settings else False
+    try:
+        settings    = await db.settings.find_one({"_id": "config"})
+        maintenance = settings.get("maintenance", False) if settings else False
 
-    categories    = await db.store_categories.find().to_list(100)
-    stock_details = {}
-    
-    for cat in categories:
-        # 1. تحويل الآيدي لنص عشان مايعملش Error في الـ HTML
-        if "_id" in cat:
-            cat["_id"] = str(cat["_id"])
-            
-        for p in cat.get("products", []):
-            # 2. استخدام .get() لتفادي (KeyError) لو في منتج متسجل غلط أو ناقص بيانات
-            sk = p.get("stock_key")
-            if sk and sk not in stock_details:
-                stock_details[sk] = await db.stock.count_documents({"category": sk})
+        categories    = await db.store_categories.find().to_list(100)
+        stock_details = {}
+        
+        for cat in categories:
+            # 1. تحويل الآيدي لنص عشان مايعملش Error في الـ HTML
+            if "_id" in cat:
+                cat["_id"] = str(cat["_id"])
+                
+            # 2. الحماية من أن يكون قسم المنتجات فارغ تماماً (null)
+            products = cat.get("products") or []
+            for p in products:
+                # 3. الحماية من المنتجات اللي ملهاش stock_key
+                sk = p.get("stock_key")
+                if sk and sk not in stock_details:
+                    stock_details[sk] = await db.stock.count_documents({"category": sk})
+
+        return templates.TemplateResponse("storefront.html", {
+            "request":     request,
+            "categories":  categories,
+            "stock":       stock_details,
+            "client_id":   GOOGLE_CLIENT_ID,
+            "maintenance": maintenance,
+        })
+    except Exception as e:
+        # 4. طباعة الخطأ بالكامل على الشاشة بدل الإيرور 500 المزعج
+        error_details = traceback.format_exc()
+        print(error_details)
+        return HTMLResponse(
+            content=f"<div style='direction:ltr; text-align:left; background:#111; color:#7dfc89; padding:20px; font-family:monospace; height:100vh; overflow:auto;'><h2>System Error Debugger:</h2><pre>{error_details}</pre></div>", 
+            status_code=500
+        )
 
     return templates.TemplateResponse("storefront.html", {
         "request":     request,
