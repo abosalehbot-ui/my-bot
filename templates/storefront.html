@@ -6,6 +6,7 @@
     <title>Saleh Zone | Storefront</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="/static/js/core.js"></script>
     <script>
         tailwind.config = { theme: { extend: { colors: { szgreen: 'var(--theme-primary)', szcyan: 'var(--theme-secondary)', darkbg: '#050505', panelbg: '#111' } } } }
     </script>
@@ -128,14 +129,14 @@
                         
                         <div class="mt-2 mb-6 bg-black w-full py-3 rounded-xl border border-gray-800">
                             {% for curr in currencies %}
-                            <div class="price-display price-{{ curr._id }} {{ 'hidden' if curr._id != currencies[0]._id else '' }}">
-                                <span class="text-2xl font-black text-white">{{ p.prices.get(curr._id, 0) }}</span> 
+                            <div class="price-display price-{{ curr._id }} {{ 'hidden' if loop.index0 > 0 else '' }}">
+                                <span class="text-2xl font-black text-white">{{ p.get('prices', {}).get(curr._id, p.get('price_egp', 0) if curr._id == 'EGP' else p.get('price_usd', 0)) }}</span> 
                                 <span class="text-[10px] text-szcyan font-bold uppercase ml-1">{{ curr.symbol }}</span>
                             </div>
                             {% endfor %}
                         </div>
 
-                        <button onclick="buyProductDynamic('{{ p.stock_key }}', {{ p.prices | tojson | forceescape }}, '{{ p.name }}', '{{ cat.icon }}')" {{ 'disabled' if stock.get(p.stock_key, 0) == 0 }} class="w-full bg-{{ 'szgreen text-black hover:bg-szcyan' if stock.get(p.stock_key, 0) > 0 else 'gray-900 text-gray-600' }} font-bold py-3 rounded-xl transition uppercase text-sm btn-glow flex justify-center items-center gap-2">
+                        <button onclick="buyProductDynamic('{{ p.stock_key }}', {{ p.get('prices', {'EGP': p.get('price_egp', 0), 'USD': p.get('price_usd', 0)}) | tojson | forceescape }}, '{{ p.name }}', '{{ cat.icon }}')" {{ 'disabled' if stock.get(p.stock_key, 0) == 0 }} class="w-full bg-{{ 'szgreen text-black hover:bg-szcyan' if stock.get(p.stock_key, 0) > 0 else 'gray-900 text-gray-600' }} font-bold py-3 rounded-xl transition uppercase text-sm btn-glow flex justify-center items-center gap-2">
                             <i class="fas fa-shopping-cart"></i> <span>{{ 'Buy Now' if stock.get(p.stock_key, 0) > 0 else 'Unavailable' }}</span>
                         </button>
                     </div>
@@ -275,8 +276,6 @@
         </div>
     </div>
 
-    <script src="/static/js/core.js"></script>
-    <script src="/static/js/store.js"></script>
     <script>
         function toggleCurrency() {
             currentCurrency = document.getElementById('currency-toggle').value;
@@ -369,6 +368,5 @@
             Core.openModal('profile-modal');
         }
     </script>
-    {% endif %}
 </body>
 </html>
