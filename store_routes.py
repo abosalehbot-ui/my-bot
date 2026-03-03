@@ -296,3 +296,150 @@ async def store_manage_balance(request: Request, email: str = Form(...), amount:
         await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: -amount}})
 
     return JSONResponse({"success": True, "msg": f"{currency.upper()} balance updated successfully!"})
+
+# ==========================================
+# 6. Profile — Get / Edit / Avatar / Password / Email
+# ==========================================
+
+import base64, re as _re
+
+def _make_username(name: str, user_id: int) -> str:
+    """توليد يوزر تلقائي من الاسم + آخر 4 أرقام من الـ id"""
+    base = _re.sub(r'[^a-z0-9]', '', name.lower())[:12] or "user"
+    return f"{base}{str(user_id)[-4:]}"
+
+@router.get("/api/store/me")
+async def get_profile(request: Request):
+    email = request.cookies.get("store_session")
+    if not email:
+        return JSONResponse({"success": False, "msg": "Not logged in"})
+
+    user = await db.store_customers.find_one({"email": email})
+    if not user:
+        return JSONResponse({"success": False, "msg": "User not found"})
+
+    # Auto-generate username if missing
+    if not user.get("username"):
+        auto_uname = _make_username(user["name"], user["user_id"])
+        await db.store_customers.update_one({"email": email}, {"$set": {"username": auto_uname}})
+        user["username"] = auto_uname
+
+    return JSONResponse({
+        "success":     True,
+        "user_id":     user.get("user_id"),
+        "name":        user.get("name"),
+        "username":    user.get("username"),
+        "email":       user.get("email"),
+        "balance_egp": user.get("balance_egp", 0),
+        "balance_usd": user.get("balance_usd", 0),
+        "avatar":      user.get("avatar", ""),
+        "created_at":  user.get("created_at", ""),
+    })
+
+@router.post("/api/store/update-profile")
+async def update_profile(request: Request, name: str = Form(...), username: str = Form(...)):
+    email = request.cookies.get("store_session")
+    if not email:
+        return JSONResponse({"success": False, "msg": "Not logged in"})
+
+    username = username.lower().strip()
+    if not _re.match(r'^[a-z0-9_]{3,20}$', username):
+        return JSONResponse({"success": False, "msg": "Username must be 3-20 characters (letters, numbers, _)"})
+    if not name.strip():
+        return JSONResponse({"success": False, "msg": "Name cannot be empty"})
+
+    # Check username not taken by someone else
+    existing = await db.store_customers.find_one({"username": username, "email": {"$ne": email}})
+    if existing:
+        return JSONResponse({"success": False, "msg": "Username is already taken!"})
+
+    await db.store_customers.update_one(
+        {"email": email},
+        {"$set": {"name": name.strip(), "username": username}}
+    )
+    return JSONResponse({"success": True, "msg": "Profile updated successfully!", "name": name.strip(), "username": username})
+
+@router.post("/api/store/upload-avatar")
+async def upload_avatar(request: Request, avatar_b64: str = Form(...)):
+    email = request.cookies.get("store_session")
+    if not email:
+        return JSONResponse({"success": False, "msg": "Not logged in"})
+
+    # Validate it's a real base64 image (max ~1MB)
+    if len(avatar_b64) > 1_400_000:
+        return JSONResponse({"success": False, "msg": "Image too large! Max 1MB."})
+    if not avatar_b64.startswith("data:image/"):
+        return JSONResponse({"success": False, "msg": "Invalid image format."})
+
+    await db.store_customers.update_one({"email": email}, {"$set": {"avatar": avatar_b64}})
+    return JSONResponse({"success": True, "msg": "Avatar updated!", "avatar": avatar_b64})
+
+@router.post("/api/store/change-password")
+async def change_password(request: Request,
+                          current_password: str = Form(...),
+                          new_password: str = Form(...)):
+    email = request.cookies.get("store_session")
+    if not email:
+        return JSONResponse({"success": False, "msg": "Not logged in"})
+
+    user = await db.store_customers.find_one({"email": email})
+    if not user:
+        return JSONResponse({"success": False, "msg": "User not found"})
+    if not user.get("password"):
+        return JSONResponse({"success": False, "msg": "Your account uses Google/Telegram login — no password to change."})
+    if user["password"] != hash_password(current_password):
+        return JSONResponse({"success": False, "msg": "Current password is incorrect!"})
+    if len(new_password) < 8:
+        return JSONResponse({"success": False, "msg": "New password must be at least 8 characters."})
+    if current_password == new_password:
+        return JSONResponse({"success": False, "msg": "New password must be different from current."})
+
+    await db.store_customers.update_one({"email": email}, {"$set": {"password": hash_password(new_password)}})
+    return JSONResponse({"success": True, "msg": "Password changed successfully!"})
+
+@router.post("/api/store/change-email-request")
+async def change_email_request(request: Request, new_email: str = Form(...)):
+    current_email = request.cookies.get("store_session")
+    if not current_email:
+        return JSONResponse({"success": False, "msg": "Not logged in"})
+    if not _re.match(r'^[^@]+@[^@]+\.[^@]+$', new_email):
+        return JSONResponse({"success": False, "msg": "Invalid email address."})
+    if new_email == current_email:
+        return JSONResponse({"success": False, "msg": "This is already your current email."})
+    if await db.store_customers.find_one({"email": new_email}):
+        return JSONResponse({"success": False, "msg": "This email is already registered."})
+
+    code = str(random.randint(100000, 999999))
+    await db.otps.update_one(
+        {"email": current_email},
+        {"$set": {"code": code, "new_email": new_email, "type": "email_change", "created_at": datetime.now()}},
+        upsert=True
+    )
+    print(f"\n[MOCK EMAIL] To: {new_email} | EMAIL CHANGE OTP: {code}\n")
+    return JSONResponse({"success": True, "msg": f"Verification code sent to {new_email}"})
+
+@router.post("/api/store/change-email-verify")
+async def change_email_verify(request: Request, code: str = Form(...)):
+    current_email = request.cookies.get("store_session")
+    if not current_email:
+        return JSONResponse({"success": False, "msg": "Not logged in"})
+
+    otp_doc = await db.otps.find_one({"email": current_email, "code": code, "type": "email_change"})
+    if not otp_doc:
+        return JSONResponse({"success": False, "msg": "Invalid verification code."})
+    if (datetime.now() - otp_doc["created_at"]).total_seconds() > 300:
+        return JSONResponse({"success": False, "msg": "Code expired! Please try again."})
+
+    new_email = otp_doc["new_email"]
+    # Double-check new email not taken
+    if await db.store_customers.find_one({"email": new_email}):
+        return JSONResponse({"success": False, "msg": "This email was just registered by someone else."})
+
+    await db.store_customers.update_one({"email": current_email}, {"$set": {"email": new_email}})
+    await db.store_orders.update_many({"email": current_email}, {"$set": {"email": new_email}})
+    await db.otps.delete_one({"_id": otp_doc["_id"]})
+
+    # Update session cookie
+    response = JSONResponse({"success": True, "msg": "Email updated successfully!", "new_email": new_email})
+    response.set_cookie(key="store_session", value=new_email, httponly=True, max_age=86400 * 30)
+    return response

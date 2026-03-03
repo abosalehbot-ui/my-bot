@@ -99,8 +99,14 @@
                 <li id="sidebar-user" class="hidden bg-[#050505] p-4 rounded-lg border border-gray-800 fade-in cursor-pointer hover:border-szgreen transition" onclick="openProfileModal(); toggleSidebarMobile();">
                     <div class="flex items-center justify-between mb-3">
                         <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 bg-gray-900 rounded-full flex items-center justify-center text-szgreen border border-gray-700"><i class="fas fa-user"></i></div>
-                            <div class="font-bold text-white truncate" id="sidebar-ui-name">Name</div>
+                            <div class="w-10 h-10 rounded-full border border-gray-700 overflow-hidden flex items-center justify-center bg-gray-900 shrink-0">
+                                <i class="fas fa-user text-szgreen avatar-placeholder"></i>
+                                <img class="avatar-img w-full h-full object-cover hidden" src="" alt="">
+                            </div>
+                            <div>
+                                <div class="font-bold text-white truncate leading-tight" id="sidebar-ui-name">Name</div>
+                                <div class="text-xs text-gray-500 font-mono leading-tight" id="sidebar-ui-username"></div>
+                            </div>
                         </div>
                         <i class="fas fa-chevron-right text-gray-600 text-xs"></i>
                     </div>
@@ -389,35 +395,78 @@
     </div>
 
     <div id="profile-modal" class="fixed inset-0 bg-black/90 z-[60] hidden flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="w-full max-w-4xl bg-panelbg border border-gray-800 rounded-2xl shadow-2xl relative fade-in h-[85vh] flex flex-col">
+        <div class="w-full max-w-3xl bg-panelbg border border-gray-800 rounded-2xl shadow-2xl relative fade-in h-[90vh] flex flex-col">
+
+            <!-- Hidden file input for avatar -->
+            <input type="file" id="avatar-file-input" accept="image/*" class="hidden" onchange="handleAvatarChange(this)">
+
+            <!-- Header -->
             <div class="flex items-center justify-between p-5 border-b border-gray-800 shrink-0">
                 <h2 class="text-xl font-black text-white uppercase tracking-widest"><i class="fas fa-user-astronaut text-szcyan mr-2"></i> Player Profile</h2>
                 <button onclick="closeModal('profile-modal')" class="text-gray-500 hover:text-red-500 transition"><i class="fas fa-times text-xl"></i></button>
             </div>
 
-            <div class="flex border-b border-gray-800 shrink-0 px-6 mt-2 gap-4">
-                <button onclick="switchProfileTab('overview')" id="ptab-btn-overview" class="pb-3 px-2 font-bold text-sm text-szgreen border-b-2 border-szgreen transition">Account Overview</button>
-                <button onclick="switchProfileTab('history')" id="ptab-btn-history" class="pb-3 px-2 font-bold text-sm text-gray-500 hover:text-gray-300 transition border-b-2 border-transparent">Purchase History</button>
+            <!-- Tabs -->
+            <div class="flex border-b border-gray-800 shrink-0 px-4 mt-2 gap-1 overflow-x-auto">
+                <button onclick="switchProfileTab('overview')" id="ptab-btn-overview" class="pb-3 px-3 font-bold text-sm text-szgreen border-b-2 border-szgreen transition whitespace-nowrap">
+                    <i class="fas fa-user mr-1"></i> Overview
+                </button>
+                <button onclick="switchProfileTab('edit')" id="ptab-btn-edit" class="pb-3 px-3 font-bold text-sm text-gray-500 hover:text-gray-300 transition border-b-2 border-transparent whitespace-nowrap">
+                    <i class="fas fa-edit mr-1"></i> Edit Profile
+                </button>
+                <button onclick="switchProfileTab('security')" id="ptab-btn-security" class="pb-3 px-3 font-bold text-sm text-gray-500 hover:text-gray-300 transition border-b-2 border-transparent whitespace-nowrap">
+                    <i class="fas fa-shield-alt mr-1"></i> Security
+                </button>
+                <button onclick="switchProfileTab('history')" id="ptab-btn-history" class="pb-3 px-3 font-bold text-sm text-gray-500 hover:text-gray-300 transition border-b-2 border-transparent whitespace-nowrap">
+                    <i class="fas fa-history mr-1"></i> History
+                </button>
             </div>
 
-            <div id="ptab-overview" class="flex-1 p-6 overflow-y-auto block">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="bg-black border border-gray-800 rounded-xl p-6">
-                        <h3 class="text-sm text-gray-400 font-bold uppercase tracking-wider mb-4 border-b border-gray-800 pb-2">Personal Details</h3>
-                        <div class="space-y-4">
-                            <div><div class="text-[10px] text-gray-500 uppercase">Full Name</div><div class="text-white font-bold text-lg" id="prof-name">...</div></div>
-                            <div><div class="text-[10px] text-gray-500 uppercase">Email Address</div><div class="text-white font-mono text-sm" id="prof-email">...</div></div>
+            <!-- ══ TAB: Overview ══════════════════════════════════════════════ -->
+            <div id="ptab-overview" class="flex-1 p-5 overflow-y-auto">
+                <!-- Avatar + Name card -->
+                <div class="flex items-center gap-5 bg-black border border-gray-800 rounded-2xl p-5 mb-5">
+                    <div class="relative shrink-0 cursor-pointer group" onclick="switchProfileTab('edit')">
+                        <div class="w-20 h-20 rounded-full bg-gray-900 border-2 border-gray-700 flex items-center justify-center overflow-hidden">
+                            <i class="fas fa-user text-3xl text-gray-500 avatar-placeholder"></i>
+                            <img class="avatar-img w-full h-full object-cover hidden" src="" alt="avatar">
+                        </div>
+                        <div class="absolute inset-0 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+                            <i class="fas fa-camera text-white text-sm"></i>
                         </div>
                     </div>
-                    <div class="bg-black border border-gray-800 rounded-xl p-6">
-                        <h3 class="text-sm text-gray-400 font-bold uppercase tracking-wider mb-4 border-b border-gray-800 pb-2">Wallet Balances</h3>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="bg-gray-900 border border-yellow-500/30 rounded-lg p-4 text-center">
-                                <div class="text-xs text-gray-500 uppercase mb-1">EGP Wallet</div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-xl font-black text-white truncate" id="prof-name">...</div>
+                        <div class="text-szcyan text-sm font-mono mt-0.5" id="prof-username">@...</div>
+                        <div class="text-gray-500 text-xs mt-1" id="prof-user-id">#...</div>
+                    </div>
+                    <button onclick="switchProfileTab('edit')" class="shrink-0 bg-gray-900 border border-gray-700 text-gray-400 hover:text-szgreen hover:border-szgreen px-3 py-2 rounded-lg text-xs font-bold transition">
+                        <i class="fas fa-edit mr-1"></i>Edit
+                    </button>
+                </div>
+
+                <!-- Info grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-black border border-gray-800 rounded-xl p-4 space-y-3">
+                        <h3 class="text-[10px] text-gray-500 uppercase font-bold tracking-wider border-b border-gray-800 pb-2">Account Info</h3>
+                        <div>
+                            <div class="text-[10px] text-gray-500 uppercase">Email</div>
+                            <div class="text-white font-mono text-sm truncate" id="prof-email">...</div>
+                        </div>
+                        <div>
+                            <div class="text-[10px] text-gray-500 uppercase">Member Since</div>
+                            <div class="text-white text-sm" id="prof-joined">...</div>
+                        </div>
+                    </div>
+                    <div class="bg-black border border-gray-800 rounded-xl p-4">
+                        <h3 class="text-[10px] text-gray-500 uppercase font-bold tracking-wider border-b border-gray-800 pb-2 mb-3">Wallets</h3>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="bg-gray-900 border border-yellow-500/30 rounded-lg p-3 text-center">
+                                <div class="text-[10px] text-gray-500 uppercase mb-1">EGP</div>
                                 <div class="text-yellow-500 font-black text-2xl" id="prof-bal-egp">0</div>
                             </div>
-                            <div class="bg-gray-900 border border-szcyan/30 rounded-lg p-4 text-center">
-                                <div class="text-xs text-gray-500 uppercase mb-1">USD Wallet</div>
+                            <div class="bg-gray-900 border border-szcyan/30 rounded-lg p-3 text-center">
+                                <div class="text-[10px] text-gray-500 uppercase mb-1">USD</div>
                                 <div class="text-szcyan font-black text-2xl" id="prof-bal-usd">0</div>
                             </div>
                         </div>
@@ -425,17 +474,130 @@
                 </div>
             </div>
 
-            <div id="ptab-history" class="flex-1 p-6 overflow-y-auto hidden relative">
-                <div id="orders-loading" class="text-center text-szcyan py-10 font-bold hidden"><i class="fas fa-spinner fa-spin text-3xl mb-2"></i><br>Loading Orders...</div>
-                <div class="relative overflow-x-auto border border-gray-800 rounded-xl bg-black">
+            <!-- ══ TAB: Edit Profile ══════════════════════════════════════════ -->
+            <div id="ptab-edit" class="flex-1 p-5 overflow-y-auto hidden">
+                <!-- Avatar upload -->
+                <div class="flex flex-col items-center mb-6">
+                    <div class="relative cursor-pointer group" onclick="triggerAvatarUpload()">
+                        <div class="w-24 h-24 rounded-full bg-gray-900 border-2 border-gray-700 flex items-center justify-center overflow-hidden">
+                            <i class="fas fa-user text-4xl text-gray-500 avatar-placeholder"></i>
+                            <img class="avatar-img w-full h-full object-cover hidden" src="" alt="avatar">
+                        </div>
+                        <div class="absolute inset-0 rounded-full bg-black/70 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+                            <i class="fas fa-camera text-white"></i>
+                        </div>
+                    </div>
+                    <button onclick="triggerAvatarUpload()" class="mt-3 text-xs text-szcyan font-bold hover:underline">
+                        <i class="fas fa-camera mr-1"></i>Change Avatar
+                    </button>
+                    <p class="text-[10px] text-gray-600 mt-1">JPG/PNG · Max 1MB</p>
+                </div>
+
+                <!-- Edit form -->
+                <form onsubmit="doUpdateProfile(event)" class="space-y-4 max-w-sm mx-auto">
+                    <div>
+                        <label class="block text-xs text-gray-400 font-bold mb-1 uppercase">Full Name</label>
+                        <input type="text" id="edit-name" required class="w-full bg-black border border-gray-700 rounded-lg px-4 py-3 text-gray-200 text-sm outline-none focus:border-szgreen transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 font-bold mb-1 uppercase">Username</label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-bold">@</span>
+                            <input type="text" id="edit-username" required minlength="3" maxlength="20"
+                                class="w-full bg-black border border-gray-700 rounded-lg pl-8 pr-4 py-3 text-gray-200 text-sm outline-none focus:border-szgreen transition"
+                                placeholder="your_username">
+                        </div>
+                        <p class="text-[10px] text-gray-600 mt-1">3-20 characters, letters/numbers/_ only</p>
+                    </div>
+                    <div id="edit-status" class="text-xs font-bold text-center h-4"></div>
+                    <button type="submit" id="btn-update-profile"
+                        class="w-full bg-gradient-to-r from-szgreen to-szcyan text-black py-3 rounded-xl font-black uppercase tracking-wide hover:opacity-90 transition">
+                        Save Changes
+                    </button>
+                </form>
+            </div>
+
+            <!-- ══ TAB: Security ════════════════════════════════════════════ -->
+            <div id="ptab-security" class="flex-1 p-5 overflow-y-auto hidden space-y-5">
+                <div id="sec-status" class="text-xs font-bold text-center h-4 mb-2"></div>
+
+                <!-- Change Password -->
+                <div class="bg-black border border-gray-800 rounded-xl p-5">
+                    <h3 class="text-sm font-black text-white uppercase mb-4 flex items-center gap-2">
+                        <i class="fas fa-key text-szgreen"></i> Change Password
+                    </h3>
+                    <form id="pass-change-form" onsubmit="doChangePassword(event)" class="space-y-3">
+                        <div>
+                            <label class="text-xs text-gray-500 font-bold uppercase block mb-1">Current Password</label>
+                            <input type="password" id="sec-curr-pass" required class="w-full bg-[#050505] border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-gray-200 outline-none focus:border-szgreen transition">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-500 font-bold uppercase block mb-1">New Password (min 8)</label>
+                            <input type="password" id="sec-new-pass" required minlength="8" class="w-full bg-[#050505] border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-gray-200 outline-none focus:border-szcyan transition">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-500 font-bold uppercase block mb-1">Confirm New Password</label>
+                            <input type="password" id="sec-conf-pass" required minlength="8" class="w-full bg-[#050505] border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-gray-200 outline-none focus:border-szcyan transition">
+                        </div>
+                        <button type="submit" id="btn-change-pass"
+                            class="w-full bg-szgreen text-black py-2.5 rounded-lg font-bold uppercase text-sm hover:opacity-90 transition mt-2">
+                            Update Password
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Change Email -->
+                <div class="bg-black border border-gray-800 rounded-xl p-5">
+                    <h3 class="text-sm font-black text-white uppercase mb-1 flex items-center gap-2">
+                        <i class="fas fa-envelope text-szcyan"></i> Change Email
+                    </h3>
+                    <p class="text-xs text-gray-500 mb-4">A verification code will be sent to your new email.</p>
+                    <form id="email-change-form" class="space-y-3">
+                        <div>
+                            <label class="text-xs text-gray-500 font-bold uppercase block mb-1">New Email Address</label>
+                            <input type="email" id="sec-new-email" required class="w-full bg-[#050505] border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-gray-200 outline-none focus:border-szgreen transition">
+                        </div>
+                        <button type="button" id="btn-email-req" onclick="doChangeEmailRequest(event)"
+                            class="w-full bg-szcyan text-black py-2.5 rounded-lg font-bold uppercase text-sm hover:opacity-90 transition">
+                            Send Verification Code
+                        </button>
+                        <!-- OTP step (hidden initially) -->
+                        <div id="email-otp-step" class="hidden space-y-3">
+                            <div>
+                                <label class="text-xs text-gray-500 font-bold uppercase block mb-1">6-Digit Code</label>
+                                <input type="text" id="sec-email-otp" maxlength="6"
+                                    class="w-full bg-[#050505] border border-gray-700 rounded-lg px-4 py-2.5 text-szgreen text-center text-xl tracking-[0.4em] font-black outline-none focus:border-szgreen transition">
+                            </div>
+                            <button type="button" onclick="doChangeEmailVerify(event)"  id="btn-email-verify"
+                                class="w-full bg-szgreen text-black py-2.5 rounded-lg font-bold uppercase text-sm hover:opacity-90 transition">
+                                Verify & Change Email
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- ══ TAB: History ═══════════════════════════════════════════════ -->
+            <div id="ptab-history" class="flex-1 p-5 overflow-y-auto hidden relative">
+                <div id="orders-loading" class="text-center text-szcyan py-10 font-bold hidden">
+                    <i class="fas fa-spinner fa-spin text-3xl mb-2"></i><br>Loading Orders...
+                </div>
+                <div class="overflow-x-auto border border-gray-800 rounded-xl bg-black">
                     <table class="w-full text-left text-sm whitespace-nowrap">
                         <thead class="bg-[#111] text-gray-400 uppercase text-[10px] sticky top-0">
-                            <tr><th class="px-4 py-3">Order ID</th><th class="px-4 py-3">Date</th><th class="px-4 py-3">Item</th><th class="px-4 py-3">Price</th><th class="px-4 py-3">Code</th></tr>
+                            <tr>
+                                <th class="px-4 py-3">Order ID</th>
+                                <th class="px-4 py-3">Date</th>
+                                <th class="px-4 py-3">Item</th>
+                                <th class="px-4 py-3">Price</th>
+                                <th class="px-4 py-3">Code</th>
+                            </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-800 text-gray-300" id="orders-table-body"></tbody>
                     </table>
                 </div>
             </div>
+
         </div>
     </div>
 

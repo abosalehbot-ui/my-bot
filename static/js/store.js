@@ -79,6 +79,12 @@ function updateUI(name, balEgp, balUsd) {
     set('sidebar-ui-name',    name);
     set('sidebar-ui-bal-egp', balEgp ?? '0');
     set('sidebar-ui-bal-usd', balUsd ?? '0');
+
+    // Show username in sidebar if available
+    const uname = localStorage.getItem('store_username');
+    const unameEl = document.getElementById('sidebar-ui-username');
+    if (unameEl) unameEl.innerText = uname ? '@' + uname : '';
+
     set('prof-name',    name);
     set('prof-email',   localStorage.getItem('store_email') || 'N/A');
     set('prof-bal-egp', balEgp ?? '0');
@@ -329,25 +335,7 @@ function copyPurchasedCode() {
     if (code) Core.copy(code);
 }
 
-// ─── Profile Modal ───────────────────────────────────────
-function openProfileModal() {
-    openModal('profile-modal');
-    switchProfileTab('overview');
-}
-
-function switchProfileTab(tab) {
-    ['overview', 'history'].forEach(t => {
-        document.getElementById(`ptab-${t}`)?.classList.add('hidden');
-        const btn = document.getElementById(`ptab-btn-${t}`);
-        if (btn) btn.className = 'pb-3 px-2 font-bold text-sm text-gray-500 hover:text-gray-300 transition border-b-2 border-transparent';
-    });
-
-    document.getElementById(`ptab-${tab}`)?.classList.remove('hidden');
-    const activeBtn = document.getElementById(`ptab-btn-${tab}`);
-    if (activeBtn) activeBtn.className = 'pb-3 px-2 font-bold text-sm text-szgreen border-b-2 border-szgreen transition';
-
-    if (tab === 'history' && !ordersLoaded) fetchMyOrders();
-}
+// ─── Profile Modal & Tab Switcher — see extended version below ───
 
 // ─── Order History ───────────────────────────────────────
 async function fetchMyOrders() {
@@ -411,5 +399,284 @@ document.addEventListener('DOMContentLoaded', () => {
             scrollBtn.classList.toggle('translate-y-0',        past);
         });
         scrollBtn.onclick = () => mainScroll.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+});
+
+// ─── Extended Profile State ───────────────────────────────
+let _profileLoaded = false;
+
+// ─── Save Full Profile to localStorage ───────────────────
+function saveProfile(data) {
+    localStorage.setItem('store_email',    data.email);
+    localStorage.setItem('store_name',     data.name);
+    localStorage.setItem('store_username', data.username  || '');
+    localStorage.setItem('store_user_id',  data.user_id   || '');
+    localStorage.setItem('store_avatar',   data.avatar    || '');
+    updateUI(data.name, data.balance_egp, data.balance_usd);
+    _applyAvatar(data.avatar || '');
+}
+
+function _applyAvatar(src) {
+    const placeholders = document.querySelectorAll('.avatar-placeholder');
+    const imgs         = document.querySelectorAll('.avatar-img');
+    if (src) {
+        placeholders.forEach(el => el.classList.add('hidden'));
+        imgs.forEach(el => { el.src = src; el.classList.remove('hidden'); });
+    } else {
+        placeholders.forEach(el => el.classList.remove('hidden'));
+        imgs.forEach(el => el.classList.add('hidden'));
+    }
+}
+
+// Override saveAndLogin to save full data
+const _origSaveAndLogin = saveAndLogin;
+// We redefine saveAndLogin below to also fetch /me after login
+async function saveAndLogin(data) {
+    localStorage.setItem('store_email', data.email);
+    localStorage.setItem('store_name',  data.name);
+    updateUI(data.name, data.balance_egp, data.balance_usd);
+    closeModal('auth-modal');
+    Core.showToast(`Welcome, ${data.name}!`);
+    // Fetch full profile in background
+    fetchAndApplyProfile();
+}
+
+async function fetchAndApplyProfile() {
+    try {
+        const res  = await fetch('/api/store/me');
+        const data = await res.json();
+        if (data.success) {
+            saveProfile(data);
+            // Update profile modal if open
+            _fillProfileModal(data);
+        }
+    } catch {}
+}
+
+function _fillProfileModal(data) {
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
+    set('prof-name',     data.name);
+    set('prof-email',    data.email);
+    set('prof-username', data.username || '—');
+    set('prof-user-id',  '#' + (data.user_id || ''));
+    set('prof-bal-egp',  data.balance_egp ?? '0');
+    set('prof-bal-usd',  data.balance_usd ?? '0');
+    set('prof-joined',   data.created_at || '');
+
+    // Edit tab prefill
+    const nameIn = document.getElementById('edit-name');
+    const uname  = document.getElementById('edit-username');
+    if (nameIn) nameIn.value = data.name;
+    if (uname)  uname.value  = data.username || '';
+
+    _applyAvatar(data.avatar || '');
+}
+
+// ─── Override openProfileModal to load from server ────────
+function openProfileModal() {
+    openModal('profile-modal');
+    switchProfileTab('overview');
+    if (!_profileLoaded) {
+        _profileLoaded = true;
+        fetchAndApplyProfile();
+    } else {
+        // Refresh from localStorage
+        _fillProfileModal({
+            name:        localStorage.getItem('store_name'),
+            email:       localStorage.getItem('store_email'),
+            username:    localStorage.getItem('store_username'),
+            user_id:     localStorage.getItem('store_user_id'),
+            avatar:      localStorage.getItem('store_avatar'),
+            balance_egp: localStorage.getItem('bal_egp'),
+            balance_usd: localStorage.getItem('bal_usd'),
+        });
+    }
+}
+
+// ─── Profile Tab Switcher (extended) ─────────────────────
+function switchProfileTab(tab) {
+    ['overview', 'edit', 'security', 'history'].forEach(t => {
+        document.getElementById(`ptab-${t}`)?.classList.add('hidden');
+        const btn = document.getElementById(`ptab-btn-${t}`);
+        if (btn) btn.className = 'pb-3 px-2 font-bold text-sm text-gray-500 hover:text-gray-300 transition border-b-2 border-transparent';
+    });
+    document.getElementById(`ptab-${tab}`)?.classList.remove('hidden');
+    const activeBtn = document.getElementById(`ptab-btn-${tab}`);
+    if (activeBtn) activeBtn.className = 'pb-3 px-2 font-bold text-sm text-szgreen border-b-2 border-szgreen transition';
+    if (tab === 'history' && !ordersLoaded) fetchMyOrders();
+}
+
+// ─── Avatar Upload ────────────────────────────────────────
+function triggerAvatarUpload() {
+    document.getElementById('avatar-file-input')?.click();
+}
+
+async function handleAvatarChange(input) {
+    const file = input.files[0];
+    if (!file) return;
+    if (file.size > 1_000_000) return Core.showToast('Image too large! Max 1MB.', 'error');
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        const b64 = e.target.result;
+        // Preview immediately
+        _applyAvatar(b64);
+
+        const fd = new FormData();
+        fd.append('avatar_b64', b64);
+        try {
+            const res  = await fetch('/api/store/upload-avatar', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (data.success) {
+                localStorage.setItem('store_avatar', b64);
+                Core.showToast('Avatar updated!');
+            } else Core.showToast(data.msg, 'error');
+        } catch { Core.showToast('Upload failed!', 'error'); }
+    };
+    reader.readAsDataURL(file);
+}
+
+// ─── Update Profile (name + username) ────────────────────
+async function doUpdateProfile(e) {
+    e.preventDefault();
+    const btn  = document.getElementById('btn-update-profile');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    btn.disabled  = true;
+
+    const fd = new FormData();
+    fd.append('name',     document.getElementById('edit-name').value);
+    fd.append('username', document.getElementById('edit-username').value);
+
+    try {
+        const res  = await fetch('/api/store/update-profile', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.success) {
+            localStorage.setItem('store_name',     data.name);
+            localStorage.setItem('store_username', data.username);
+            // Update sidebar
+            const el = document.getElementById('sidebar-ui-name');
+            if (el) el.innerText = data.name;
+            // Update overview tab
+            const set = (id, val) => { const e = document.getElementById(id); if (e) e.innerText = val; };
+            set('prof-name',     data.name);
+            set('prof-username', data.username);
+            setEditStatus(data.msg, false);
+        } else setEditStatus(data.msg, true);
+    } catch { setEditStatus('Error!', true); }
+
+    btn.innerHTML = orig;
+    btn.disabled  = false;
+}
+
+function setEditStatus(msg, isError) {
+    const el = document.getElementById('edit-status');
+    if (el) el.innerHTML = isError
+        ? `<span class="text-red-500"><i class="fas fa-times-circle mr-1"></i>${msg}</span>`
+        : `<span class="text-szgreen"><i class="fas fa-check-circle mr-1"></i>${msg}</span>`;
+}
+
+// ─── Change Password ──────────────────────────────────────
+async function doChangePassword(e) {
+    e.preventDefault();
+    const newPass  = document.getElementById('sec-new-pass').value;
+    const confPass = document.getElementById('sec-conf-pass').value;
+    if (newPass !== confPass) return setSecStatus('Passwords do not match!', true);
+
+    const btn  = document.getElementById('btn-change-pass');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    btn.disabled  = true;
+
+    const fd = new FormData();
+    fd.append('current_password', document.getElementById('sec-curr-pass').value);
+    fd.append('new_password',     newPass);
+
+    try {
+        const res  = await fetch('/api/store/change-password', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.success) {
+            setSecStatus(data.msg, false);
+            document.getElementById('pass-change-form').reset();
+        } else setSecStatus(data.msg, true);
+    } catch { setSecStatus('Error!', true); }
+
+    btn.innerHTML = orig;
+    btn.disabled  = false;
+}
+
+// ─── Change Email Flow ────────────────────────────────────
+let _emailChangeStep = 1;
+
+async function doChangeEmailRequest(e) {
+    e.preventDefault();
+    const btn  = document.getElementById('btn-email-req');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    btn.disabled  = true;
+
+    const fd = new FormData();
+    fd.append('new_email', document.getElementById('sec-new-email').value);
+
+    try {
+        const res  = await fetch('/api/store/change-email-request', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.success) {
+            setSecStatus(data.msg, false);
+            // Show OTP step
+            document.getElementById('email-otp-step').classList.remove('hidden');
+            document.getElementById('btn-email-req').classList.add('hidden');
+        } else setSecStatus(data.msg, true);
+    } catch { setSecStatus('Error!', true); }
+
+    btn.innerHTML = orig;
+    btn.disabled  = false;
+}
+
+async function doChangeEmailVerify(e) {
+    e.preventDefault();
+    const btn  = document.getElementById('btn-email-verify');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    btn.disabled  = true;
+
+    const fd = new FormData();
+    fd.append('code', document.getElementById('sec-email-otp').value);
+
+    try {
+        const res  = await fetch('/api/store/change-email-verify', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.success) {
+            localStorage.setItem('store_email', data.new_email);
+            document.getElementById('prof-email')?.innerText !== undefined
+                && (document.getElementById('prof-email').innerText = data.new_email);
+            setSecStatus(data.msg, false);
+            // Reset form
+            document.getElementById('email-change-form').reset();
+            document.getElementById('email-otp-step').classList.add('hidden');
+            document.getElementById('btn-email-req').classList.remove('hidden');
+        } else setSecStatus(data.msg, true);
+    } catch { setSecStatus('Error!', true); }
+
+    btn.innerHTML = orig;
+    btn.disabled  = false;
+}
+
+function setSecStatus(msg, isError) {
+    const el = document.getElementById('sec-status');
+    if (el) el.innerHTML = isError
+        ? `<span class="text-red-500"><i class="fas fa-times-circle mr-1"></i>${msg}</span>`
+        : `<span class="text-szgreen"><i class="fas fa-check-circle mr-1"></i>${msg}</span>`;
+}
+
+// ─── Init override: load full profile on page load ────────
+document.addEventListener('DOMContentLoaded', () => {
+    const email = localStorage.getItem('store_email');
+    const name  = localStorage.getItem('store_name');
+    if (email && name) {
+        updateUI(name, localStorage.getItem('bal_egp') || '0', localStorage.getItem('bal_usd') || '0');
+        _applyAvatar(localStorage.getItem('store_avatar') || '');
+        // Fetch fresh profile in background
+        fetchAndApplyProfile();
     }
 });
