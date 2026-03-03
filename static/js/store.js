@@ -108,7 +108,6 @@ async function saveAndLogin(data) {
     _applyAvatar(data.avatar || '');
     closeModal('auth-modal');
     Core.showToast(`Welcome, ${data.name}!`);
-    // Fetch full profile (includes user_id, username, avatar)
     fetchAndApplyProfile();
 }
 
@@ -218,7 +217,7 @@ async function onTelegramAuth(user) {
     } catch { setStatus('Error!', true); }
 }
 
-// ─── Purchase Flow ───────────────────────────────────────────────────────
+// ─── Purchase Flow (Buy Now) ─────────────────────────────────────────────
 function buyProduct(stock_key, pEgp, pUsd, name, iconClass) {
     if (!localStorage.getItem('store_email')) { openAuthModal('signin'); toggleSidebarMobile(); return; }
     const finalPrice = currentCurrency === 'EGP' ? pEgp : pUsd;
@@ -269,13 +268,12 @@ function copyPurchasedCode() {
     const code = $('purchased-code')?.innerText;
     if (code) Core.copy(code);
 }
-// ─── مصفوفة السلة ──────────────────────────────────────────────────
+
+// ─── Cart System (Add/Remove/Qty) ─────────────────────────────────────────
 let cart = [];
 
 function addToCart(stock_key, pEgp, pUsd, name, iconClass) {
     if (!localStorage.getItem('store_email')) { openAuthModal('signin'); toggleSidebarMobile(); return; }
-    
-    // لو المنتج موجود أصلاً، زود العدد
     const existing = cart.find(i => i.stock_key === stock_key);
     if (existing) {
         existing.qty += 1;
@@ -289,31 +287,38 @@ function addToCart(stock_key, pEgp, pUsd, name, iconClass) {
 function removeFromCart(stock_key) {
     cart = cart.filter(i => i.stock_key !== stock_key);
     updateCartUI();
-    openCartModal(); // تحديث النافذة وهي مفتوحة
+    if(!$('cart-modal').classList.contains('hidden')) openCartModal(); 
 }
 
-function updateCartQty(stock_key, qty) {
+function increaseCartQty(stock_key) {
+    const item = cart.find(i => i.stock_key === stock_key);
+    if (item) { item.qty++; updateCartUI(); openCartModal(); }
+}
+
+function decreaseCartQty(stock_key) {
     const item = cart.find(i => i.stock_key === stock_key);
     if (item) {
-        item.qty = parseInt(qty);
+        item.qty--;
         if (item.qty <= 0) removeFromCart(stock_key);
-        else openCartModal(); 
+        else { updateCartUI(); openCartModal(); }
     }
 }
 
 function updateCartUI() {
     const count = cart.reduce((sum, item) => sum + item.qty, 0);
-    if ($('cart-count-mobile')) $('cart-count-mobile').innerText = count;
-    if ($('cart-count-desktop')) $('cart-count-desktop').innerText = count;
+    const cm = $('cart-count-mobile');
+    const cd = $('cart-count-desktop');
+    if (cm) cm.innerText = count;
+    if (cd) cd.innerText = count;
 }
 
 window.openCartModal = function() {
     if (!localStorage.getItem('store_email')) { openAuthModal('signin'); return; }
-    const tbody = $('cart-tbody');
-    if (!tbody) return;
+    const container = $('cart-items-container');
+    if (!container) return;
     
     if (cart.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center p-8 text-gray-500 font-bold"><i class="fas fa-shopping-cart text-3xl mb-3 block"></i> Cart is empty</td></tr>';
+        container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-500 py-16"><i class="fas fa-shopping-cart text-6xl mb-4 opacity-30"></i><p class="font-bold">Your cart is empty</p></div>';
         $('cart-total-price').innerText = '0.00 ' + currentCurrency;
         openModal('cart-modal');
         return;
@@ -326,17 +331,25 @@ window.openCartModal = function() {
         const itemTotal = price * item.qty;
         total += itemTotal;
         html += `
-        <tr class="border-b border-gray-800 hover:bg-[#111] transition">
-            <td class="p-4 text-white font-bold text-sm">${item.name}</td>
-            <td class="p-4"><input type="number" min="1" value="${item.qty}" onchange="updateCartQty('${item.stock_key}', this.value)" class="w-16 bg-[#050505] border border-gray-700 text-white p-1.5 rounded text-center outline-none focus:border-szcyan"></td>
-            <td class="p-4 text-szcyan font-black text-sm">${itemTotal.toFixed(2)}</td>
-            <td class="p-4 text-center"><button onclick="removeFromCart('${item.stock_key}')" class="text-red-500 hover:text-red-400 bg-red-900/20 p-2 rounded transition"><i class="fas fa-trash"></i></button></td>
-        </tr>`;
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-black border border-gray-800 rounded-xl mb-3 hover:border-szcyan/50 transition gap-4">
+            <div class="flex-1 min-w-0">
+                <h4 class="text-white font-bold text-sm truncate">${item.name}</h4>
+                <div class="text-szcyan font-black text-sm mt-1">${price} ${currentCurrency} <span class="text-gray-500 text-[10px] font-bold uppercase ml-1">each</span></div>
+            </div>
+            <div class="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
+                <div class="flex items-center bg-[#050505] border border-gray-700 rounded-lg overflow-hidden h-9">
+                    <button onclick="decreaseCartQty('${item.stock_key}')" class="w-9 h-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-800 transition"><i class="fas fa-minus text-xs"></i></button>
+                    <span class="w-10 text-center text-white font-bold text-sm">${item.qty}</span>
+                    <button onclick="increaseCartQty('${item.stock_key}')" class="w-9 h-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-800 transition"><i class="fas fa-plus text-xs"></i></button>
+                </div>
+                <button onclick="removeFromCart('${item.stock_key}')" class="text-red-500 hover:text-white hover:bg-red-600 bg-red-900/20 w-9 h-9 rounded-lg flex items-center justify-center transition shrink-0"><i class="fas fa-trash-alt"></i></button>
+            </div>
+        </div>`;
     });
-    tbody.innerHTML = html;
+    container.innerHTML = html;
     $('cart-total-price').innerText = total.toFixed(2) + ' ' + currentCurrency;
     openModal('cart-modal');
-}
+};
 
 async function confirmCartPurchase() {
     if (cart.length === 0) return;
@@ -345,7 +358,6 @@ async function confirmCartPurchase() {
     const btn = $('btn-confirm-cart'), orig = btn.innerHTML;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...'; btn.disabled = true;
     
-    // تجهيز الداتا عشان نبعتها للباك إند
     const cartData = cart.map(i => ({
         stock_key: i.stock_key,
         qty: i.qty,
@@ -364,12 +376,11 @@ async function confirmCartPurchase() {
             const newUsd = d.currency === 'USD' ? d.new_balance : localStorage.getItem('bal_usd');
             updateUI(localStorage.getItem('store_name'), newEgp, newUsd);
             
-            cart = []; // تفريغ السلة بعد النجاح
+            cart = [];
             updateCartUI();
             ordersLoaded = false;
             closeModal('cart-modal');
             
-            // عرض الأكواد في نافذة النجاح
             const ce = $('purchased-code');
             if (ce) ce.innerHTML = d.codes.join('<br><br>');
             openModal('success-modal');
@@ -380,6 +391,7 @@ async function confirmCartPurchase() {
     } catch { alert('An error occurred!'); }
     btn.innerHTML = orig; btn.disabled = false;
 }
+
 // ─── Profile Modal ───────────────────────────────────────────────────────
 function openProfileModal() {
     openModal('profile-modal');
@@ -388,10 +400,7 @@ function openProfileModal() {
     else _applyLocalProfile();
 }
 
-// TAB SWITCHING — uses explicit style.display instead of Tailwind hidden
-// to avoid flex-1 / display:none conflicts
 function switchProfileTab(tab) {
-    // Panels are absolute inset-0 inside a relative wrapper — toggle hidden only
     ['overview', 'edit', 'security', 'history'].forEach(t => {
         $('ptab-'+t)?.classList.add('hidden');
         const btn = $('ptab-btn-'+t);
@@ -403,7 +412,6 @@ function switchProfileTab(tab) {
     if (tab === 'history' && !ordersLoaded) fetchMyOrders();
 }
 
-// ─── Profile Data ────────────────────────────────────────────────────────
 function _applyLocalProfile() {
     _fillProfileUI({
         name:        localStorage.getItem('store_name'),
@@ -440,7 +448,6 @@ async function fetchAndApplyProfile() {
     } catch {}
 }
 
-// ─── Avatar ──────────────────────────────────────────────────────────────
 function triggerAvatarUpload() { $('avatar-file-input')?.click(); }
 
 async function handleAvatarChange(input) {
@@ -460,7 +467,6 @@ async function handleAvatarChange(input) {
     reader.readAsDataURL(file);
 }
 
-// ─── Edit Profile ────────────────────────────────────────────────────────
 async function doUpdateProfile(e) {
     e.preventDefault();
     const btn = $('btn-update-profile'), orig = btn.innerHTML;
@@ -483,7 +489,6 @@ async function doUpdateProfile(e) {
     btn.innerHTML = orig; btn.disabled = false;
 }
 
-// ─── Change Password ─────────────────────────────────────────────────────
 async function doChangePassword(e) {
     e.preventDefault();
     const np = $('sec-new-pass').value, cp = $('sec-conf-pass').value;
@@ -501,7 +506,6 @@ async function doChangePassword(e) {
     btn.innerHTML = orig; btn.disabled = false;
 }
 
-// ─── Change Email ────────────────────────────────────────────────────────
 async function doChangeEmailRequest(e) {
     e.preventDefault();
     const btn = $('btn-email-req'), orig = btn.innerHTML;
@@ -545,7 +549,6 @@ function _setFormStatus(id, msg, isError) {
         : `<span class="text-szgreen"><i class="fas fa-check-circle mr-1"></i>${msg}</span>`;
 }
 
-// ─── Order History ───────────────────────────────────────────────────────
 async function fetchMyOrders() {
     const loader = $('orders-loading'), tbody = $('orders-table-body');
     if (loader) loader.classList.remove('hidden');
@@ -572,22 +575,18 @@ async function fetchMyOrders() {
     } catch { if (loader) loader.innerHTML = '<span class="text-red-500">Error loading orders.</span>'; }
 }
 
-// ─── Init ────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-    // Apply saved theme
     const theme = localStorage.getItem('sz_theme') || 'default';
     document.documentElement.setAttribute('data-theme', theme);
 
-    // Restore session
     const email = localStorage.getItem('store_email');
     const name  = localStorage.getItem('store_name');
     if (email && name) {
         updateUI(name, localStorage.getItem('bal_egp') || '0', localStorage.getItem('bal_usd') || '0');
         _applyAvatar(localStorage.getItem('store_avatar') || '');
-        fetchAndApplyProfile(); // refresh from server
+        fetchAndApplyProfile(); 
     }
 
-    // Scroll-to-top button
     const ms = $('main-scroll'), sb = $('scrollToTopBtn');
     if (ms && sb) {
         ms.addEventListener('scroll', () => {
