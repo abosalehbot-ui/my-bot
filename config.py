@@ -16,3 +16,10 @@ PORT = int(os.environ.get("PORT", 8080))
 
 # Admin auth — مكان واحد للتوكن السري
 SECRET_TOKEN = os.environ.get("SECRET_TOKEN", "salehzon_secure_2026")
+
+UC_CATEGORIES = {
+    "60_UC": "ID_60",      # يمكنك تغيير الأسماء والقيم حسب حاجتك
+    "325_UC": "ID_325",
+    "660_UC": "ID_660",
+    "1800_UC": "ID_1800"
+}
