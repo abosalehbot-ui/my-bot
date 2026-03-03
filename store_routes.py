@@ -332,7 +332,6 @@ async def get_my_orders(request: Request):
     for o in orders:
         o["order_id"] = str(o.get("_id", ""))
     return JSONResponse({"success": True, "orders": orders})
-
 # ==========================================
 # 5. لوحة أدمن المتجر
 # ==========================================
@@ -346,7 +345,7 @@ async def store_admin_page(request: Request):
 
     store_customers = await db.store_customers.find().sort("created_at", -1).to_list(200)
     
-    # ✅ الحل هنا: تحويل الـ ObjectId لنص عشان الصفحة تفهمه وماتضربش 500
+    # ✅ السطرين دول هم اللي بيحلوا مشكلة الـ 500 (تحويل الـ _id لنص)
     for customer in store_customers:
         if "_id" in customer:
             customer["_id"] = str(customer["_id"])
@@ -359,8 +358,6 @@ async def store_admin_page(request: Request):
         "store_orders":    store_orders,
         "maintenance":     maintenance,
     })
-   
-
 @router.post("/api/store/manage_balance")
 async def store_manage_balance(request: Request, email: str = Form(...), amount: float = Form(...), action: str = Form(...), currency: str = Form(...)):
     if not check_auth(request):
