@@ -37,7 +37,7 @@ async def public_storefront(request: Request):
 
     categories = await db.store_categories.find().to_list(100)
     
-    # --- التعديل 1: كود الحماية للمنتجات القديمة عشان متعملش إيرور ---
+    # --- كود الحماية للمنتجات القديمة عشان متعملش إيرور ---
     for cat in categories:
         for p in cat.get("products", []):
             if "prices" not in p:
@@ -46,7 +46,7 @@ async def public_storefront(request: Request):
                     "USD": p.get("price_usd", 0)
                 }
 
-    # --- التعديل 2: جلب العملات الديناميكية ---
+    # --- جلب العملات الديناميكية ---
     currencies = await db.store_currencies.find().to_list(100)
     if not currencies:
         currencies = [{"_id": "EGP", "symbol": "EGP"}, {"_id": "USD", "symbol": "USD"}]
@@ -61,7 +61,7 @@ async def public_storefront(request: Request):
     return templates.TemplateResponse("storefront.html", {
         "request": request, 
         "categories": categories, 
-        "currencies": currencies, # تمرير العملات للواجهة
+        "currencies": currencies,
         "stock": stock_details, 
         "client_id": GOOGLE_CLIENT_ID, 
         "maintenance": maintenance
@@ -71,7 +71,6 @@ async def public_storefront(request: Request):
 # 2. أنظمة التسجيل والمصادقة الموحدة
 # ==========================================
 def get_user_data(user):
-    # --- التعديل 3: جلب المحافظ الديناميكية للمستخدم ---
     data = {"email": user["email"], "name": user["name"], "username": user.get("username", ""), "avatar": user.get("avatar", "")}
     for key, val in user.items():
         if key.startswith("balance_"):
@@ -101,7 +100,6 @@ async def signup_request(request: Request, name: str = Form(...), username: str 
     hashed_pw = hash_password(password)
     await db.otps.update_one({"email": email}, {"$set": {"code": code, "name": name, "username": username.lower(), "password": hashed_pw, "type": "signup", "created_at": datetime.now()}}, upsert=True)
     
-    print(f"\n[MOCK EMAIL] To: {email} | SIGNUP OTP: {code}\n")
     return JSONResponse({"success": True, "msg": "OTP sent to your email!"})
 
 @router.post("/api/store/signup-verify")
@@ -171,8 +169,6 @@ async def forgot_password(request: Request, email: str = Form(...)):
     
     code = str(random.randint(100000, 999999))
     await db.otps.update_one({"email": email}, {"$set": {"code": code, "type": "reset", "created_at": datetime.now()}}, upsert=True)
-    
-    print(f"\n[MOCK EMAIL] To: {email} | PASSWORD RESET OTP: {code}\n")
     return JSONResponse({"success": True, "msg": "Password reset code sent to your email!"})
 
 @router.post("/api/store/reset-password")
@@ -184,7 +180,6 @@ async def reset_password(request: Request, email: str = Form(...), code: str = F
     
     await db.store_customers.update_one({"email": email}, {"$set": {"password": hash_password(new_password)}})
     await db.otps.delete_one({"_id": otp_doc["_id"]})
-    
     return JSONResponse({"success": True, "msg": "Password updated successfully! You can now login."})
 
 # ==========================================
@@ -237,7 +232,7 @@ async def get_my_orders(request: Request):
     return JSONResponse({"success": True, "orders": orders})
 
 # ==========================================
-# 5. دوال البروفايل (موجودة بدون أي مسح)
+# 5. دوال البروفايل (الاسم والصورة والإيميل)
 # ==========================================
 @router.get("/api/store/profile")
 async def get_profile(request: Request):
@@ -294,7 +289,7 @@ async def change_email_verify(request: Request, new_email: str = Form(...), code
     return res
 
 # ==========================================
-# 6. لوحة أدمن الاستور (لإدارة العملاء)
+# 6. لوحة أدمن الاستور
 # ==========================================
 @router.get("/store-admin", response_class=HTMLResponse)
 async def store_admin_page(request: Request):
@@ -302,7 +297,6 @@ async def store_admin_page(request: Request):
     store_customers = await db.store_customers.find().sort("created_at", -1).to_list(100)
     store_orders = await db.store_orders.find().sort("date", -1).to_list(200)
     
-    # --- التعديل 4: تمرير العملات لصفحة الـ CRM ---
     currencies = await db.store_currencies.find().to_list(100)
     if not currencies:
         currencies = [{"_id": "EGP", "symbol": "EGP"}, {"_id": "USD", "symbol": "USD"}]
