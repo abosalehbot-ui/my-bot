@@ -10,6 +10,17 @@ from datetime import datetime
 
 from database import db, get_next_order_id
 from config import SECRET_TOKEN
+from pydantic import BaseModel
+from typing import List
+
+class CartItem(BaseModel):
+    stock_key: str
+    price: float
+    currency: str
+    quantity: int
+
+class CheckoutRequest(BaseModel):
+    cart: List[CartItem]
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
@@ -31,13 +42,21 @@ async def generate_unique_id():
 # 1. الواجهة الرئيسية للمتجر
 # ==========================================
 @router.get("/", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
 async def public_storefront(request: Request):
     settings = await db.settings.find_one({"_id": "config"})
     maintenance = settings.get("maintenance", False) if settings else False
 
+    # --- جلب بيانات العميل لتجنب خطأ 500 ---
+    email = request.cookies.get("store_session")
+    customer_data = {"name": ""} 
+    if email:
+        user = await db.store_customers.find_one({"email": email})
+        if user:
+            customer_data = user
+
     categories = await db.store_categories.find().to_list(100)
     
-    # --- كود الحماية للمنتجات القديمة عشان متعملش إيرور ---
     for cat in categories:
         for p in cat.get("products", []):
             if "prices" not in p:
@@ -46,7 +65,6 @@ async def public_storefront(request: Request):
                     "USD": p.get("price_usd", 0)
                 }
 
-    # --- جلب العملات الديناميكية ---
     currencies = await db.store_currencies.find().to_list(100)
     if not currencies:
         currencies = [{"_id": "EGP", "symbol": "EGP"}, {"_id": "USD", "symbol": "USD"}]
@@ -64,7 +82,8 @@ async def public_storefront(request: Request):
         "currencies": currencies,
         "stock": stock_details, 
         "client_id": GOOGLE_CLIENT_ID, 
-        "maintenance": maintenance
+        "maintenance": maintenance,
+        "customer": customer_data # تمرير البيانات هنا
     })
 
 # ==========================================
@@ -220,7 +239,63 @@ async def customer_buy_uc(request: Request, stock_key: str = Form(...), price: f
     })
     
     return JSONResponse({"success": True, "code": code_str, "new_balance": new_bal, "currency": currency.upper(), "msg": "Purchase successful!"})
+@router.post("/api/store/checkout-cart")
+async def checkout_cart(request: Request, payload: CheckoutRequest):
+    email = request.cookies.get("store_session")
+    if not email: 
+        return JSONResponse({"success": False, "msg": "Unauthorized! Please login again.", "force_logout": True})
+    
+    user = await db.store_customers.find_one({"email": email})
+    if not user: 
+        return JSONResponse({"success": False, "msg": "Account not found!", "force_logout": True})
+    
+    results = []
+    
+    for item in payload.cart:
+        for _ in range(item.quantity):
+            stock_key = item.stock_key
+            price = item.price
+            currency = item.currency.upper()
+            bal_field = f"balance_{currency.lower()}"
 
+            user = await db.store_customers.find_one({"email": email})
+            
+            if user.get(bal_field, 0) < price:
+                results.append({"name": stock_key, "status": "Failed", "msg": f"Insufficient {currency} balance!"})
+                continue
+
+            code_doc = await db.stock.find_one_and_delete({"category": stock_key})
+            if not code_doc:
+                results.append({"name": stock_key, "status": "Failed", "msg": "Out of stock"})
+                continue
+
+            code_str = str(code_doc.get("code") or code_doc["_id"])
+            seq = await get_next_order_id()
+            order_id_str = f"{seq}S"
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+            await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: -price}})
+            
+            await db.store_orders.insert_one({
+                "_id": order_id_str, "email": email, "name": user["name"], 
+                "category": stock_key, "code": code_str, "price": price, 
+                "currency": currency, "date": now_str
+            })
+            
+            await db.codes_map.insert_one({
+                "code": code_str, "order_id": order_id_str, 
+                "name": f"{user['name']} (Web)", "time": now_str, "source": "Web Store"
+            })
+            
+            results.append({"name": stock_key, "status": "Success", "code": code_str, "price": price, "currency": currency})
+    
+    user = await db.store_customers.find_one({"email": email})
+    new_balances = {
+        "EGP": user.get("balance_egp", 0),
+        "USD": user.get("balance_usd", 0)
+    }
+
+    return JSONResponse({"success": True, "results": results, "new_balances": new_balances, "msg": "Checkout completed!"})
 @router.get("/api/store/my-orders")
 async def get_my_orders(request: Request):
     email = request.cookies.get("store_session")
