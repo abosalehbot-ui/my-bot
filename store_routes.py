@@ -64,9 +64,9 @@ async def public_storefront(request: Request):
         "currencies": currencies,
         "stock": stock_details, 
         "client_id": GOOGLE_CLIENT_ID, 
-        "maintenance": maintenance
+        "maintenance": maintenance,
+        "customer": {"name": ""} # <-- هذا هو السطر الذي أضفناه لحل المشكلة
     })
-
 # ==========================================
 # 2. أنظمة التسجيل والمصادقة الموحدة
 # ==========================================
