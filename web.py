@@ -22,8 +22,10 @@ templates = Jinja2Templates(directory="templates")
 ADMIN_USERNAME = os.environ.get("ADMIN_USER", "admin")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASS", "123456")
 
+
 def check_auth(request: Request):
     return request.cookies.get("admin_session") == SECRET_TOKEN
+
 
 async def web_log(action, details=""):
     await db.system_logs.insert_one({
@@ -31,16 +33,22 @@ async def web_log(action, details=""):
         "details": details, "time": datetime.now().strftime('%Y-%m-%d %H:%M'), "timestamp": datetime.now()
     })
 
+
 def clean_and_extract_tokens(raw_text):
     valid_tokens = []
     for line in raw_text.splitlines():
         line = line.strip()
-        if not line: continue
+        if not line:
+            continue
         token = re.split(r'[;:\s\|]', line)[0].strip()
         if len(token) > 15 and re.match(r'^[A-Za-z0-9\-_]+$', token):
             valid_tokens.append(token)
     return valid_tokens
 
+
+# ==========================================
+# Login / Logout
+# ==========================================
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request, "error": None})
@@ -59,9 +67,14 @@ async def logout():
     resp.delete_cookie("admin_session")
     return resp
 
+
+# ==========================================
+# Dashboard
+# ==========================================
 @app.get("/admin", response_class=HTMLResponse)
 async def dashboard(request: Request):
-    if not check_auth(request): return RedirectResponse(url="/login")
+    if not check_auth(request):
+        return RedirectResponse(url="/login")
 
     now               = datetime.now()
     today_str         = now.strftime("%Y-%m-%d")
@@ -109,12 +122,18 @@ async def dashboard(request: Request):
     for u in all_users:
         u["stats_details"] = user_stats.get(u["_id"], {"api_today": 0, "api_month": 0, "stock_today": 0, "stock_month": 0})
 
-    categories = await db.store_categories.find().to_list(100)
+    categories       = await db.store_categories.find().to_list(100)
+    
+    # ✅ كود حماية المنتجات القديمة من حدوث Error
     for cat in categories:
         for p in cat.get("products", []):
             if "prices" not in p:
-                p["prices"] = { "EGP": p.get("price_egp", 0), "USD": p.get("price_usd", 0) }
+                p["prices"] = {
+                    "EGP": p.get("price_egp", 0),
+                    "USD": p.get("price_usd", 0)
+                }
 
+    # ✅ جلب العملات
     currencies = await db.store_currencies.find().to_list(None)
     if not currencies:
         default_curs = [{"_id": "EGP", "symbol": "EGP"}, {"_id": "USD", "symbol": "USD"}]
@@ -143,27 +162,30 @@ async def dashboard(request: Request):
         "global_stats": global_stats, "store_stats": store_stats, "tracked_users": tracked_users,
     })
 
+
 # ==========================================
-# Currencies APIs 
+# Currencies APIs (العملات)
 # ==========================================
 @app.post("/api/catalog/currency/add")
-async def add_currency(request: Request, code: str = Form(...), symbol: str = Form(...)):
+async def api_add_currency(request: Request, code: str = Form(...), symbol: str = Form(...)):
     if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauthorized"})
     code = code.upper().strip()
-    if await db.store_currencies.find_one({"_id": code}): return JSONResponse({"success": False, "msg": "Currency already exists!"})
+    if await db.store_currencies.find_one({"_id": code}):
+        return JSONResponse({"success": False, "msg": "Currency already exists!"})
     await db.store_currencies.insert_one({"_id": code, "symbol": symbol})
     await web_log("إضافة عملة", f"{code} ({symbol})")
     return JSONResponse({"success": True, "msg": "Currency added successfully!"})
 
 @app.post("/api/catalog/currency/delete")
-async def delete_currency(request: Request, code: str = Form(...)):
+async def api_delete_currency(request: Request, code: str = Form(...)):
     if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauthorized"})
     await db.store_currencies.delete_one({"_id": code})
     await web_log("حذف عملة", f"{code}")
     return JSONResponse({"success": True, "msg": "Currency deleted!"})
 
+
 # ==========================================
-# Catalog APIs (تمت إضافة Logo و Image)
+# Catalog APIs (الكتالوج والصور والأسعار)
 # ==========================================
 @app.post("/api/catalog/category/add")
 async def api_add_category(request: Request, cat_id: str = Form(...), name: str = Form(...), icon: str = Form("fa-gamepad"), image: str = Form(""), logo: str = Form("")):
@@ -171,12 +193,14 @@ async def api_add_category(request: Request, cat_id: str = Form(...), name: str 
     cat_id = cat_id.lower().replace(" ", "_")
     if await db.store_categories.find_one({"_id": cat_id}): return JSONResponse({"success": False, "msg": "ID exists!"})
     await db.store_categories.insert_one({"_id": cat_id, "name": name, "icon": icon, "image": image, "logo": logo, "products": []})
+    await web_log("إنشاء فئة جديدة", f"الفئة: {name}")
     return JSONResponse({"success": True, "msg": "Category Added!"})
 
 @app.post("/api/catalog/category/edit")
 async def api_edit_category(request: Request, cat_id: str = Form(...), name: str = Form(...), icon: str = Form(...), image: str = Form(""), logo: str = Form("")):
     if not check_auth(request): return JSONResponse({"success": False})
     await db.store_categories.update_one({"_id": cat_id}, {"$set": {"name": name, "icon": icon, "image": image, "logo": logo}})
+    await web_log("تعديل فئة", f"{cat_id} → {name}")
     return JSONResponse({"success": True, "msg": "Category Updated!"})
 
 @app.post("/api/catalog/category/delete")
@@ -192,7 +216,7 @@ async def api_add_product(request: Request):
     cat_id = form.get("cat_id")
     stock_key = form.get("stock_key")
     name = form.get("name")
-    image = form.get("image", "") # الصورة الخاصة بالمنتج
+    image = form.get("image", "")
     
     prices = {}
     for key, val in form.items():
@@ -202,10 +226,15 @@ async def api_add_product(request: Request):
             except ValueError: prices[curr_code] = 0.0
 
     product = {
-        "stock_key": stock_key, "name": name, "image": image, "prices": prices,
-        "price_egp": prices.get("EGP", 0), "price_usd": prices.get("USD", 0)
+        "stock_key": stock_key, 
+        "name": name, 
+        "image": image,
+        "prices": prices,
+        "price_egp": prices.get("EGP", 0),
+        "price_usd": prices.get("USD", 0)
     }
     await db.store_categories.update_one({"_id": cat_id}, {"$push": {"products": product}})
+    await web_log("إضافة منتج", f"{name} في {cat_id}")
     return JSONResponse({"success": True, "msg": "Product Added!"})
 
 @app.post("/api/catalog/product/edit")
@@ -215,7 +244,7 @@ async def api_edit_product(request: Request):
     cat_id = form.get("cat_id")
     stock_key = form.get("stock_key")
     name = form.get("name")
-    image = form.get("image", "") # الصورة الخاصة بالمنتج
+    image = form.get("image", "")
 
     prices = {}
     for key, val in form.items():
@@ -227,8 +256,11 @@ async def api_edit_product(request: Request):
     await db.store_categories.update_one(
         {"_id": cat_id, "products.stock_key": stock_key},
         {"$set": {
-            "products.$.name": name, "products.$.image": image, "products.$.prices": prices,
-            "products.$.price_egp": prices.get("EGP", 0), "products.$.price_usd": prices.get("USD", 0)
+            "products.$.name": name,
+            "products.$.image": image,
+            "products.$.prices": prices,
+            "products.$.price_egp": prices.get("EGP", 0),
+            "products.$.price_usd": prices.get("USD", 0)
         }}
     )
     return JSONResponse({"success": True, "msg": "Product Updated!"})
@@ -239,8 +271,9 @@ async def api_delete_product(request: Request, cat_id: str = Form(...), stock_ke
     await db.store_categories.update_one({"_id": cat_id}, {"$pull": {"products": {"stock_key": stock_key}}})
     return JSONResponse({"success": True, "msg": "Product Deleted!"})
 
+
 # ==========================================
-# Tools & Stock APIs 
+# Tools & Stock APIs
 # ==========================================
 @app.post("/api/toggle_maintenance")
 async def toggle_maint(request: Request):
@@ -324,33 +357,41 @@ async def api_add_user_tokens(request: Request, user_id: int = Form(...), tokens
 async def api_add_user(request: Request, user_id: int = Form(...), name: str = Form(...), role: str = Form(...)):
     if not check_auth(request): return RedirectResponse("/login")
     if not await db.users.find_one({"_id": user_id}):
-        await db.users.insert_one({"_id": user_id, "role": role, "name": name, "tokens": [], "history": [], "logs": [], "token_logs": [], "stats": {"api": 0, "stock": 0}})
+        await db.users.insert_one({"_id": user_id, "role": role, "name": name, "tokens": [],
+                                   "history": [], "logs": [], "token_logs": [], "stats": {"api": 0, "stock": 0}})
     return RedirectResponse(url="/admin?tab=users", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/user_action")
 async def api_user_action(request: Request, user_id: int = Form(...), action: str = Form(...)):
     if not check_auth(request): return RedirectResponse("/login")
-    if action == "delete": await db.users.delete_one({"_id": user_id})
-    elif action == "clear_tokens": await db.users.update_one({"_id": user_id}, {"$set": {"tokens": []}})
+    if action == "delete":
+        await db.users.delete_one({"_id": user_id})
+    elif action == "clear_tokens":
+        await db.users.update_one({"_id": user_id}, {"$set": {"tokens": []}})
     elif action == "toggle_role":
         u = await db.users.find_one({"_id": user_id})
         new_role = "employee" if u.get("role") == "user" else "user"
         await db.users.update_one({"_id": user_id}, {"$set": {"role": new_role}})
-    elif action == "clear_logs": await db.users.update_one({"_id": user_id}, {"$set": {"logs": [], "history": [], "token_logs": []}})
+    elif action == "clear_logs":
+        await db.users.update_one({"_id": user_id}, {"$set": {"logs": [], "history": [], "token_logs": []}})
     return RedirectResponse(url="/admin?tab=users", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/tracked_users")
 async def api_tracked_users(request: Request, user_id: int = Form(...), action: str = Form(...)):
     if not check_auth(request): return RedirectResponse("/login")
-    if action == "add": await db.settings.update_one({"_id": "cache_config"}, {"$addToSet": {"tracked_users": user_id}}, upsert=True)
-    elif action == "remove": await db.settings.update_one({"_id": "cache_config"}, {"$pull": {"tracked_users": user_id}}, upsert=True)
+    if action == "add":
+        await db.settings.update_one({"_id": "cache_config"}, {"$addToSet": {"tracked_users": user_id}}, upsert=True)
+    elif action == "remove":
+        await db.settings.update_one({"_id": "cache_config"}, {"$pull": {"tracked_users": user_id}}, upsert=True)
     return RedirectResponse(url="/admin?tab=tools", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/return_order")
 async def api_return_order(request: Request, order_id: str = Form(...)):
     if not check_auth(request): return RedirectResponse("/login")
+
     order = await db.orders.find_one({"_id": int(order_id)}) if order_id.isdigit() else None
-    if not order: order = await db.store_orders.find_one({"_id": order_id})
+    if not order:
+        order = await db.store_orders.find_one({"_id": order_id})
 
     if order and "items" in order:
         cat             = order["type"].split("(")[1].split(")")[0] if "(" in order.get("type", "") else "Unknown"
@@ -383,13 +424,15 @@ async def api_search(request: Request):
                 items_str = "\n".join([f"  - {item}" for item in order.get("items", [])])
                 return JSONResponse({"result": f"📄 Bot Order #{query}\n👤 By: {order.get('user', 'Unknown')} | ID: {order.get('user_id')}\n📅 Date: {order.get('date')}\n📦 Type: {order.get('type')}\n\n⬇️ Items ({len(order.get('items',[]))}):\n{items_str}"})
             else:
+                # ✅ FIX: store orders use 'price', not 'price_egp'/'price_usd'
                 price    = order.get("price", "N/A")
                 currency = order.get("currency", "")
                 return JSONResponse({"result": f"🛒 Web Store Order #{query}\n👤 By: {order.get('name', 'Unknown')} | Email: {order.get('email')}\n📅 Date: {order.get('date')}\n📦 Package: {order.get('category')}\n💰 Paid: {price} {currency}\n\n⬇️ Delivered Code:\n  - {order.get('code')}"})
 
         if is_bot:
             user = await db.users.find_one({"_id": int(query)})
-            if user: return JSONResponse({"result": f"👤 {user.get('name')}\n🆔 ID: {user.get('_id')}\n🎖 Role: {user.get('role')}\n🔑 Tokens: {len(user.get('tokens', []))}"})
+            if user:
+                return JSONResponse({"result": f"👤 {user.get('name')}\n🆔 ID: {user.get('_id')}\n🎖 Role: {user.get('role')}\n🔑 Tokens: {len(user.get('tokens', []))}"})
 
     records  = await db.codes_map.find({"$or": [{"_id": query}, {"code": query}]}).to_list(length=10)
     in_stock = await db.stock.count_documents({"$or": [{"_id": query}, {"code": query}]})
