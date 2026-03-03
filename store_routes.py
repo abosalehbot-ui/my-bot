@@ -415,11 +415,16 @@ async def store_manage_balance(request: Request, email: str = Form(...), amount:
     
     return JSONResponse({"success": True, "msg": f"{currency.upper()} Balance updated successfully!"})
 
+# ==========================================
+# 7. مسارات التحكم الشاملة للعملاء (Admin Controls)
+# ==========================================
+
 @router.post("/api/store/admin/delete-customer")
 async def admin_delete_customer(request: Request, email: str = Form(...)):
     if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauthorized"})
     await db.store_customers.delete_one({"email": email})
     return JSONResponse({"success": True, "msg": "Customer account deleted."})
+
 @router.post("/api/store/admin/update-customer")
 async def admin_update_customer(request: Request, email: str = Form(...), name: str = Form(None), password: str = Form(None), username: str = Form(None)):
     if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauthorized"})
@@ -444,7 +449,7 @@ async def admin_change_email_req(request: Request, email: str = Form(...), new_e
     
     code = str(random.randint(100000, 999999))
     await db.otps.update_one({"email": new_email}, {"$set": {"code": code, "old_email": email, "type": "admin_change_email", "created_at": datetime.now()}}, upsert=True)
-    return JSONResponse({"success": True, "msg": "Verification OTP generated. Check database or logs (Admin Bypass)."})
+    return JSONResponse({"success": True, "msg": "Verification OTP generated. Check database or logs."})
 
 @router.post("/api/store/admin/email-verify")
 async def admin_change_email_ver(request: Request, email: str = Form(...), code: str = Form(...)):
@@ -459,3 +464,43 @@ async def admin_change_email_ver(request: Request, email: str = Form(...), code:
     await db.otps.delete_one({"_id": otp_doc["_id"]})
     
     return JSONResponse({"success": True, "msg": "Email changed successfully!", "new_email": new_email})
+
+
+# -------------------------------------------------------------------
+# 👇 الأكواد المضافة حديثاً لتشغيل (Account Controls) وسجل الطلبات 👇
+# -------------------------------------------------------------------
+
+@router.post("/api/store/admin/toggle-status")
+async def admin_toggle_status(request: Request, email: str = Form(...), action: str = Form(...)):
+    if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauthorized"})
+    user = await db.store_customers.find_one({"email": email})
+    if not user: return JSONResponse({"success": False, "msg": "User not found!"})
+    
+    if action == "ban":
+        new_status = not user.get("is_banned", False)
+        await db.store_customers.update_one({"email": email}, {"$set": {"is_banned": new_status}})
+        return JSONResponse({"success": True, "msg": "Account Banned!" if new_status else "Account Unbanned!", "new_status": new_status})
+        
+    elif action == "freeze":
+        new_status = not user.get("balance_frozen", False)
+        await db.store_customers.update_one({"email": email}, {"$set": {"balance_frozen": new_status}})
+        return JSONResponse({"success": True, "msg": "Balance Frozen!" if new_status else "Balance Unfrozen!", "new_status": new_status})
+        
+    return JSONResponse({"success": False, "msg": "Invalid action."})
+
+@router.get("/api/store/customer-info")
+async def get_customer_info(request: Request, email: str):
+    if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauthorized"})
+    user = await db.store_customers.find_one({"email": email})
+    if not user: return JSONResponse({"success": False})
+    return JSONResponse({"success": True, **get_user_data(user)})
+
+@router.get("/api/store/admin/customer-orders")
+async def admin_customer_orders(request: Request, email: str):
+    if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauthorized"})
+    orders = await db.store_orders.find({"email": email}).sort("date", -1).to_list(100)
+    for o in orders:
+        if '_id' in o:
+            o['order_id'] = str(o['_id'])
+            o['_id'] = str(o['_id'])
+    return JSONResponse({"success": True, "orders": orders})
