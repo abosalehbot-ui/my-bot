@@ -30,9 +30,22 @@
 </head>
 <body class="selection:bg-szgreen selection:text-black flex h-screen">
 
+    {% if maintenance %}
+    <div class="flex flex-col items-center justify-center w-full h-full p-4 text-center bg-darkbg bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]">
+        <div class="inline-flex items-center justify-center w-24 h-24 bg-black rounded-full border-2 border-szgreen/50 shadow-[0_0_30px_rgba(125,252,137,0.4)] mb-8 floating">
+            <span class="text-4xl font-black text-szgreen">SZ</span>
+        </div>
+        <h1 class="text-4xl md:text-6xl font-black text-white mb-4 uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">System Maintenance</h1>
+        <p class="text-gray-400 max-w-xl mb-10 text-lg">We are currently upgrading our servers to bring you the best gaming codes and digital goods. We will be back online shortly!</p>
+        <div class="flex flex-col sm:flex-row gap-4">
+            <a href="#" class="px-8 py-3 border border-szcyan text-szcyan rounded-xl font-bold hover:bg-szcyan hover:text-black transition shadow-[0_0_15px_rgba(94,234,212,0.2)]"><i class="fab fa-telegram-plane mr-2 text-lg"></i> Join Telegram</a>
+            <button onclick="location.reload()" class="px-8 py-3 bg-szgreen text-black rounded-xl font-bold transition btn-glow"><i class="fas fa-sync-alt mr-2 text-lg"></i> Refresh Status</button>
+        </div>
+    </div>
+    {% else %}
     <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black/80 z-40 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
 
-    <aside id="sz-sidebar" class="fixed top-0 left-0 z-50 w-64 h-screen transition-transform -translate-x-full md:translate-x-0 shadow-[4px_0_24px_rgba(0,0,0,0.5)]" aria-label="Sidenav">
+    <aside id="sz-sidebar" class="fixed top-0 left-0 z-50 w-64 h-screen transition-transform -translate-x-full md:translate-x-0 shadow-[4px_0_24px_rgba(0,0,0,0.5)] flex-shrink-0" aria-label="Sidenav">
         <div class="overflow-y-auto py-5 px-3 h-full bg-panelbg border-r border-gray-800 pb-20">
             
             <div class="flex items-center justify-between px-2 mb-6 pb-6 border-b border-gray-800 md:justify-center">
@@ -74,7 +87,7 @@
                 <li><hr class="border-gray-800"></li>
                 
                 <li>
-                    <a href="#" onclick="document.getElementById('main-scroll').scrollTo(0,0); toggleSidebarMobile();" class="flex items-center p-3 text-base font-bold text-white rounded-lg bg-gray-900 group shadow-[0_0_10px_rgba(125,252,137,0.1)]">
+                    <a href="#" onclick="document.getElementById('main-scroll').scrollTo({top:0, behavior:'smooth'}); toggleSidebarMobile();" class="flex items-center p-3 text-base font-bold text-white rounded-lg bg-gray-900 group shadow-[0_0_10px_rgba(125,252,137,0.1)]">
                         <i class="fas fa-store w-6 text-szgreen"></i><span class="ml-3">Store Home</span>
                     </a>
                 </li>
@@ -106,10 +119,10 @@
         <header class="h-16 bg-panelbg/80 backdrop-blur-md border-b border-gray-800 flex items-center justify-between px-4 md:hidden sticky top-0 z-30">
             <button onclick="toggleSidebar()" class="text-white text-xl p-2"><i class="fas fa-bars"></i></button>
             <span class="text-lg font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">SALEH ZONE</span>
-            <div class="w-8 flex justify-end"><button onclick="toggleSidebar()" class="text-szgreen"><i class="fas fa-user-circle text-xl"></i></button></div>
+            <div class="w-8 flex justify-end"><button onclick="openProfileModal()" class="text-szgreen"><i class="fas fa-user-circle text-xl"></i></button></div>
         </header>
 
-        <div class="p-6 md:p-10 max-w-6xl mx-auto w-full pb-24">
+        <div class="p-6 md:p-10 max-w-6xl mx-auto w-full flex-1">
             <div class="text-center md:text-left mb-12 fade-in">
                 <h1 class="text-3xl md:text-5xl font-black mb-3 text-white uppercase tracking-widest">Instant <span class="text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">Delivery</span></h1>
                 <p class="text-gray-400 max-w-xl text-sm">Select your package. Codes are delivered instantly after payment.</p>
@@ -155,13 +168,30 @@
                         <button disabled class="w-full bg-gray-900 text-gray-600 font-bold py-2.5 md:py-3 rounded-xl cursor-not-allowed border border-gray-800 text-sm md:text-base">UNAVAILABLE</button>
                         {% endif %}
                     </div>
-                    {% else %}
-                    <p class="text-gray-600 col-span-full text-sm">No products in this category yet.</p>
                     {% endfor %}
                 </div>
             </div>
             {% endfor %}
         </div>
+
+        <footer class="border-t border-gray-800 bg-[#0a0a0a] mt-auto w-full">
+            <div class="max-w-6xl mx-auto px-6 py-8 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-black rounded-full border border-szgreen/50 flex items-center justify-center shadow-[0_0_10px_rgba(125,252,137,0.3)] text-xs font-black text-szgreen">SZ</div>
+                    <span class="text-xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan">SALEH ZONE</span>
+                </div>
+                <p class="text-gray-500 text-sm font-bold">© 2026 Saleh Zone. All rights reserved.</p>
+                <div class="flex gap-4">
+                    <a href="#" class="w-10 h-10 rounded-full bg-gray-900 border border-gray-800 flex items-center justify-center text-gray-400 hover:text-szcyan hover:border-szcyan transition"><i class="fab fa-telegram-plane"></i></a>
+                    <a href="#" class="w-10 h-10 rounded-full bg-gray-900 border border-gray-800 flex items-center justify-center text-gray-400 hover:text-szgreen hover:border-szgreen transition"><i class="fab fa-whatsapp"></i></a>
+                </div>
+            </div>
+        </footer>
+
+        <button id="scrollToTopBtn" class="fixed bottom-6 right-6 md:bottom-8 md:right-8 bg-szcyan text-black w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold shadow-[0_0_15px_rgba(94,234,212,0.5)] transition-all duration-300 opacity-0 pointer-events-none translate-y-4 z-40 btn-glow">
+            <i class="fas fa-arrow-up"></i>
+        </button>
+
     </main>
 
     <div id="checkout-modal" class="fixed inset-0 bg-black/90 z-[60] hidden flex items-center justify-center p-4 backdrop-blur-sm">
@@ -390,6 +420,23 @@
             if(email && name) updateUI(name, localStorage.getItem('bal_egp'), localStorage.getItem('bal_usd'));
         });
 
+        // زرار الصعود للأعلى
+        const mainScroll = document.getElementById('main-scroll');
+        if(mainScroll) {
+            mainScroll.addEventListener('scroll', () => {
+                const btn = document.getElementById('scrollToTopBtn');
+                if (mainScroll.scrollTop > 300) {
+                    btn.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-4');
+                    btn.classList.add('opacity-100', 'translate-y-0');
+                } else {
+                    btn.classList.add('opacity-0', 'pointer-events-none', 'translate-y-4');
+                    btn.classList.remove('opacity-100', 'translate-y-0');
+                }
+            });
+            const btnScroll = document.getElementById('scrollToTopBtn');
+            if(btnScroll) btnScroll.onclick = () => mainScroll.scrollTo({top: 0, behavior: 'smooth'});
+        }
+
         function updateUI(name, balEgp, balUsd) {
             document.getElementById('sidebar-guest').classList.add('hidden');
             document.getElementById('sidebar-user').classList.remove('hidden');
@@ -399,7 +446,6 @@
             document.getElementById('sidebar-ui-bal-egp').innerText = balEgp;
             document.getElementById('sidebar-ui-bal-usd').innerText = balUsd;
             
-            // تحديث بيانات البروفايل بالمرة
             document.getElementById('prof-name').innerText = name;
             document.getElementById('prof-email').innerText = localStorage.getItem('store_email') || 'N/A';
             document.getElementById('prof-bal-egp').innerText = balEgp;
@@ -438,7 +484,6 @@
             else if(view === 'reset') { title.innerText = 'New Password'; social.classList.add('hidden'); }
         }
 
-        // ================= نظام تسجيل الدخول واستعادة الباسورد =================
         async function doManualLogin(e) {
             e.preventDefault();
             const btn = document.getElementById('btn-signin'); btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; btn.disabled = true;
@@ -502,7 +547,6 @@
             try { const res = await fetch('/api/store/telegram-login', {method: 'POST', body: fd}); const data = await res.json(); if(data.success) saveAndLogin(data); else setStatus(data.msg, true); } catch(err) { setStatus('Error!', true); }
         }
 
-        // ================= الشراء والبروفايل =================
         function buyProduct(stock_key, pEgp, pUsd, name, iconClass) {
             const email = localStorage.getItem('store_email');
             const userName = localStorage.getItem('store_name');
@@ -545,7 +589,7 @@
                     if (data.currency === 'EGP') updateUI(localStorage.getItem('store_name'), data.new_balance, localStorage.getItem('bal_usd'));
                     else updateUI(localStorage.getItem('store_name'), localStorage.getItem('bal_egp'), data.new_balance);
                     
-                    ordersLoaded = false; // لإعادة تحميل الطلبات في البروفايل
+                    ordersLoaded = false; 
                     closeModal('checkout-modal');
                     document.getElementById('purchased-code').innerText = data.code;
                     openModal('success-modal');
@@ -571,9 +615,7 @@
             
             document.getElementById('ptab-btn-' + tab).className = "pb-3 px-2 font-bold text-sm text-szgreen border-b-2 border-szgreen transition";
 
-            if(tab === 'history' && !ordersLoaded) {
-                fetchMyOrders();
-            }
+            if(tab === 'history' && !ordersLoaded) fetchMyOrders();
         }
 
         async function fetchMyOrders() {
@@ -607,5 +649,6 @@
             }
         }
     </script>
+    {% endif %}
 </body>
 </html>
