@@ -307,7 +307,7 @@ function updateCartUI() {
     if ($('cart-count-desktop')) $('cart-count-desktop').innerText = count;
 }
 
-function openCartModal() {
+window.openCartModal = function() {
     if (!localStorage.getItem('store_email')) { openAuthModal('signin'); return; }
     const tbody = $('cart-tbody');
     if (!tbody) return;
