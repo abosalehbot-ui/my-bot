@@ -73,6 +73,8 @@ async def login_manual(request: Request, email: str = Form(...), password: str =
         return JSONResponse({"success": False, "msg": "Please login with Google or Telegram."})
     if user["password"] != hash_password(password):
         return JSONResponse({"success": False, "msg": "Incorrect password!"})
+    if user.get("is_banned", False):
+        return JSONResponse({"success": False, "msg": "Your account has been suspended by the admin."})
 
     response = JSONResponse({"success": True, **get_user_data(user)})
     response.set_cookie(key="store_session", value=user["email"], httponly=True, max_age=86400 * 30)
@@ -114,6 +116,8 @@ async def signup_verify(request: Request, email: str = Form(...), code: str = Fo
         "password":    otp_doc["password"],
         "balance_egp": 0,
         "balance_usd": 0,
+        "is_banned":   False,
+        "balance_frozen": False,
         "created_at":  datetime.now().strftime("%Y-%m-%d %H:%M"),
     })
     await db.otps.delete_one({"_id": otp_doc["_id"]})
@@ -141,8 +145,11 @@ async def google_login(request: Request, credential: str = Form(...)):
             user_id  = await generate_unique_id()
             username = email.split("@")[0].lower() + str(random.randint(10, 99))
             user = {"user_id": user_id, "username": username, "email": email, "name": name,
-                    "balance_egp": 0, "balance_usd": 0, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")}
+                    "balance_egp": 0, "balance_usd": 0, "is_banned": False, "balance_frozen": False, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")}
             await db.store_customers.insert_one(user)
+
+        if user.get("is_banned", False):
+            return JSONResponse({"success": False, "msg": "Your account has been suspended by the admin."})
 
         response = JSONResponse({"success": True, **get_user_data(user)})
         response.set_cookie(key="store_session", value=email, httponly=True, max_age=86400 * 30)
@@ -157,8 +164,11 @@ async def telegram_login(request: Request, tg_id: str = Form(...), name: str = F
         user_id        = await generate_unique_id()
         final_username = username.lower() if username else f"user{tg_id}"
         user = {"user_id": user_id, "username": final_username, "email": email, "name": name,
-                "balance_egp": 0, "balance_usd": 0, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")}
+                "balance_egp": 0, "balance_usd": 0, "is_banned": False, "balance_frozen": False, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")}
         await db.store_customers.insert_one(user)
+
+    if user.get("is_banned", False):
+        return JSONResponse({"success": False, "msg": "Your account has been suspended by the admin."})
 
     response = JSONResponse({"success": True, **get_user_data(user)})
     response.set_cookie(key="store_session", value=email, httponly=True, max_age=86400 * 30)
@@ -184,7 +194,6 @@ async def forgot_password(request: Request, email: str = Form(...)):
         {"$set": {"code": code, "type": "reset", "created_at": datetime.now()}},
         upsert=True
     )
-    print(f"\n[MOCK EMAIL] To: {email} | PASSWORD RESET OTP: {code}\n")
     return JSONResponse({"success": True, "msg": "Password reset code sent to your email!"})
 
 @router.post("/api/store/reset-password")
@@ -212,6 +221,12 @@ async def customer_buy(request: Request, stock_key: str = Form(...), price: floa
     user = await db.store_customers.find_one({"email": email})
     if not user:
         return JSONResponse({"success": False, "msg": "Account not found!", "force_logout": True})
+    
+    if user.get("is_banned", False):
+        return JSONResponse({"success": False, "msg": "Your account is suspended.", "force_logout": True})
+        
+    if user.get("balance_frozen", False):
+        return JSONResponse({"success": False, "msg": "Your balance is currently frozen. Please contact support."})
 
     bal_field = f"balance_{currency.lower()}"
     if user.get(bal_field, 0) < price:
@@ -249,79 +264,7 @@ async def customer_buy(request: Request, stock_key: str = Form(...), price: floa
 
     return JSONResponse({"success": True, "code": code_str, "new_balance": new_bal,
                          "currency": currency.upper(), "msg": "Purchase successful!"})
-import json
 
-@router.post("/api/store/buy-cart")
-async def customer_buy_cart(request: Request, cart_data: str = Form(...), currency: str = Form(...)):
-    email = request.cookies.get("store_session")
-    if not email:
-        return JSONResponse({"success": False, "msg": "Unauthorized! Please login again.", "force_logout": True})
-
-    user = await db.store_customers.find_one({"email": email})
-    if not user:
-        return JSONResponse({"success": False, "msg": "Account not found!", "force_logout": True})
-
-    try:
-        items = json.loads(cart_data) # فك شفرة السلة
-    except:
-        return JSONResponse({"success": False, "msg": "Invalid cart data."})
-
-    if not items:
-        return JSONResponse({"success": False, "msg": "Cart is empty."})
-
-    total_price = sum(float(item["price"]) * int(item["qty"]) for item in items)
-    bal_field = f"balance_{currency.lower()}"
-    
-    if user.get(bal_field, 0) < total_price:
-        return JSONResponse({"success": False, "msg": f"Insufficient {currency.upper()} balance! Please recharge."})
-
-    # 1. التأكد إن المخزون يكفي لكل المنتجات اللي في السلة قبل ما نخصم الفلوس
-    for item in items:
-        available = await db.stock.count_documents({"category": item["stock_key"]})
-        if available < int(item["qty"]):
-            return JSONResponse({"success": False, "msg": f"Not enough stock for {item['name']}. Available: {available}"})
-
-    # 2. خصم إجمالي الفلوس من الرصيد
-    await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: -total_price}})
-    new_bal = user.get(bal_field, 0) - total_price
-
-    # 3. سحب الأكواد وإنشاء الطلبات في الداتا بيز
-    pulled_codes_display = []
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-    
-    for item in items:
-        sk = item["stock_key"]
-        qty = int(item["qty"])
-        price_per_item = float(item["price"])
-        
-        for _ in range(qty):
-            code_doc = await db.stock.find_one_and_delete({"category": sk})
-            if code_doc:
-                code_str = str(code_doc.get("code") or code_doc["_id"])
-                seq = await get_next_order_id()
-                order_id = f"{seq}S"
-                
-                await db.store_orders.insert_one({
-                    "_id":      order_id,
-                    "email":    email,
-                    "name":     user["name"],
-                    "category": sk,
-                    "code":     code_str,
-                    "price":    price_per_item,
-                    "currency": currency.upper(),
-                    "date":     now_str,
-                })
-                await db.codes_map.insert_one({
-                    "code":     code_str,
-                    "order_id": order_id,
-                    "name":     f"{user['name']} (Web)",
-                    "time":     now_str,
-                    "source":   "Web Store",
-                })
-                pulled_codes_display.append(f"<b>{item['name']}</b>: <code>{code_str}</code>")
-
-    return JSONResponse({"success": True, "codes": pulled_codes_display, "new_balance": new_bal,
-                         "currency": currency.upper(), "msg": "Purchase successful!"})
 @router.get("/api/store/my-orders")
 async def get_my_orders(request: Request):
     email = request.cookies.get("store_session")
@@ -332,6 +275,7 @@ async def get_my_orders(request: Request):
     for o in orders:
         o["order_id"] = str(o.get("_id", ""))
     return JSONResponse({"success": True, "orders": orders})
+
 # ==========================================
 # 5. لوحة أدمن المتجر
 # ==========================================
@@ -345,7 +289,7 @@ async def store_admin_page(request: Request):
 
     store_customers = await db.store_customers.find().sort("created_at", -1).to_list(200)
     
-    # ✅ السطرين دول هم اللي بيحلوا مشكلة الـ 500 (تحويل الـ _id لنص)
+    # تحويل الـ ObjectId لـ string عشان الـ Error 500
     for customer in store_customers:
         if "_id" in customer:
             customer["_id"] = str(customer["_id"])
@@ -358,20 +302,44 @@ async def store_admin_page(request: Request):
         "store_orders":    store_orders,
         "maintenance":     maintenance,
     })
+
 @router.post("/api/store/manage_balance")
 async def store_manage_balance(request: Request, email: str = Form(...), amount: float = Form(...), action: str = Form(...), currency: str = Form(...)):
     if not check_auth(request):
         return JSONResponse({"success": False, "msg": "Unauthorized"})
 
+    # ده بيسمح بإنشاء أي عملة جديدة تلقائياً بمجرد كتابة اسمها!
     bal_field = f"balance_{currency.lower()}"
+    
     if action == "add":
         await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: amount}})
-    elif action == "set":
-        await db.store_customers.update_one({"email": email}, {"$set": {bal_field: amount}})
     elif action == "sub":
         await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: -amount}})
 
     return JSONResponse({"success": True, "msg": f"{currency.upper()} balance updated successfully!"})
+
+# Endpoint تجميد الرصيد أو حظر الحساب
+@router.post("/api/store/admin/toggle-status")
+async def admin_toggle_status(request: Request, email: str = Form(...), action: str = Form(...)):
+    if not admin_check(request):
+        return JSONResponse({"success": False, "msg": "Unauthorized"})
+        
+    user = await db.store_customers.find_one({"email": email})
+    if not user:
+        return JSONResponse({"success": False, "msg": "User not found"})
+        
+    if action == "ban":
+        new_status = not user.get("is_banned", False)
+        await db.store_customers.update_one({"email": email}, {"$set": {"is_banned": new_status}})
+        msg = "Account Suspended Successfully!" if new_status else "Account Reactivated Successfully!"
+    elif action == "freeze":
+        new_status = not user.get("balance_frozen", False)
+        await db.store_customers.update_one({"email": email}, {"$set": {"balance_frozen": new_status}})
+        msg = "Balance Frozen Successfully!" if new_status else "Balance Unfrozen Successfully!"
+    else:
+        return JSONResponse({"success": False, "msg": "Invalid action"})
+        
+    return JSONResponse({"success": True, "msg": msg, "new_status": new_status})
 
 # ==========================================
 # 6. Profile — Get / Edit / Avatar / Password / Email
@@ -380,7 +348,6 @@ async def store_manage_balance(request: Request, email: str = Form(...), amount:
 import base64, re as _re
 
 def _make_username(name: str, user_id: int) -> str:
-    """توليد يوزر تلقائي من الاسم + آخر 4 أرقام من الـ id"""
     base = _re.sub(r'[^a-z0-9]', '', name.lower())[:12] or "user"
     return f"{base}{str(user_id)[-4:]}"
 
@@ -394,7 +361,6 @@ async def get_profile(request: Request):
     if not user:
         return JSONResponse({"success": False, "msg": "User not found"})
 
-    # Auto-generate username if missing
     if not user.get("username"):
         auto_uname = _make_username(user["name"], user["user_id"])
         await db.store_customers.update_one({"email": email}, {"$set": {"username": auto_uname}})
@@ -424,7 +390,6 @@ async def update_profile(request: Request, name: str = Form(...), username: str 
     if not name.strip():
         return JSONResponse({"success": False, "msg": "Name cannot be empty"})
 
-    # Check username not taken by someone else
     existing = await db.store_customers.find_one({"username": username, "email": {"$ne": email}})
     if existing:
         return JSONResponse({"success": False, "msg": "Username is already taken!"})
@@ -441,7 +406,6 @@ async def upload_avatar(request: Request, avatar_b64: str = Form(...)):
     if not email:
         return JSONResponse({"success": False, "msg": "Not logged in"})
 
-    # Validate it's a real base64 image (max ~1MB)
     if len(avatar_b64) > 1_400_000:
         return JSONResponse({"success": False, "msg": "Image too large! Max 1MB."})
     if not avatar_b64.startswith("data:image/"):
@@ -491,7 +455,6 @@ async def change_email_request(request: Request, new_email: str = Form(...)):
         {"$set": {"code": code, "new_email": new_email, "type": "email_change", "created_at": datetime.now()}},
         upsert=True
     )
-    print(f"\n[MOCK EMAIL] To: {new_email} | EMAIL CHANGE OTP: {code}\n")
     return JSONResponse({"success": True, "msg": f"Verification code sent to {new_email}"})
 
 @router.post("/api/store/change-email-verify")
@@ -507,7 +470,6 @@ async def change_email_verify(request: Request, code: str = Form(...)):
         return JSONResponse({"success": False, "msg": "Code expired! Please try again."})
 
     new_email = otp_doc["new_email"]
-    # Double-check new email not taken
     if await db.store_customers.find_one({"email": new_email}):
         return JSONResponse({"success": False, "msg": "This email was just registered by someone else."})
 
@@ -515,7 +477,6 @@ async def change_email_verify(request: Request, code: str = Form(...)):
     await db.store_orders.update_many({"email": current_email}, {"$set": {"email": new_email}})
     await db.otps.delete_one({"_id": otp_doc["_id"]})
 
-    # Update session cookie
     response = JSONResponse({"success": True, "msg": "Email updated successfully!", "new_email": new_email})
     response.set_cookie(key="store_session", value=new_email, httponly=True, max_age=86400 * 30)
     return response
@@ -534,10 +495,12 @@ async def customer_info(request: Request, email: str):
     user = await db.store_customers.find_one({"email": email})
     if not user:
         return JSONResponse({"success": False, "msg": "Not found"})
+        
+    # جلب أي عملة ديناميكية متسجلة للعميل
+    balances = {k: v for k, v in user.items() if k.startswith("balance_")}
     return JSONResponse({
-        "success":     True,
-        "balance_egp": user.get("balance_egp", 0),
-        "balance_usd": user.get("balance_usd", 0),
+        "success": True,
+        **balances
     })
 
 @router.post("/api/store/admin/update-customer")
@@ -587,7 +550,6 @@ async def admin_email_request(request: Request, email: str = Form(...), new_emai
         {"$set": {"code": code, "new_email": new_email, "type": "admin_email_change", "created_at": datetime.now()}},
         upsert=True
     )
-    print(f"\n[ADMIN EMAIL CHANGE] To: {new_email} | OTP: {code}\n")
     return JSONResponse({"success": True, "msg": f"Code sent to {new_email}"})
 
 @router.post("/api/store/admin/email-verify")
@@ -639,6 +601,5 @@ async def admin_delete_customer(request: Request, email: str = Form(...)):
     result = await db.store_customers.delete_one({"email": email})
     if result.deleted_count == 0:
         return JSONResponse({"success": False, "msg": "Customer not found"})
-    # Also clean up their OTPs
     await db.otps.delete_many({"email": email})
     return JSONResponse({"success": True, "msg": f"Account {email} deleted."})
