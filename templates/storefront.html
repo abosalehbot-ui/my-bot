@@ -39,8 +39,47 @@
         @keyframes gradientX { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } } .text-gradient-animate { background-size: 200% 200%; animation: gradientX 3s ease infinite; }
         
         .uc-card { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        .uc-card:hover { transform: translateY(-8px); box-shadow: 0 15px 35px rgba(0,0,0,0.5); border-color: var(--theme-secondary); }
+        .uc-card:hover { transform: translateY(-8px); box-shadow: 0 15px 35px rgba(0,0,0,0.5); }
         
+        /* ========================================================
+           🔥 الأكواد الجديدة للإطار المتحرك السحري للكروت 🔥
+        ======================================================== */
+        .animated-card {
+            position: relative;
+            overflow: hidden;
+            border: none !important;
+            border-radius: 1rem; /* rounded-2xl */
+        }
+        .animated-card::before {
+            content: '';
+            position: absolute;
+            width: 150px;
+            height: 250%; /* عشان يغطي الكارت مهما كبر */
+            background-image: linear-gradient(180deg, var(--theme-secondary), var(--theme-primary));
+            animation: rotBGimg 4s linear infinite;
+            top: -75%;
+            left: calc(50% - 75px);
+            z-index: 0;
+            transition: all 0.2s linear;
+        }
+        @keyframes rotBGimg {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .animated-card::after {
+            content: '';
+            position: absolute;
+            inset: 2px; /* ده بيتحكم في سُمك الإطار اللي بيلف */
+            background: #111; /* نفس لون الـ panelbg */
+            border-radius: 14px; /* لفة أقل درجة عشان تركب صح مع اللي بره */
+            z-index: 0;
+        }
+        /* بنعلي طبقة المحتوى عشان تبان فوق الإطار */
+        .animated-card > * {
+            position: relative;
+            z-index: 1;
+        }
+
         .social-btn { position: relative; width: 45px; height: 45px; display: flex; justify-content: center; align-items: center; border-radius: 8px; background-color: transparent; cursor: pointer; transition: background-color 0.3s; overflow: hidden; }
         .social-btn:hover { background-color: rgba(255,255,255,0.05); }
         .social-btn svg { width: 22px; height: 22px; fill: #9ca3af; transition: fill 0.3s, transform 0.3s; position: absolute; pointer-events: none; z-index: 1; }
@@ -205,7 +244,9 @@
                 
                 <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                     {% for p in cat.products %}
-                    <div class="uc-card bg-panelbg border border-gray-800 rounded-2xl p-5 md:p-6 flex flex-col items-center text-center relative overflow-hidden">
+                    
+                    <div class="uc-card animated-card bg-panelbg rounded-2xl p-5 md:p-6 flex flex-col items-center text-center relative">
+                        
                         {% if stock.get(p.stock_key, 0) > 0 %}
                         <div class="absolute top-3 right-3 bg-szgreen/20 text-szgreen text-[10px] font-bold px-2 py-1 rounded border border-szgreen/30"><i class="fas fa-bolt mr-1"></i> INSTANT</div>
                         {% else %}
