@@ -249,7 +249,79 @@ async def customer_buy(request: Request, stock_key: str = Form(...), price: floa
 
     return JSONResponse({"success": True, "code": code_str, "new_balance": new_bal,
                          "currency": currency.upper(), "msg": "Purchase successful!"})
+import json
 
+@router.post("/api/store/buy-cart")
+async def customer_buy_cart(request: Request, cart_data: str = Form(...), currency: str = Form(...)):
+    email = request.cookies.get("store_session")
+    if not email:
+        return JSONResponse({"success": False, "msg": "Unauthorized! Please login again.", "force_logout": True})
+
+    user = await db.store_customers.find_one({"email": email})
+    if not user:
+        return JSONResponse({"success": False, "msg": "Account not found!", "force_logout": True})
+
+    try:
+        items = json.loads(cart_data) # فك شفرة السلة
+    except:
+        return JSONResponse({"success": False, "msg": "Invalid cart data."})
+
+    if not items:
+        return JSONResponse({"success": False, "msg": "Cart is empty."})
+
+    total_price = sum(float(item["price"]) * int(item["qty"]) for item in items)
+    bal_field = f"balance_{currency.lower()}"
+    
+    if user.get(bal_field, 0) < total_price:
+        return JSONResponse({"success": False, "msg": f"Insufficient {currency.upper()} balance! Please recharge."})
+
+    # 1. التأكد إن المخزون يكفي لكل المنتجات اللي في السلة قبل ما نخصم الفلوس
+    for item in items:
+        available = await db.stock.count_documents({"category": item["stock_key"]})
+        if available < int(item["qty"]):
+            return JSONResponse({"success": False, "msg": f"Not enough stock for {item['name']}. Available: {available}"})
+
+    # 2. خصم إجمالي الفلوس من الرصيد
+    await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: -total_price}})
+    new_bal = user.get(bal_field, 0) - total_price
+
+    # 3. سحب الأكواد وإنشاء الطلبات في الداتا بيز
+    pulled_codes_display = []
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    
+    for item in items:
+        sk = item["stock_key"]
+        qty = int(item["qty"])
+        price_per_item = float(item["price"])
+        
+        for _ in range(qty):
+            code_doc = await db.stock.find_one_and_delete({"category": sk})
+            if code_doc:
+                code_str = str(code_doc.get("code") or code_doc["_id"])
+                seq = await get_next_order_id()
+                order_id = f"{seq}S"
+                
+                await db.store_orders.insert_one({
+                    "_id":      order_id,
+                    "email":    email,
+                    "name":     user["name"],
+                    "category": sk,
+                    "code":     code_str,
+                    "price":    price_per_item,
+                    "currency": currency.upper(),
+                    "date":     now_str,
+                })
+                await db.codes_map.insert_one({
+                    "code":     code_str,
+                    "order_id": order_id,
+                    "name":     f"{user['name']} (Web)",
+                    "time":     now_str,
+                    "source":   "Web Store",
+                })
+                pulled_codes_display.append(f"<b>{item['name']}</b>: <code>{code_str}</code>")
+
+    return JSONResponse({"success": True, "codes": pulled_codes_display, "new_balance": new_bal,
+                         "currency": currency.upper(), "msg": "Purchase successful!"})
 @router.get("/api/store/my-orders")
 async def get_my_orders(request: Request):
     email = request.cookies.get("store_session")
