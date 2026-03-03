@@ -443,3 +443,126 @@ async def change_email_verify(request: Request, code: str = Form(...)):
     response = JSONResponse({"success": True, "msg": "Email updated successfully!", "new_email": new_email})
     response.set_cookie(key="store_session", value=new_email, httponly=True, max_age=86400 * 30)
     return response
+
+# ==========================================
+# 7. Admin — Full Customer Control
+# ==========================================
+
+def admin_check(request: Request):
+    return request.cookies.get("admin_session") == SECRET_TOKEN
+
+@router.get("/api/store/customer-info")
+async def customer_info(request: Request, email: str):
+    if not admin_check(request):
+        return JSONResponse({"success": False, "msg": "Unauthorized"})
+    user = await db.store_customers.find_one({"email": email})
+    if not user:
+        return JSONResponse({"success": False, "msg": "Not found"})
+    return JSONResponse({
+        "success":     True,
+        "balance_egp": user.get("balance_egp", 0),
+        "balance_usd": user.get("balance_usd", 0),
+    })
+
+@router.post("/api/store/admin/update-customer")
+async def admin_update_customer(
+    request: Request,
+    email:        str = Form(...),
+    name:         str = Form(...),
+    username:     str = Form(...),
+    new_password: str = Form(""),
+):
+    if not admin_check(request):
+        return JSONResponse({"success": False, "msg": "Unauthorized"})
+
+    username = username.lower().strip()
+    if not _re.match(r'^[a-z0-9_]{3,20}$', username):
+        return JSONResponse({"success": False, "msg": "Username: 3-20 chars (letters/numbers/_)"})
+    if not name.strip():
+        return JSONResponse({"success": False, "msg": "Name cannot be empty"})
+
+    existing = await db.store_customers.find_one({"username": username, "email": {"$ne": email}})
+    if existing:
+        return JSONResponse({"success": False, "msg": "Username already taken"})
+
+    update = {"name": name.strip(), "username": username}
+    if new_password:
+        if len(new_password) < 8:
+            return JSONResponse({"success": False, "msg": "Password must be at least 8 characters"})
+        update["password"] = hash_password(new_password)
+
+    await db.store_customers.update_one({"email": email}, {"$set": update})
+    return JSONResponse({"success": True, "msg": "Customer updated!", "name": name.strip(), "username": username})
+
+@router.post("/api/store/admin/email-request")
+async def admin_email_request(request: Request, email: str = Form(...), new_email: str = Form(...)):
+    if not admin_check(request):
+        return JSONResponse({"success": False, "msg": "Unauthorized"})
+    if not _re.match(r'^[^@]+@[^@]+\.[^@]+$', new_email):
+        return JSONResponse({"success": False, "msg": "Invalid email address"})
+    if new_email == email:
+        return JSONResponse({"success": False, "msg": "Same as current email"})
+    if await db.store_customers.find_one({"email": new_email}):
+        return JSONResponse({"success": False, "msg": "Email already registered"})
+
+    code = str(random.randint(100000, 999999))
+    await db.otps.update_one(
+        {"email": email},
+        {"$set": {"code": code, "new_email": new_email, "type": "admin_email_change", "created_at": datetime.now()}},
+        upsert=True
+    )
+    print(f"\n[ADMIN EMAIL CHANGE] To: {new_email} | OTP: {code}\n")
+    return JSONResponse({"success": True, "msg": f"Code sent to {new_email}"})
+
+@router.post("/api/store/admin/email-verify")
+async def admin_email_verify(request: Request, email: str = Form(...), code: str = Form(...)):
+    if not admin_check(request):
+        return JSONResponse({"success": False, "msg": "Unauthorized"})
+
+    otp_doc = await db.otps.find_one({"email": email, "code": code, "type": "admin_email_change"})
+    if not otp_doc:
+        return JSONResponse({"success": False, "msg": "Invalid code"})
+    if (datetime.now() - otp_doc["created_at"]).total_seconds() > 600:
+        return JSONResponse({"success": False, "msg": "Code expired"})
+
+    new_email = otp_doc["new_email"]
+    if await db.store_customers.find_one({"email": new_email}):
+        return JSONResponse({"success": False, "msg": "Email just taken by someone else"})
+
+    await db.store_customers.update_one({"email": email}, {"$set": {"email": new_email}})
+    await db.store_orders.update_many({"email": email}, {"$set": {"email": new_email}})
+    await db.otps.delete_one({"_id": otp_doc["_id"]})
+    return JSONResponse({"success": True, "msg": "Email changed successfully!", "new_email": new_email})
+
+@router.post("/api/store/admin/set-avatar")
+async def admin_set_avatar(request: Request, email: str = Form(...), avatar_b64: str = Form("")):
+    if not admin_check(request):
+        return JSONResponse({"success": False, "msg": "Unauthorized"})
+    if avatar_b64 and len(avatar_b64) > 1_400_000:
+        return JSONResponse({"success": False, "msg": "Image too large (max 1MB)"})
+    if avatar_b64 and not avatar_b64.startswith("data:image/"):
+        return JSONResponse({"success": False, "msg": "Invalid image format"})
+
+    await db.store_customers.update_one({"email": email}, {"$set": {"avatar": avatar_b64}})
+    msg = "Avatar updated!" if avatar_b64 else "Avatar removed!"
+    return JSONResponse({"success": True, "msg": msg})
+
+@router.get("/api/store/admin/customer-orders")
+async def admin_customer_orders(request: Request, email: str):
+    if not admin_check(request):
+        return JSONResponse({"success": False, "orders": []})
+    orders = await db.store_orders.find({"email": email}).sort("date", -1).to_list(200)
+    for o in orders:
+        o["order_id"] = str(o.get("_id", ""))
+    return JSONResponse({"success": True, "orders": orders})
+
+@router.post("/api/store/admin/delete-customer")
+async def admin_delete_customer(request: Request, email: str = Form(...)):
+    if not admin_check(request):
+        return JSONResponse({"success": False, "msg": "Unauthorized"})
+    result = await db.store_customers.delete_one({"email": email})
+    if result.deleted_count == 0:
+        return JSONResponse({"success": False, "msg": "Customer not found"})
+    # Also clean up their OTPs
+    await db.otps.delete_many({"email": email})
+    return JSONResponse({"success": True, "msg": f"Account {email} deleted."})
