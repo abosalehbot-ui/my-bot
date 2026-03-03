@@ -13,3 +13,6 @@ PRODUCT_ID = "24h-nongmail"
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb+srv://abosalehlt_db_user:7_RvkParzvUeC_v@abosaleh.yhuwfdt.mongodb.net/?appName=abosaleh")
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL") 
 PORT = int(os.environ.get("PORT", 8080))
+
+# Admin auth — مكان واحد للتوكن السري
+SECRET_TOKEN = os.environ.get("SECRET_TOKEN", "salehzon_secure_2026")
