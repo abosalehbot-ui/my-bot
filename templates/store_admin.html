@@ -289,11 +289,9 @@
                                     USD</span>{% endif %}
                             </td>
                             <td class="px-4 py-3 text-xs text-gray-500">{{ o.date }}</td>
-                            <td class="px-4 py-3">
-                                <button onclick="copyText('{{ o.code }}')"
-                                    class="bg-gray-900 text-szgreen border border-gray-700 px-3 py-1 rounded text-xs font-mono hover:bg-szgreen hover:text-black transition">
-                                    <i class="fas fa-copy mr-1"></i>Copy
-                                </button>
+                            <td class="px-4 py-3 flex items-center gap-2">
+                                <span class="text-szgreen font-mono font-bold tracking-wider select-all">{{ o.code }}</span>
+                                <button onclick="copyText('{{ o.code }}')" class="text-gray-500 hover:text-white transition" title="Copy"><i class="fas fa-copy"></i></button>
                             </td>
                             <td class="px-4 py-3">
                                 <button onclick="returnOrder('{{ o._id }}')"
@@ -511,6 +509,13 @@
                     <div id="cm-orders-loading" class="text-center py-6 text-szcyan hidden">
                         <i class="fas fa-spinner fa-spin text-2xl mb-2"></i><br>Loading...
                     </div>
+                    
+                    <div id="cm-orders-action-bar" class="flex justify-end mb-3 hidden">
+                        <button onclick="returnAllCustomerOrders()" class="bg-red-900/20 text-red-500 border border-red-900/50 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-500 hover:text-black transition flex items-center gap-1 shadow-[0_0_10px_rgba(239,68,68,0.2)]">
+                            <i class="fas fa-undo-alt"></i> Return All User Orders
+                        </button>
+                    </div>
+
                     <div class="overflow-x-auto border border-gray-800 rounded-xl bg-black">
                         <table class="w-full text-xs text-left whitespace-nowrap">
                             <thead class="bg-[#111] text-gray-500 uppercase text-[9px]">
@@ -518,8 +523,8 @@
                                     <th class="px-3 py-2">Order</th>
                                     <th class="px-3 py-2">Package</th>
                                     <th class="px-3 py-2">Price</th>
-                                    <th class="px-3 py-2">Date</th>
-                                    <th class="px-3 py-2">Code</th>
+                                    <th class="px-3 py-2">Code Info</th>
+                                    <th class="px-3 py-2">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="cm-orders-tbody" class="divide-y divide-gray-800 text-gray-300"></tbody>
@@ -527,6 +532,20 @@
                     </div>
                 </div>
 
+            </div>
+        </div>
+    </div>
+
+    <div id="custom-confirm-modal" class="fixed inset-0 bg-black/90 z-[300] hidden flex items-center justify-center p-4 backdrop-blur-sm fade-in">
+        <div class="bg-panelbg border border-gray-800 rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl relative overflow-hidden">
+            <div class="w-16 h-16 bg-red-900/20 text-red-500 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 shadow-[0_0_20px_rgba(239,68,68,0.2)]">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h3 id="confirm-title" class="text-xl font-black text-white mb-2">Are you sure?</h3>
+            <p id="confirm-msg" class="text-sm text-gray-400 mb-6">This action cannot be undone.</p>
+            <div class="flex gap-3">
+                <button onclick="closeConfirmModal()" class="flex-1 bg-gray-900 text-white font-bold py-3 rounded-xl hover:bg-gray-800 transition border border-gray-700">Cancel</button>
+                <button id="confirm-action-btn" class="flex-1 bg-red-500 text-black font-black py-3 rounded-xl hover:bg-red-600 transition shadow-[0_0_15px_rgba(239,68,68,0.4)]">Yes, Do it!</button>
             </div>
         </div>
     </div>
@@ -810,25 +829,83 @@
             } catch { showToast('Error!', 'error'); }
         }
 
-        // ─── Customer Orders ──────────────────────────────────────────────────────
+        // ─── Custom Confirm Logic ────────────────────────────────────────────────
+        let confirmCallback = null;
+        function showConfirm(title, msg, callback) {
+            $('confirm-title').innerText = title;
+            $('confirm-msg').innerText = msg;
+            confirmCallback = callback;
+            $('custom-confirm-modal').classList.remove('hidden');
+        }
+        function closeConfirmModal() {
+            $('custom-confirm-modal').classList.add('hidden');
+            confirmCallback = null;
+        }
+        $('confirm-action-btn')?.addEventListener('click', () => {
+            if(confirmCallback) confirmCallback();
+            closeConfirmModal();
+        });
+
+        // ─── Return Order (Single & All) ─────────────────────────────────────────
+        function returnOrder(orderId) {
+            showConfirm('Return Order?', `Are you sure you want to return order #${orderId} to stock?`, async () => {
+                const fd = new FormData(); fd.append('order_id', orderId);
+                try {
+                    const d = await (await fetch('/api/store/admin/return-order', { method: 'POST', body: fd })).json();
+                    if (d.success) { 
+                        showToast(d.msg); 
+                        if(_cEmail && !$('customer-modal').classList.contains('hidden')) {
+                            loadCustomerOrders(); 
+                        } else {
+                            setTimeout(() => location.reload(), 1000); 
+                        }
+                    } else showToast(d.msg, 'error');
+                } catch { showToast('Error returning order!', 'error'); }
+            });
+        }
+
+        function returnAllCustomerOrders() {
+            showConfirm('Return ALL Orders?', `WARNING: This will return all purchased codes for ${_cEmail} back to stock!`, async () => {
+                const fd = new FormData(); fd.append('email', _cEmail);
+                try {
+                    const d = await (await fetch('/api/store/admin/return-all-orders', { method: 'POST', body: fd })).json();
+                    if (d.success) { showToast(d.msg); loadCustomerOrders(); } 
+                    else showToast(d.msg, 'error');
+                } catch { showToast('Error returning orders!', 'error'); }
+            });
+        }
+
+        // ─── Customer Orders (Updated) ────────────────────────────────────────────
         async function loadCustomerOrders() {
             const tbody = $('cm-orders-tbody'), loader = $('cm-orders-loading');
+            const actionBar = $('cm-orders-action-bar');
+            
             if (loader) loader.classList.remove('hidden');
+            if (actionBar) actionBar.classList.add('hidden');
             if (tbody) tbody.innerHTML = '';
+            
             try {
                 const d = await (await fetch('/api/store/admin/customer-orders?email=' + encodeURIComponent(_cEmail))).json();
                 if (loader) loader.classList.add('hidden');
+                
                 if (d.success && d.orders.length > 0) {
+                    if (actionBar) actionBar.classList.remove('hidden');
                     tbody.innerHTML = d.orders.map(o => {
                         const pc = o.currency === 'USD' ? 'text-szcyan' : 'text-yellow-500';
+                        const safeCode = String(o.code).replace(/'/g, "\\'");
                         return `<tr class="hover:bg-[#111] transition">
-                    <td class="px-3 py-2 font-mono text-szcyan">#${o.order_id}</td>
-                    <td class="px-3 py-2 font-bold text-white">${o.category}</td>
-                    <td class="px-3 py-2 font-black ${pc}">${o.price} <span class="text-[10px] text-gray-500">${o.currency}</span></td>
-                    <td class="px-3 py-2 text-gray-500">${o.date}</td>
-                    <td class="px-3 py-2"><button onclick="copyText('${String(o.code).replace(/'/g, "\\'")}')"\
-                        class="bg-gray-900 text-szgreen border border-gray-700 px-2 py-1 rounded text-[10px] font-mono hover:bg-szgreen hover:text-black transition">Copy</button></td>
-                </tr>`;
+                            <td class="px-3 py-3 font-mono text-szcyan">#${o.order_id}</td>
+                            <td class="px-3 py-3 font-bold text-white">${o.category}</td>
+                            <td class="px-3 py-3 font-black ${pc}">${o.price} <span class="text-[10px] text-gray-500">${o.currency}</span></td>
+                            <td class="px-3 py-3">
+                                <div class="text-szgreen font-mono text-xs tracking-wider mb-1 select-all">${o.code}</div>
+                                <div class="text-[9px] text-gray-600">${o.date}</div>
+                            </td>
+                            <td class="px-3 py-3 flex items-center gap-2">
+                                <button onclick="copyText('${safeCode}')" class="bg-gray-900 text-szcyan border border-gray-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-szcyan hover:text-black transition">Copy</button>
+                                <button onclick="returnOrder('${o.order_id}')" class="bg-red-900/20 text-red-400 border border-red-900/30 px-2 py-1 rounded text-[10px] font-bold hover:bg-red-500 hover:text-black transition">Return</button>
+                            </td>
+                        </tr>`;
                     }).join('');
                     _cOrdersLoaded = true;
                 } else if (tbody) {
@@ -839,23 +916,14 @@
 
         // ─── Delete Customer ──────────────────────────────────────────────────────
         async function deleteCustomer() {
-            if (!confirm(`Delete account for ${_cEmail}? This cannot be undone.`)) return;
-            const fd = new FormData(); fd.append('email', _cEmail);
-            try {
-                const d = await (await fetch('/api/store/admin/delete-customer', { method: 'POST', body: fd })).json();
-                if (d.success) { showToast(d.msg); closeCustomerModal(); setTimeout(() => location.reload(), 1200); }
-                else showToast(d.msg, 'error');
-            } catch { showToast('Error!', 'error'); }
-        }
-
-        // ─── Return Order ─────────────────────────────────────────────────────────
-        async function returnOrder(orderId) {
-            if (!confirm(`Return order #${orderId}? The code will go back to stock.`)) return;
-            const fd = new FormData(); fd.append('order_id', orderId);
-            try {
-                const res = await fetch('/api/return_order', { method: 'POST', body: fd });
-                if (res.redirected || res.ok) { showToast('Order returned to stock!'); setTimeout(() => location.reload(), 1200); }
-            } catch { showToast('Error!', 'error'); }
+            showConfirm('Delete Customer?', `Delete account for ${_cEmail}? This cannot be undone.`, async () => {
+                const fd = new FormData(); fd.append('email', _cEmail);
+                try {
+                    const d = await (await fetch('/api/store/admin/delete-customer', { method: 'POST', body: fd })).json();
+                    if (d.success) { showToast(d.msg); closeCustomerModal(); setTimeout(() => location.reload(), 1200); }
+                    else showToast(d.msg, 'error');
+                } catch { showToast('Error!', 'error'); }
+            });
         }
 
         // ─── Helpers ─────────────────────────────────────────────────────────────
