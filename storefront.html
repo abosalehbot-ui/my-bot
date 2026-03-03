@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="default">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saleh Zone | Storefront</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="/static/js/core.js"></script>
+    <script>
+        tailwind.config = { theme: { extend: { colors: { szgreen: 'var(--theme-primary)', szcyan: 'var(--theme-secondary)', darkbg: '#050505', panelbg: '#111' } } } }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
+
+        :root {
+            --theme-primary: #7dfc89;
+            --theme-secondary: #5eead4;
+        }
+
+        html[data-theme="synthwave"] {
+            --theme-primary: #a855f7;
+            --theme-secondary: #f97316;
+        }
+
+        html[data-theme="sith"] {
+            --theme-primary: #ef4444;
+            --theme-secondary: #dc2626;
+        }
+
+        html[data-theme="vip"] {
+            --theme-primary: #eab308;
+            --theme-secondary: #facc15;
+        }
+
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #050505;
+            color: #d1d5db;
+            scroll-behavior: smooth;
+            overflow: hidden;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #050505;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 10px;
+            transition: 0.3s;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--theme-primary);
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(15px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .floating {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translateY(0px);
+            }
+
+            50% {
+                transform: translateY(-8px);
+            }
+
+            100% {
+                transform: translateY(0px);
+            }
+        }
+
+        .btn-glow {
+            transition: all 0.3s ease;
+        }
+
+        .btn-glow:hover {
+            box-shadow: 0 0 15px var(--theme-primary);
+            border-color: var(--theme-primary);
+        }
+
+        .uc-card {
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .uc-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+            border-color: var(--theme-secondary);
+        }
+
+        .cat-card-img {
+            transition: transform 0.7s ease;
+        }
+
+        .cat-group:hover .cat-card-img {
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+
+<body class="selection:bg-szgreen selection:text-black flex h-screen">
+
+    <div id="toast-container" class="fixed top-5 right-5 z-[9999] flex flex-col gap-2"></div>
+    <div id="sidebar-backdrop" onclick="toggleSidebar()"
+        class="fixed inset-0 bg-black/80 z-40 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
+
+    {% if maintenance %}
+    <div class="flex flex-col items-center justify-center w-full h-full p-4 text-center bg-darkbg z-50">
+        <div
+            class="inline-flex items-center justify-center w-24 h-24 bg-black rounded-full border-2 border-szgreen/50 shadow-[0_0_30px_rgba(125,252,137,0.4)] mb-8 floating">
+            <span class="text-4xl font-black text-szgreen">SZ</span>
+        </div>
+        <h1
+            class="text-4xl md:text-6xl font-black text-white mb-4 uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan">
+            System Maintenance</h1>
+        <p class="text-gray-400 max-w-xl mb-10 text-lg">We are currently upgrading our servers. We will be back online
+            shortly!</p>
+        <button onclick="location.reload()"
+            class="px-8 py-3 bg-szgreen text-black rounded-xl font-bold transition btn-glow"><i
+                class="fas fa-sync-alt mr-2"></i> Refresh Status</button>
+    </div>
+    {% else %}
+
+    <aside id="sz-sidebar"
+        class="fixed top-0 left-0 z-50 w-64 h-screen transition-transform -translate-x-full md:translate-x-0 shadow-[4px_0_24px_rgba(0,0,0,0.5)] flex-shrink-0">
+        <div class="overflow-y-auto py-5 px-3 h-full bg-panelbg border-r border-gray-800 pb-20">
+            <div class="flex items-center justify-between px-2 mb-6 pb-6 border-b border-gray-800 md:justify-center">
+                <div
+                    class="inline-flex items-center justify-center w-8 h-8 bg-black rounded-full border border-szgreen/50 shadow-[0_0_10px_var(--theme-primary)] floating">
+                    SZ</div>
+                <span
+                    class="text-xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan">SALEH
+                    ZONE</span>
+                <button onclick="toggleSidebar()" class="md:hidden text-gray-500 hover:text-white"><i
+                        class="fas fa-times"></i></button>
+            </div>
+
+            <ul class="space-y-4">
+                <li id="sidebar-guest">
+                    <button onclick="openAuthModal('signin'); toggleSidebarMobile();"
+                        class="flex items-center justify-center w-full p-3 text-sm font-bold text-szgreen bg-szgreen/10 rounded-lg border border-szgreen/20"><i
+                            class="fas fa-sign-in-alt mr-2"></i> Login / Sign Up</button>
+                </li>
+
+                <li id="sidebar-user"
+                    class="hidden bg-[#050505] p-4 rounded-lg border border-gray-800 fade-in cursor-pointer hover:border-szgreen transition"
+                    onclick="openProfileModal(); toggleSidebarMobile();">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="w-10 h-10 rounded-full bg-gray-900 border border-gray-700 overflow-hidden relative group">
+                                <img id="sidebar-avatar" src="" class="w-full h-full object-cover hidden">
+                                <div id="sidebar-avatar-fallback"
+                                    class="w-full h-full flex items-center justify-center text-szgreen"><i
+                                        class="fas fa-user"></i></div>
+                            </div>
+                            <div class="font-bold text-white truncate" id="sidebar-ui-name">Name</div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2" id="dynamic-wallets-sidebar">
+                        {% for curr in currencies %}
+                        <div class="bg-black border border-gray-800 rounded p-2 text-center">
+                            <div class="text-[9px] text-gray-500 uppercase">{{ curr._id }}</div>
+                            <div class="text-white font-black text-sm" id="sidebar-ui-bal-{{ curr._id|lower }}">0</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="mt-3 text-center text-[10px] text-szcyan uppercase font-bold tracking-wider"><i
+                            class="fas fa-id-card mr-1"></i> View Profile</div>
+                </li>
+
+                <li>
+                    <hr class="border-gray-800">
+                </li>
+                <li><a href="#" onclick="closeCategory(); toggleSidebarMobile();"
+                        class="flex items-center p-3 text-base font-bold text-white rounded-lg bg-gray-900 group"><i
+                            class="fas fa-store w-6 text-szgreen"></i> Store Home</a></li>
+            </ul>
+        </div>
+
+        <div
+            class="absolute bottom-0 left-0 flex items-center justify-between p-4 w-full bg-[#0a0a0a] border-t border-gray-800 z-20">
+            <select id="currency-toggle" onchange="toggleCurrency()"
+                class="bg-gray-900 border border-gray-700 text-white text-xs font-bold py-2 px-3 rounded outline-none focus:border-szgreen">
+                {% for curr in currencies %}
+                <option value="{{ curr._id }}">{{ curr.symbol }} {{ curr._id }}</option>
+                {% endfor %}
+            </select>
+            <div class="flex gap-2">
+                <button onclick="document.getElementById('theme-drop').classList.toggle('hidden')"
+                    class="text-gray-500 hover:text-szgreen p-2"><i class="fas fa-paint-roller text-lg"></i></button>
+                <div id="theme-drop"
+                    class="hidden absolute bottom-12 -right-2 bg-black border border-gray-800 rounded-lg w-36 py-2 z-50">
+                    <a href="#" onclick="setTheme('default')"
+                        class="block px-4 py-2 text-sm text-white hover:bg-gray-900">Cyberpunk</a>
+                    <a href="#" onclick="setTheme('synthwave')"
+                        class="block px-4 py-2 text-sm text-white hover:bg-gray-900">Synthwave</a>
+                    <a href="#" onclick="setTheme('sith')"
+                        class="block px-4 py-2 text-sm text-white hover:bg-gray-900">Sith Red</a>
+                    <a href="#" onclick="setTheme('vip')"
+                        class="block px-4 py-2 text-sm text-white hover:bg-gray-900">VIP Gold</a>
+                </div>
+                <button id="sidebar-logout-btn" onclick="logout()" class="hidden text-red-500 p-2"><i
+                        class="fas fa-power-off text-lg"></i></button>
+            </div>
+        </div>
+    </aside>
+
+    <main id="main-scroll" class="flex-1 flex flex-col h-screen overflow-y-auto bg-darkbg relative">
+        <header
+            class="h-16 bg-panelbg/90 backdrop-blur-md border-b border-gray-800 flex items-center justify-between px-4 md:hidden sticky top-0 z-30">
+            <button onclick="toggleSidebar()" class="text-white text-xl p-2"><i class="fas fa-bars"></i></button>
+            <span class="text-lg font-black tracking-wider text-szgreen">SALEH ZONE</span>
+            <button onclick="openProfileModal()" class="text-szgreen text-xl p-2"><i
+                    class="fas fa-user-circle"></i></button>
+        </header>
+
+        <div class="p-6 md:p-10 max-w-6xl mx-auto w-full flex-1">
+            <div class="text-center md:text-left mb-12 fade-in">
+                <h1 class="text-3xl md:text-5xl font-black mb-3 text-white uppercase tracking-widest">Digital <span
+                        class="text-szcyan">Delivery</span></h1>
+                <p class="text-gray-400 text-sm">Select your package. Codes are delivered instantly after payment.</p>
+            </div>
+
+            <div id="categories-view">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {% for cat in categories %}
+                    <div onclick="openCategory('{{ cat._id }}')"
+                        class="relative w-full h-32 md:h-48 rounded-2xl overflow-hidden cursor-pointer cat-group shadow-2xl border border-gray-800 fade-in">
+                        <img src="{{ cat.image|default('https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070') }}"
+                            class="absolute inset-0 w-full h-full object-cover cat-card-img opacity-60">
+                        <div class="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent"></div>
+                        <div class="absolute bottom-0 left-0 p-6 md:p-8 flex items-center gap-4 w-full">
+                            {% if cat.logo %}
+                            <img src="{{ cat.logo }}"
+                                class="w-14 h-14 rounded-xl object-cover shadow-[0_0_20px_rgba(94,234,212,0.4)]">
+                            {% elif cat.icon %}
+                            <div
+                                class="w-14 h-14 bg-black/50 backdrop-blur-md border border-szcyan/50 rounded-xl flex items-center justify-center text-szcyan text-2xl shadow-[0_0_20px_rgba(94,234,212,0.4)]">
+                                <i class="fas {{ cat.icon }}"></i>
+                            </div>
+                            {% endif %}
+                            <div>
+                                <h2
+                                    class="text-3xl md:text-4xl font-black text-white uppercase tracking-widest drop-shadow-lg">
+                                    {{ cat.name }}</h2>
+                                <p class="text-szcyan text-xs font-bold uppercase tracking-wider mt-1"><i
+                                        class="fas fa-bolt"></i> Instant Codes</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="col-span-full text-center text-gray-500 py-10">Store is empty. Please add categories
+                        from Master Panel.</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div id="products-view" class="hidden">
+                <button onclick="closeCategory()"
+                    class="mb-8 bg-gray-900 text-gray-300 hover:text-white px-4 py-2 rounded-lg font-bold border border-gray-800 hover:border-szgreen transition flex items-center gap-2">
+                    <i class="fas fa-arrow-left"></i> Back to Categories
+                </button>
+
+                {% for cat in categories %}
+                <div id="prod-grid-{{ cat._id }}" class="cat-prod-grid hidden fade-in">
+                    <h2
+                        class="text-2xl font-black text-white mb-6 flex items-center gap-3 border-b border-gray-800 pb-2">
+                        {% if cat.logo %}<img src="{{ cat.logo }}" class="w-8 h-8 rounded object-cover">{% elif cat.icon
+                        %}<i class="fas {{ cat.icon }} text-szcyan"></i>{% endif %}
+                        {{ cat.name }} Products
+                    </h2>
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                        {% for p in cat.products %}
+                        <div
+                            class="uc-card bg-panelbg border border-gray-800 rounded-2xl p-5 flex flex-col items-center text-center relative overflow-hidden">
+                            <div
+                                class="absolute top-3 right-3 bg-{{ 'szgreen/20 text-szgreen' if stock.get(p.stock_key, 0) > 0 else 'red-900/50 text-red-400' }} text-[10px] font-bold px-2 py-1 rounded border">
+                                {{ 'INSTANT' if stock.get(p.stock_key, 0) > 0 else 'OUT OF STOCK' }}
+                            </div>
+
+                            {% if p.image %}
+                            <img src="{{ p.image }}"
+                                class="w-20 h-20 mt-4 mb-2 rounded-xl object-cover floating shadow-[0_0_20px_rgba(94,234,212,0.2)]">
+                            {% else %}
+                            <div
+                                class="w-20 h-20 mt-4 mb-2 rounded-full bg-szcyan/10 flex items-center justify-center floating text-szcyan text-3xl">
+                                <i class="fas {{ cat.icon }}"></i>
+                            </div>
+                            {% endif %}
+
+                            <h3 class="text-lg md:text-xl font-black text-white mt-2 mb-2">{{ p.name }}</h3>
+
+                            <div class="mt-2 mb-6 bg-black w-full py-3 rounded-xl border border-gray-800">
+                                {% for curr in currencies %}
+                                <div
+                                    class="price-display price-{{ curr._id }} {{ 'hidden' if loop.index0 > 0 else '' }}">
+                                    <span class="text-2xl font-black text-white">{{ p.get('prices', {}).get(curr._id,
+                                        p.get('price_egp', 0) if curr._id == 'EGP' else p.get('price_usd', 0)) }}</span>
+                                    <span class="text-[10px] text-szcyan font-bold uppercase ml-1">{{ curr.symbol
+                                        }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+
+                            <button
+                                onclick="buyProductDynamic('{{ p.stock_key }}', {{ p.get('prices', {'EGP': p.get('price_egp', 0), 'USD': p.get('price_usd', 0)}) | tojson | forceescape }}, '{{ p.name }}', '{{ cat.icon }}')"
+                                {{ 'disabled' if stock.get(p.stock_key, 0)==0 }}
+                                class="w-full bg-{{ 'szgreen text-black hover:bg-szcyan' if stock.get(p.stock_key, 0) > 0 else 'gray-900 text-gray-600' }} font-bold py-3 rounded-xl transition uppercase text-sm btn-glow flex justify-center items-center gap-2">
+                                <i class="fas fa-shopping-cart"></i> <span>{{ 'Buy Now' if stock.get(p.stock_key, 0) > 0
+                                    else 'Unavailable' }}</span>
+                            </button>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <button id="scrollToTopBtn"
+            class="fixed bottom-6 right-6 md:bottom-8 md:right-8 bg-szcyan text-black w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold transition-all duration-300 opacity-0 pointer-events-none translate-y-4 z-40 btn-glow">
+            <i class="fas fa-arrow-up"></i>
+        </button>
+    </main>
+
+    <div id="checkout-modal"
+        class="fixed inset-0 bg-black/90 z-[60] hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div
+            class="w-full max-w-2xl bg-panelbg border border-gray-800 rounded-2xl shadow-2xl relative fade-in max-h-[90vh] overflow-y-auto">
+            <div
+                class="flex items-center justify-between p-5 border-b border-gray-800 sticky top-0 bg-panelbg/95 backdrop-blur z-10">
+                <h2 class="text-xl font-black text-white uppercase tracking-widest"><i
+                        class="fas fa-shopping-bag text-szcyan mr-2"></i> Order Summary</h2>
+                <button onclick="closeModal('checkout-modal')" class="text-gray-500 hover:text-red-500 transition"><i
+                        class="fas fa-times text-xl"></i></button>
+            </div>
+            <div class="p-6">
+                <div class="mb-6 pb-6 border-b border-gray-800">
+                    <dl class="bg-[#050505] border border-gray-800 p-4 rounded-xl flex items-center gap-3">
+                        <div class="w-10 h-10 bg-gray-900 rounded-full flex items-center justify-center text-szgreen"><i
+                                class="fas fa-user"></i></div>
+                        <div>
+                            <dt class="text-sm font-bold text-white" id="checkout-user-name">...</dt>
+                            <dd class="text-xs text-szcyan font-mono" id="checkout-user-email">...</dd>
+                        </div>
+                    </dl>
+                </div>
+                <div class="bg-black border border-gray-800 p-6 rounded-xl">
+                    <dl class="flex items-center justify-between gap-4 mb-6">
+                        <dt class="text-xl font-black text-white uppercase">Total to Pay</dt>
+                        <dd class="text-2xl font-black text-szcyan" id="checkout-total-price">$0.00</dd>
+                    </dl>
+                    <div class="flex items-start sm:items-center mt-4 mb-6">
+                        <input id="terms-checkbox" type="checkbox" checked
+                            class="h-4 w-4 rounded border-gray-700 bg-[#050505] text-szgreen focus:ring-2 focus:ring-szgreen accent-szgreen cursor-pointer" />
+                        <label class="ms-2 text-xs font-medium text-gray-400"> I agree to the <a href="#"
+                                class="text-szcyan hover:underline">Terms of Service</a>. </label>
+                    </div>
+                    <button type="button" id="btn-confirm-pay" onclick="confirmPurchase()"
+                        class="w-full flex items-center justify-center rounded-xl bg-szgreen px-5 py-3 text-sm font-black text-black uppercase tracking-wide btn-glow">Confirm
+                        & Pay <i class="fas fa-arrow-right ml-2"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="success-modal"
+        class="fixed inset-0 bg-black/90 z-[60] hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div
+            class="bg-panelbg border border-szgreen w-full max-w-md rounded-2xl p-8 text-center relative overflow-hidden shadow-[0_0_40px_rgba(125,252,137,0.15)] fade-in">
+            <div class="inline-block bg-szgreen/20 text-szgreen p-4 rounded-full mb-4"><i
+                    class="fas fa-check-circle text-4xl"></i></div>
+            <h2 class="text-2xl font-bold text-white mb-2">Purchase Successful!</h2>
+            <div class="bg-[#050505] border border-gray-800 p-4 rounded-xl mb-6">
+                <p id="purchased-code" class="text-lg font-mono text-szgreen tracking-wider select-all">LOADING...</p>
+            </div>
+            <button onclick="copyPurchasedCode()"
+                class="w-full bg-gray-800 text-white font-bold py-3 rounded-xl mb-3 hover:bg-szcyan hover:text-black transition flex justify-center items-center gap-2 btn-glow"><span>Copy
+                    Code</span> <i class="fas fa-copy"></i></button>
+            <button onclick="closeModal('success-modal')"
+                class="w-full text-gray-500 font-bold py-2 hover:text-white transition">Close</button>
+        </div>
+    </div>
+
+    <div id="auth-modal"
+        class="fixed inset-0 bg-black/90 z-[60] hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div
+            class="w-full max-w-[360px] bg-[#111827] p-8 rounded-xl shadow-2xl relative border border-gray-800 fade-in">
+            <button onclick="closeModal('auth-modal')"
+                class="absolute top-4 right-4 text-gray-500 hover:text-red-500"><i
+                    class="fas fa-times text-xl"></i></button>
+            <h2 id="modal-title" class="text-center text-2xl font-black text-white mb-6">Login</h2>
+            <div id="signin-view" class="auth-view block">
+                <form class="space-y-4" onsubmit="doManualLogin(event)">
+                    <div><input type="email" id="signin-email" required placeholder="Email"
+                            class="w-full rounded-md border border-gray-700 bg-[#0a0a0a] px-4 py-3 text-white outline-none focus:border-szgreen">
+                    </div>
+                    <div><input type="password" id="signin-password" required placeholder="Password"
+                            class="w-full rounded-md border border-gray-700 bg-[#0a0a0a] px-4 py-3 text-white outline-none focus:border-szcyan">
+                    </div>
+                    <button type="submit" id="btn-signin"
+                        class="w-full bg-szgreen text-black py-3 rounded-md font-bold uppercase btn-glow">Sign
+                        in</button>
+                </form>
+                <p class="text-center text-xs text-gray-500 mt-5">Don't have an account? <button
+                        onclick="switchAuthView('signup')" class="text-szcyan hover:underline font-bold">Sign
+                        up</button></p>
+            </div>
+            <div id="auth-status" class="text-xs font-bold text-center mt-3 h-4"></div>
+        </div>
+    </div>
+
+    <div id="profile-modal"
+        class="fixed inset-0 bg-black/90 z-[60] hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div
+            class="w-full max-w-4xl bg-panelbg border border-gray-800 rounded-2xl shadow-2xl relative fade-in h-[85vh] flex flex-col overflow-hidden">
+
+            <div
+                class="flex items-center justify-between p-5 border-b border-gray-800 shrink-0 bg-[#111] relative z-10">
+                <h2 class="text-xl font-black text-white uppercase tracking-widest"><i
+                        class="fas fa-user-astronaut text-szcyan mr-2"></i> Player Profile</h2>
+                <button onclick="closeModal('profile-modal')" class="text-gray-500 hover:text-red-500 transition"><i
+                        class="fas fa-times text-xl"></i></button>
+            </div>
+
+            <div class="flex border-b border-gray-800 shrink-0 px-6 pt-4 bg-[#111] relative z-10 gap-4 overflow-x-auto">
+                <button
+                    onclick="Core.switchTab('overview', 'prof-tab-panel', 'prof-tab-btn', 'text-szgreen border-szgreen', 'text-gray-500 border-transparent')"
+                    id="btn-overview"
+                    class="prof-tab-btn pb-3 px-2 font-bold text-sm text-szgreen border-b-2 border-szgreen whitespace-nowrap transition">Overview</button>
+                <button
+                    onclick="Core.switchTab('history', 'prof-tab-panel', 'prof-tab-btn', 'text-szgreen border-szgreen', 'text-gray-500 border-transparent'); fetchMyOrders();"
+                    id="btn-history"
+                    class="prof-tab-btn pb-3 px-2 font-bold text-sm text-gray-500 border-b-2 border-transparent hover:text-gray-300 whitespace-nowrap transition">Purchase
+                    History</button>
+                <button
+                    onclick="Core.switchTab('settings', 'prof-tab-panel', 'prof-tab-btn', 'text-szgreen border-szgreen', 'text-gray-500 border-transparent')"
+                    id="btn-settings"
+                    class="prof-tab-btn pb-3 px-2 font-bold text-sm text-gray-500 border-b-2 border-transparent hover:text-gray-300 whitespace-nowrap transition">Account
+                    Settings</button>
+            </div>
+
+            <div class="flex-1 relative bg-darkbg">
+
+                <div id="tab-overview" class="prof-tab-panel absolute inset-0 overflow-y-auto p-5 block">
+                    <div class="flex flex-col md:flex-row gap-6 mb-6">
+                        <div
+                            class="bg-black border border-gray-800 p-6 rounded-xl flex items-center gap-6 w-full md:w-1/2">
+                            <div class="relative group">
+                                <div
+                                    class="w-24 h-24 rounded-full border-4 border-gray-800 overflow-hidden bg-gray-900 flex items-center justify-center">
+                                    <img id="prof-avatar-img" src="" class="w-full h-full object-cover hidden">
+                                    <i id="prof-avatar-icon" class="fas fa-user text-4xl text-szgreen"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 class="text-2xl font-black text-white mb-1" id="prof-name">...</h3>
+                                <p class="text-sm text-szcyan font-mono" id="prof-email">...</p>
+                                <span
+                                    class="inline-block mt-2 bg-szgreen/20 text-szgreen text-[10px] px-2 py-0.5 rounded font-bold border border-szgreen/30">Verified
+                                    Player</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-black border border-gray-800 rounded-xl p-6 w-full md:w-1/2">
+                            <h4 class="text-xs text-gray-500 uppercase font-bold mb-4">Multi-Currency Wallet</h4>
+                            <div class="grid grid-cols-2 gap-4" id="prof-dynamic-wallets">
+                                {% for curr in currencies %}
+                                <div class="bg-gray-900 border border-gray-700 rounded-lg p-4 text-center">
+                                    <div class="text-xs text-gray-500 uppercase mb-1">{{ curr._id }} Wallet</div>
+                                    <div class="text-gray-300 font-black text-2xl" id="prof-bal-{{ curr._id|lower }}">0
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-history" class="prof-tab-panel absolute inset-0 overflow-y-auto p-5 hidden">
+                    <div id="orders-loading" class="text-center text-szcyan py-10 font-bold hidden"><i
+                            class="fas fa-spinner fa-spin text-3xl mb-2"></i><br>Loading...</div>
+                    <div class="border border-gray-800 rounded-xl bg-black overflow-x-auto">
+                        <table class="w-full text-left text-sm whitespace-nowrap">
+                            <thead class="bg-[#111] text-gray-400 uppercase text-[10px]">
+                                <tr>
+                                    <th class="px-4 py-3">Order</th>
+                                    <th class="px-4 py-3">Date</th>
+                                    <th class="px-4 py-3">Item</th>
+                                    <th class="px-4 py-3">Price</th>
+                                    <th class="px-4 py-3">Code</th>
+                                </tr>
+                            </thead>
+                            <tbody id="orders-table-body" class="divide-y divide-gray-800 text-gray-300"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="tab-settings" class="prof-tab-panel absolute inset-0 overflow-y-auto p-5 hidden">
+                    <div class="max-w-xl space-y-6">
+                        <div class="bg-black border border-gray-800 rounded-xl p-6">
+                            <h4 class="text-sm text-white font-bold mb-4"><i
+                                    class="fas fa-id-badge text-szcyan mr-2"></i> Update Personal Info</h4>
+                            <form onsubmit="doUpdateProfile(event)" class="space-y-4">
+                                <div><label class="text-xs text-gray-500 mb-1 block">Display Name</label><input
+                                        type="text" id="edit-name" required
+                                        class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-szcyan">
+                                </div>
+                                <div><label class="text-xs text-gray-500 mb-1 block">Avatar (File)</label><input
+                                        type="file" accept="image/*" id="edit-avatar"
+                                        class="w-full bg-[#050505] border border-gray-800 text-white p-2 rounded-lg outline-none focus:border-szcyan text-sm">
+                                </div>
+                                <button type="submit"
+                                    class="bg-szcyan text-black px-6 py-2.5 rounded-lg font-bold text-sm btn-glow">Save
+                                    Changes</button>
+                            </form>
+                        </div>
+
+                        <div class="bg-black border border-gray-800 rounded-xl p-6">
+                            <h4 class="text-sm text-white font-bold mb-4"><i
+                                    class="fas fa-envelope text-szcyan mr-2"></i> Change Email Address</h4>
+                            <form onsubmit="doChangeEmailRequest(event)" class="space-y-4" id="email-change-form">
+                                <div>
+                                    <label class="text-[10px] text-gray-500 uppercase mb-1 block">New Email
+                                        Address</label>
+                                    <input type="email" id="edit-new-email" required
+                                        class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-szcyan text-sm">
+                                </div>
+                                <button type="submit"
+                                    class="bg-gray-900 text-white hover:bg-white hover:text-black px-6 py-2.5 rounded-lg font-bold text-sm transition border border-gray-800">Send
+                                    Verification Code</button>
+                            </form>
+
+                            <form onsubmit="doChangeEmailVerify(event)"
+                                class="space-y-4 hidden mt-4 pt-4 border-t border-gray-800" id="email-verify-form">
+                                <p class="text-xs text-gray-400 mb-2">We sent a 6-digit code to your new email.</p>
+                                <div>
+                                    <input type="text" id="edit-email-code" required maxlength="6"
+                                        placeholder="Enter Code"
+                                        class="w-full bg-[#050505] border border-gray-800 text-szgreen text-center tracking-[0.5em] font-black p-3 rounded-lg outline-none focus:border-szgreen text-xl">
+                                </div>
+                                <button type="submit" id="btn-verify-email" onclick="doChangeEmailVerify(event)"
+                                    class="w-full bg-szgreen text-black py-2.5 rounded-lg font-bold uppercase text-sm hover:opacity-90 transition">Verify
+                                    & Update Email</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/core.js"></script>
+    <script src="/static/js/store.js"></script>
+    <script>
+        function toggleSidebar() {
+            document.getElementById('sz-sidebar').classList.toggle('-translate-x-full');
+            document.getElementById('sidebar-backdrop').classList.toggle('hidden');
+        }
+        function toggleSidebarMobile() {
+            if (window.innerWidth < 768) toggleSidebar();
+        }
+
+        // --- دوال فتح وإغلاق كروت الأقسام ---
+        function openCategory(catId) {
+            document.getElementById('categories-view').classList.add('hidden');
+            document.getElementById('products-view').classList.remove('hidden');
+            document.querySelectorAll('.cat-prod-grid').forEach(el => el.classList.add('hidden'));
+            document.getElementById('prod-grid-' + catId).classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function closeCategory() {
+            document.getElementById('products-view').classList.add('hidden');
+            document.getElementById('categories-view').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function toggleCurrency() {
+            currentCurrency = document.getElementById('currency-toggle').value;
+            document.querySelectorAll('.price-display').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll(`.price-${currentCurrency}`).forEach(el => el.classList.remove('hidden'));
+        }
+
+        function buyProductDynamic(stock_key, prices_json, name, iconClass) {
+            const email = localStorage.getItem('store_email');
+            if (!email) { Core.openModal('auth-modal'); return; }
+
+            const finalPrice = prices_json[currentCurrency] || 0;
+            pendingPurchase = { stock_key, price: finalPrice, currency: currentCurrency };
+
+            const priceText = finalPrice + ' ' + currentCurrency;
+            const priceColorClass = currentCurrency === 'EGP' ? 'text-yellow-500' : 'text-szcyan';
+
+            document.getElementById('checkout-item-price').innerText = priceText;
+            document.getElementById('checkout-item-price').className = `p-4 text-right font-black text-lg ${priceColorClass}`;
+            document.getElementById('checkout-total-price').innerText = priceText;
+            document.getElementById('checkout-total-price').className = `text-2xl font-black ${priceColorClass}`;
+
+            document.getElementById('checkout-user-name').innerText = localStorage.getItem('store_name');
+            document.getElementById('checkout-user-email').innerText = email;
+            document.getElementById('checkout-item-name').innerText = name;
+
+            Core.openModal('checkout-modal');
+        }
+
+        function updateUIDynamic(name, balances) {
+            document.getElementById('sidebar-ui-name').innerText = name;
+
+            for (const [curr, val] of Object.entries(balances)) {
+                const el = document.getElementById(`sidebar-ui-bal-${curr.toLowerCase()}`);
+                if (el) el.innerText = val;
+            }
+
+            const profWalletsContainer = document.getElementById('prof-dynamic-wallets');
+            if (profWalletsContainer) {
+                profWalletsContainer.innerHTML = '';
+                for (const [curr, val] of Object.entries(balances)) {
+                    const color = curr === 'EGP' ? 'text-yellow-500 border-yellow-500/30' : 'text-szcyan border-szcyan/30';
+                    profWalletsContainer.innerHTML += `
+                        <div class="bg-gray-900 border ${color} rounded-lg p-4 text-center">
+                            <div class="text-xs text-gray-500 uppercase mb-1">${curr} Wallet</div>
+                            <div class="${color.split(' ')[0]} font-black text-2xl">${val}</div>
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        async function doUpdateProfile(e) {
+            e.preventDefault();
+            const name = document.getElementById('edit-name').value;
+            const avatarFile = document.getElementById('edit-avatar').files ? document.getElementById('edit-avatar').files[0] : null;
+
+            try {
+                const fd1 = new FormData();
+                fd1.append('name', name);
+                await fetch('/api/store/update-profile', { method: 'POST', body: fd1 });
+
+                if (avatarFile) {
+                    const fd2 = new FormData();
+                    fd2.append('avatar', avatarFile);
+                    await fetch('/api/store/update-avatar', { method: 'POST', body: fd2 });
+                }
+
+                localStorage.setItem('store_name', name);
+
+                Core.showToast("Profile Updated Successfully!");
+                setTimeout(() => window.location.reload(), 1000);
+                setTimeout(() => location.reload(), 1000);
+            } catch (e) { Core.showToast("Error updating profile", "error"); }
+        }
+
+        // ✅ دوال تغيير الإيميل اللي كانت ممسوحة
+        async function doChangeEmailRequest(e) {
+            e.preventDefault();
+            const newEmail = document.getElementById('edit-new-email').value;
+            const btn = e.target.querySelector('button');
+            const orig = btn.innerHTML; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; btn.disabled = true;
+            const fd = new FormData(); fd.append('new_email', newEmail);
+            try {
+                const res = await (await fetch('/api/store/change-email-request', { method: 'POST', body: fd })).json();
+                if (res.success) {
+                    Core.showToast(res.msg);
+                    document.getElementById('email-change-form').classList.add('hidden');
+                    document.getElementById('email-verify-form').classList.remove('hidden');
+                } else { Core.showToast(res.msg, 'error'); }
+            } catch { Core.showToast('Error!', 'error'); }
+            btn.innerHTML = orig; btn.disabled = false;
+        }
+
+        async function doChangeEmailVerify(e) {
+            e.preventDefault();
+            const newEmail = document.getElementById('edit-new-email').value;
+            const code = document.getElementById('edit-email-code').value;
+            const btn = e.target.querySelector('button');
+            const orig = btn.innerHTML; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; btn.disabled = true;
+            const fd = new FormData(); fd.append('new_email', newEmail); fd.append('code', code);
+            try {
+                const res = await (await fetch('/api/store/change-email-verify', { method: 'POST', body: fd })).json();
+                if (res.success) {
+                    Core.showToast('Email changed successfully!');
+                    localStorage.setItem('store_email', newEmail);
+                    setTimeout(() => location.reload(), 1200);
+                } else { Core.showToast(res.msg, 'error'); }
+            } catch { Core.showToast('Error!', 'error'); }
+            btn.innerHTML = orig; btn.disabled = false;
+        }
+
+        function openProfileModal() {
+            document.getElementById('prof-name').innerText = localStorage.getItem('store_name');
+            document.getElementById('prof-email').innerText = localStorage.getItem('store_email');
+            document.getElementById('edit-name').value = localStorage.getItem('store_name');
+            document.getElementById('edit-avatar').value = localStorage.getItem('store_avatar') || '';
+
+            const avImg = document.getElementById('prof-avatar-img');
+            const avIcon = document.getElementById('prof-avatar-icon');
+            if (localStorage.getItem('store_avatar')) {
+                avImg.src = localStorage.getItem('store_avatar');
+                avImg.classList.remove('hidden'); avIcon.classList.add('hidden');
+            }
+
+            Core.openModal('profile-modal');
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const theme = localStorage.getItem('sz_theme') || 'default';
+            document.documentElement.setAttribute('data-theme', theme);
+
+            const mainScroll = document.getElementById('main-scroll');
+            if (mainScroll) {
+                mainScroll.addEventListener('scroll', () => {
+                    const btn = document.getElementById('scrollToTopBtn');
+                    if (mainScroll.scrollTop > 300) {
+                        btn.classList.replace('opacity-0', 'opacity-100');
+                        btn.classList.replace('pointer-events-none', 'pointer-events-auto');
+                    } else {
+                        btn.classList.replace('opacity-100', 'opacity-0');
+                        btn.classList.replace('pointer-events-auto', 'pointer-events-none');
+                    }
+                });
+                document.getElementById('scrollToTopBtn').onclick = () => mainScroll.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        });
+    </script>
+    {% endif %}
+</body>
+
+</html>
