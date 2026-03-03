@@ -137,6 +137,13 @@
                 </li>
                 
                 <li>
+    <a href="#" onclick="openProfileModal(); toggleSidebarMobile();" class="flex items-center p-3 w-full text-base font-bold text-gray-400 rounded-lg transition group hover:bg-gray-900 hover:text-white">
+        <i class="fas fa-wallet w-6 text-yellow-500 group-hover:text-yellow-400 transition"></i>
+        <span class="flex-1 ml-3 text-left whitespace-nowrap">My Wallet</span>
+    </a>
+</li>
+                
+                <li>
                     <button type="button" onclick="document.getElementById('dropdown-cats').classList.toggle('hidden')" class="flex items-center p-3 w-full text-base font-bold text-gray-400 rounded-lg transition group hover:bg-gray-900 hover:text-white">
                         <i class="fas fa-layer-group w-6 text-gray-500 group-hover:text-szcyan transition"></i>
                         <span class="flex-1 ml-3 text-left whitespace-nowrap">Categories</span>
@@ -173,12 +180,24 @@
     </aside>
 
     <main id="main-scroll" class="flex-1 flex flex-col h-screen overflow-y-auto bg-darkbg relative">
-        <header class="h-16 bg-panelbg/80 backdrop-blur-md border-b border-gray-800 flex items-center justify-between px-4 md:hidden sticky top-0 z-30">
-            <button onclick="toggleSidebar()" class="text-white text-xl p-2"><i class="fas fa-bars"></i></button>
-            <span class="text-lg font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">SALEH ZONE</span>
-            <div class="w-8 flex justify-end"><button onclick="openProfileModal()" class="text-szgreen"><i class="fas fa-user-circle text-xl"></i></button></div>
-        </header>
-
+      <header class="h-16 bg-panelbg/80 backdrop-blur-md border-b border-gray-800 flex items-center justify-between px-4 md:hidden sticky top-0 z-30">
+    <button onclick="toggleSidebar()" class="text-white text-xl p-2"><i class="fas fa-bars"></i></button>
+    <span class="text-lg font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">SALEH ZONE</span>
+    
+    <div class="flex items-center gap-4">
+        <button onclick="openCartModal()" class="text-gray-400 hover:text-szcyan relative transition">
+            <i class="fas fa-shopping-cart text-xl"></i>
+            <span class="absolute -top-1.5 -right-2 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full" id="cart-count-mobile">0</span>
+        </button>
+        <button onclick="openProfileModal()" class="text-szgreen"><i class="fas fa-user-circle text-xl"></i></button>
+    </div>
+</header>
+        <div class="hidden md:flex fixed top-6 right-8 z-40 gap-3">
+    <button onclick="openCartModal()" class="bg-panelbg/90 backdrop-blur border border-gray-800 p-3 rounded-xl shadow-lg hover:border-szcyan text-gray-400 hover:text-szcyan transition relative group btn-glow">
+        <i class="fas fa-shopping-cart text-lg"></i>
+        <span class="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full border border-darkbg shadow-sm" id="cart-count-desktop">0</span>
+    </button>
+</div>
         <div class="p-6 md:p-10 max-w-6xl mx-auto w-full flex-1">
             <div class="text-center md:text-left mb-12 fade-in">
                 <h1 class="text-3xl md:text-5xl font-black mb-3 text-white uppercase tracking-widest">Instant <span class="text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">Delivery</span></h1>
