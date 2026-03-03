@@ -421,11 +421,12 @@ async def admin_delete_customer(request: Request, email: str = Form(...)):
     await db.store_customers.delete_one({"email": email})
     return JSONResponse({"success": True, "msg": "Customer account deleted."})
 @router.post("/api/store/admin/update-customer")
-async def admin_update_customer(request: Request, email: str = Form(...), name: str = Form(None), password: str = Form(None)):
+async def admin_update_customer(request: Request, email: str = Form(...), name: str = Form(None), password: str = Form(None), username: str = Form(None)):
     if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauthorized"})
     
     update_data = {}
     if name: update_data["name"] = name
+    if username: update_data["username"] = username
     if password: update_data["password"] = hash_password(password)
     
     if update_data:
@@ -434,18 +435,27 @@ async def admin_update_customer(request: Request, email: str = Form(...), name: 
     return JSONResponse({"success": True, "msg": "Customer updated successfully!"})
 
 @router.post("/api/store/admin/email-request")
-async def admin_change_email_direct(request: Request, old_email: str = Form(...), new_email: str = Form(...)):
+async def admin_change_email_req(request: Request, email: str = Form(...), new_email: str = Form(...)):
     if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauthorized"})
     
-    # التحقق مما إذا كان الإيميل الجديد مستخدم مسبقاً
     existing = await db.store_customers.find_one({"email": new_email})
     if existing:
         return JSONResponse({"success": False, "msg": "New email is already registered to another user!"})
-        
-    # تحديث إيميل العميل
-    await db.store_customers.update_one({"email": old_email}, {"$set": {"email": new_email}})
     
-    # تحديث الإيميل في سجل الطلبات الخاص به أيضاً
-    await db.store_orders.update_many({"email": old_email}, {"$set": {"email": new_email}})
+    code = str(random.randint(100000, 999999))
+    await db.otps.update_one({"email": new_email}, {"$set": {"code": code, "old_email": email, "type": "admin_change_email", "created_at": datetime.now()}}, upsert=True)
+    return JSONResponse({"success": True, "msg": "Verification OTP generated. Check database or logs (Admin Bypass)."})
+
+@router.post("/api/store/admin/email-verify")
+async def admin_change_email_ver(request: Request, email: str = Form(...), code: str = Form(...)):
+    if not check_auth(request): return JSONResponse({"success": False})
     
-    return JSONResponse({"success": True, "msg": "Customer email changed successfully!"})
+    otp_doc = await db.otps.find_one({"old_email": email, "code": code, "type": "admin_change_email"})
+    if not otp_doc: return JSONResponse({"success": False, "msg": "Invalid code!"})
+    
+    new_email = otp_doc["email"]
+    await db.store_customers.update_one({"email": email}, {"$set": {"email": new_email}})
+    await db.store_orders.update_many({"email": email}, {"$set": {"email": new_email}})
+    await db.otps.delete_one({"_id": otp_doc["_id"]})
+    
+    return JSONResponse({"success": True, "msg": "Email changed successfully!", "new_email": new_email})
