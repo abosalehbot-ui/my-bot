@@ -42,7 +42,6 @@ async def generate_unique_id():
 # 1. الواجهة الرئيسية للمتجر
 # ==========================================
 @router.get("/", response_class=HTMLResponse)
-@router.get("/", response_class=HTMLResponse)
 async def public_storefront(request: Request):
     settings = await db.settings.find_one({"_id": "config"})
     maintenance = settings.get("maintenance", False) if settings else False
@@ -421,3 +420,32 @@ async def admin_delete_customer(request: Request, email: str = Form(...)):
     if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauthorized"})
     await db.store_customers.delete_one({"email": email})
     return JSONResponse({"success": True, "msg": "Customer account deleted."})
+@router.post("/api/store/admin/update-customer")
+async def admin_update_customer(request: Request, email: str = Form(...), name: str = Form(None), password: str = Form(None)):
+    if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauthorized"})
+    
+    update_data = {}
+    if name: update_data["name"] = name
+    if password: update_data["password"] = hash_password(password)
+    
+    if update_data:
+        await db.store_customers.update_one({"email": email}, {"$set": update_data})
+        
+    return JSONResponse({"success": True, "msg": "Customer updated successfully!"})
+
+@router.post("/api/store/admin/email-request")
+async def admin_change_email_direct(request: Request, old_email: str = Form(...), new_email: str = Form(...)):
+    if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauthorized"})
+    
+    # التحقق مما إذا كان الإيميل الجديد مستخدم مسبقاً
+    existing = await db.store_customers.find_one({"email": new_email})
+    if existing:
+        return JSONResponse({"success": False, "msg": "New email is already registered to another user!"})
+        
+    # تحديث إيميل العميل
+    await db.store_customers.update_one({"email": old_email}, {"$set": {"email": new_email}})
+    
+    # تحديث الإيميل في سجل الطلبات الخاص به أيضاً
+    await db.store_orders.update_many({"email": old_email}, {"$set": {"email": new_email}})
+    
+    return JSONResponse({"success": True, "msg": "Customer email changed successfully!"})
