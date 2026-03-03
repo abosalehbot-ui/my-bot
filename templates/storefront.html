@@ -1,28 +1,52 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="default">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Saleh Zone | Storefront</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script>tailwind.config={theme:{extend:{colors:{szgreen:'#7dfc89',szcyan:'#5eead4',darkbg:'#050505',panelbg:'#111'}}}}</script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        szgreen: 'var(--theme-primary)',
+                        szcyan: 'var(--theme-secondary)',
+                        darkbg: '#050505',
+                        panelbg: '#111'
+                    }
+                }
+            }
+        }
+    </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
+        
+        /* محرك الألوان السحري (Theme Engine) */
+        :root { --theme-primary: #7dfc89; --theme-secondary: #5eead4; } /* Default Cyberpunk */
+        html[data-theme="synthwave"] { --theme-primary: #a855f7; --theme-secondary: #f97316; } /* Purple/Orange */
+        html[data-theme="sith"] { --theme-primary: #ef4444; --theme-secondary: #dc2626; } /* Red/Dark Red */
+        html[data-theme="vip"] { --theme-primary: #eab308; --theme-secondary: #facc15; } /* Gold/Yellow */
+
         body { font-family: 'Cairo', sans-serif; background-color: #050505; color: #d1d5db; scroll-behavior: smooth; overflow: hidden; }
-        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #050505; } ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; transition: 0.3s; } ::-webkit-scrollbar-thumb:hover { background: #7dfc89; box-shadow: 0 0 10px #7dfc89; }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #050505; } ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; transition: 0.3s; } ::-webkit-scrollbar-thumb:hover { background: var(--theme-primary); box-shadow: 0 0 10px var(--theme-primary); }
+        
         @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } } .fade-in { animation: fadeIn 0.5s ease-out forwards; }
         @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-8px); } 100% { transform: translateY(0px); } } .floating { animation: float 3s ease-in-out infinite; }
-        @keyframes pulseGlow { 0% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } 50% { box-shadow: 0 0 25px rgba(125,252,137,0.6); transform: scale(1.02); } 100% { box-shadow: 0 0 10px rgba(125,252,137,0.2); } } .btn-glow { transition: all 0.3s ease; } .btn-glow:hover { animation: pulseGlow 1.5s infinite; border-color: #7dfc89; }
+        @keyframes pulseGlow { 0% { box-shadow: 0 0 10px rgba(var(--theme-primary), 0.2); } 50% { box-shadow: 0 0 25px rgba(var(--theme-primary), 0.6); transform: scale(1.02); } 100% { box-shadow: 0 0 10px rgba(var(--theme-primary), 0.2); } } 
+        .btn-glow { transition: all 0.3s ease; } .btn-glow:hover { animation: pulseGlow 1.5s infinite; border-color: var(--theme-primary); box-shadow: 0 0 15px var(--theme-primary); }
         @keyframes gradientX { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } } .text-gradient-animate { background-size: 200% 200%; animation: gradientX 3s ease infinite; }
+        
         .uc-card { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        .uc-card:hover { transform: translateY(-8px); box-shadow: 0 15px 35px rgba(94, 234, 212, 0.15); border-color: #5eead4; }
+        .uc-card:hover { transform: translateY(-8px); box-shadow: 0 15px 35px rgba(0,0,0,0.5); border-color: var(--theme-secondary); }
         
         .social-btn { position: relative; width: 45px; height: 45px; display: flex; justify-content: center; align-items: center; border-radius: 8px; background-color: transparent; cursor: pointer; transition: background-color 0.3s; overflow: hidden; }
         .social-btn:hover { background-color: rgba(255,255,255,0.05); }
         .social-btn svg { width: 22px; height: 22px; fill: #9ca3af; transition: fill 0.3s, transform 0.3s; position: absolute; pointer-events: none; z-index: 1; }
-        .social-btn.google:hover svg { fill: #7dfc89; transform: scale(1.1); }
-        .social-btn.telegram:hover svg { fill: #5eead4; transform: scale(1.1); }
+        .social-btn.google:hover svg { fill: var(--theme-primary); transform: scale(1.1); }
+        .social-btn.telegram:hover svg { fill: var(--theme-secondary); transform: scale(1.1); }
         .click-overlay { position: absolute; inset: 0; z-index: 10; opacity: 0.01; display: flex; justify-content: center; align-items: center; }
         .click-overlay iframe, .click-overlay > div { transform: scale(2.5); cursor: pointer; }
     </style>
@@ -43,6 +67,7 @@
         </div>
     </div>
     {% else %}
+
     <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black/80 z-40 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
 
     <aside id="sz-sidebar" class="fixed top-0 left-0 z-50 w-64 h-screen transition-transform -translate-x-full md:translate-x-0 shadow-[4px_0_24px_rgba(0,0,0,0.5)] flex-shrink-0" aria-label="Sidenav">
@@ -111,7 +136,20 @@
             <select id="currency-toggle" onchange="toggleCurrency()" class="bg-gray-900 border border-gray-700 text-white text-xs font-bold py-2 px-3 rounded outline-none cursor-pointer focus:border-szgreen transition">
                 <option value="EGP">🇪🇬 EGP</option><option value="USD">🇺🇸 USD</option>
             </select>
-            <button id="sidebar-logout-btn" onclick="logout()" class="hidden text-red-500 hover:bg-red-900/20 p-2 rounded transition" title="Logout"><i class="fas fa-power-off text-xl"></i></button>
+            
+            <div class="flex items-center gap-2 relative">
+                <button onclick="document.getElementById('theme-drop').classList.toggle('hidden')" class="text-gray-500 hover:text-szgreen p-2 rounded transition" title="Change Theme"><i class="fas fa-paint-roller text-lg"></i></button>
+                
+                <div id="theme-drop" class="hidden absolute bottom-12 -right-2 bg-black border border-gray-800 rounded-lg shadow-2xl w-36 py-2 z-50">
+                    <div class="text-[10px] text-gray-500 uppercase px-4 mb-2 font-bold tracking-wider">Neon Colors</div>
+                    <a href="#" onclick="setTheme('default')" class="flex items-center px-4 py-2 text-sm font-bold text-white hover:bg-gray-900 transition"><span class="w-3 h-3 rounded-full bg-[#7dfc89] mr-2 shadow-[0_0_5px_#7dfc89]"></span> Cyberpunk</a>
+                    <a href="#" onclick="setTheme('synthwave')" class="flex items-center px-4 py-2 text-sm font-bold text-white hover:bg-gray-900 transition"><span class="w-3 h-3 rounded-full bg-[#a855f7] mr-2 shadow-[0_0_5px_#a855f7]"></span> Synthwave</a>
+                    <a href="#" onclick="setTheme('sith')" class="flex items-center px-4 py-2 text-sm font-bold text-white hover:bg-gray-900 transition"><span class="w-3 h-3 rounded-full bg-[#ef4444] mr-2 shadow-[0_0_5px_#ef4444]"></span> Sith Red</a>
+                    <a href="#" onclick="setTheme('vip')" class="flex items-center px-4 py-2 text-sm font-bold text-white hover:bg-gray-900 transition"><span class="w-3 h-3 rounded-full bg-[#eab308] mr-2 shadow-[0_0_5px_#eab308]"></span> VIP Gold</a>
+                </div>
+
+                <button id="sidebar-logout-btn" onclick="logout()" class="hidden text-red-500 hover:bg-red-900/20 p-2 rounded transition" title="Logout"><i class="fas fa-power-off text-lg"></i></button>
+            </div>
         </div>
     </aside>
 
@@ -145,7 +183,7 @@
                         <div class="absolute top-3 right-3 bg-red-900/50 text-red-400 text-[10px] font-bold px-2 py-1 rounded border border-red-900/50">OUT OF STOCK</div>
                         {% endif %}
 
-                        <div class="w-20 h-20 md:w-24 md:h-24 mt-4 md:mt-0 mb-4 rounded-full bg-gradient-to-br from-szcyan/10 to-szcyan/5 border border-szcyan/20 flex items-center justify-center shadow-[0_0_20px_rgba(94,234,212,0.1)] floating text-szcyan text-3xl">
+                        <div class="w-20 h-20 md:w-24 md:h-24 mt-4 md:mt-0 mb-4 rounded-full bg-gradient-to-br from-szcyan/10 to-transparent border border-szcyan/20 flex items-center justify-center shadow-[0_0_20px_rgba(var(--theme-secondary),0.1)] floating text-szcyan text-3xl">
                             <i class="fas {{ cat.icon }}"></i>
                         </div>
                         
@@ -178,7 +216,7 @@
             <div class="max-w-6xl mx-auto px-6 py-8 flex flex-col md:flex-row justify-between items-center gap-4">
                 <div class="flex items-center gap-3">
                     <div class="w-8 h-8 bg-black rounded-full border border-szgreen/50 flex items-center justify-center shadow-[0_0_10px_rgba(125,252,137,0.3)] text-xs font-black text-szgreen">SZ</div>
-                    <span class="text-xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan">SALEH ZONE</span>
+                    <span class="text-xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">SALEH ZONE</span>
                 </div>
                 <p class="text-gray-500 text-sm font-bold">© 2026 Saleh Zone. All rights reserved.</p>
                 <div class="flex gap-4">
@@ -188,10 +226,9 @@
             </div>
         </footer>
 
-        <button id="scrollToTopBtn" class="fixed bottom-6 right-6 md:bottom-8 md:right-8 bg-szcyan text-black w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold shadow-[0_0_15px_rgba(94,234,212,0.5)] transition-all duration-300 opacity-0 pointer-events-none translate-y-4 z-40 btn-glow">
+        <button id="scrollToTopBtn" class="fixed bottom-6 right-6 md:bottom-8 md:right-8 bg-szcyan text-black w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold transition-all duration-300 opacity-0 pointer-events-none translate-y-4 z-40 btn-glow">
             <i class="fas fa-arrow-up"></i>
         </button>
-
     </main>
 
     <div id="checkout-modal" class="fixed inset-0 bg-black/90 z-[60] hidden flex items-center justify-center p-4 backdrop-blur-sm">
@@ -259,7 +296,7 @@
     </div>
 
     <div id="success-modal" class="fixed inset-0 bg-black/90 z-[60] hidden flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-panelbg border border-szgreen w-full max-w-md rounded-2xl p-8 text-center relative overflow-hidden shadow-[0_0_40px_rgba(125,252,137,0.15)] fade-in">
+        <div class="bg-panelbg border border-szgreen w-full max-w-md rounded-2xl p-8 text-center relative overflow-hidden shadow-[0_0_40px_rgba(var(--theme-primary),0.15)] fade-in">
             <div class="inline-block bg-szgreen/20 text-szgreen p-4 rounded-full mb-4"><i class="fas fa-check-circle text-4xl"></i></div>
             <h2 class="text-2xl font-bold text-white mb-2">Purchase Successful!</h2>
             <p class="text-xs text-gray-400 mb-6">Amount deducted from your balance. Here is your code:</p>
@@ -389,8 +426,7 @@
                         <thead class="bg-[#111] text-gray-400 uppercase text-[10px] sticky top-0">
                             <tr><th class="px-4 py-3">Order ID</th><th class="px-4 py-3">Date</th><th class="px-4 py-3">Item</th><th class="px-4 py-3">Price</th><th class="px-4 py-3">Code</th></tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-800 text-gray-300" id="orders-table-body">
-                            </tbody>
+                        <tbody class="divide-y divide-gray-800 text-gray-300" id="orders-table-body"></tbody>
                     </table>
                 </div>
             </div>
@@ -398,6 +434,16 @@
     </div>
 
     <script>
+        // إعداد محرك الثيمات (Theme Switcher)
+        const savedTheme = localStorage.getItem('sz_theme') || 'default';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+
+        function setTheme(themeName) {
+            document.documentElement.setAttribute('data-theme', themeName);
+            localStorage.setItem('sz_theme', themeName);
+            document.getElementById('theme-drop').classList.add('hidden');
+        }
+
         let currentCurrency = 'EGP';
         let pendingPurchase = null;
         let ordersLoaded = false;
@@ -420,7 +466,6 @@
             if(email && name) updateUI(name, localStorage.getItem('bal_egp'), localStorage.getItem('bal_usd'));
         });
 
-        // زرار الصعود للأعلى
         const mainScroll = document.getElementById('main-scroll');
         if(mainScroll) {
             mainScroll.addEventListener('scroll', () => {
