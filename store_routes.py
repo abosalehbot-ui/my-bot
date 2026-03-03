@@ -36,10 +36,14 @@ async def generate_unique_id():
         if not await db.store_customers.find_one({"user_id": new_id}): return new_id
 
 # ==========================================
-# 1. الواجهة الرئيسية للمتجر (ديناميكية)
+# 1. الواجهة الرئيسية للمتجر (ديناميكية ومربوطة بالصيانة)
 # ==========================================
 @router.get("/", response_class=HTMLResponse)
 async def public_storefront(request: Request):
+    # جلب حالة الصيانة من الداتا بيز
+    settings = await db.settings.find_one({"_id": "config"})
+    maintenance = settings.get("maintenance", False) if settings else False
+
     categories = await db.store_categories.find().to_list(100)
     stock_details = {}
     for cat in categories:
@@ -48,7 +52,13 @@ async def public_storefront(request: Request):
             if sk not in stock_details: 
                 stock_details[sk] = await db.stock.count_documents({"category": sk})
                 
-    return templates.TemplateResponse("storefront.html", {"request": request, "categories": categories, "stock": stock_details, "client_id": GOOGLE_CLIENT_ID})
+    return templates.TemplateResponse("storefront.html", {
+        "request": request, 
+        "categories": categories, 
+        "stock": stock_details, 
+        "client_id": GOOGLE_CLIENT_ID,
+        "maintenance": maintenance
+    })
 
 # ==========================================
 # 2. أنظمة التسجيل والمصادقة الموحدة
@@ -139,7 +149,7 @@ async def store_logout():
     return response
 
 # ==========================================
-# 3. نظام استعادة كلمة المرور (جديد)
+# 3. نظام استعادة كلمة المرور
 # ==========================================
 @router.post("/api/store/forgot-password")
 async def forgot_password(request: Request, email: str = Form(...)):
