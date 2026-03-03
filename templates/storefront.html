@@ -227,7 +227,7 @@
                         
                         <h3 class="text-xl md:text-2xl font-black text-white mb-1">{{ p.name }}</h3>
                         
-                        <div class="mt-2 mb-6 bg-black w-full py-2 rounded-lg border border-gray-800">
+                        <div class="mt-2 mb-4 bg-black w-full py-2 rounded-lg border border-gray-800">
                             <div class="price-display egp-price">
                                 <span class="text-xl md:text-2xl font-black text-yellow-500">{{ p.price_egp }}</span> <span class="text-[10px] text-gray-500 font-bold uppercase">EGP</span>
                             </div>
@@ -236,10 +236,22 @@
                             </div>
                         </div>
 
+                        <div class="text-xs text-gray-400 mb-4 flex justify-between items-center w-full bg-gray-900/50 p-2.5 rounded-lg border border-gray-800">
+                            <span><i class="fas fa-box text-szcyan mr-1"></i> Available:</span>
+                            <span class="font-bold {% if stock.get(p.stock_key, 0) > 0 %}text-szgreen{% else %}text-red-500{% endif %}">
+                                {{ stock.get(p.stock_key, 0) }} items
+                            </span>
+                        </div>
+
                         {% if stock.get(p.stock_key, 0) > 0 %}
-                        <button onclick="addToCart('{{ p.stock_key }}', {{ p.price_egp }}, {{ p.price_usd }}, '{{ p.name }}', '{{ cat.icon }}')" class="w-full bg-szcyan text-black font-bold py-2.5 md:py-3 rounded-xl btn-glow flex justify-center items-center gap-2 text-sm md:text-base">
-    <span>ADD TO CART</span> <i class="fas fa-cart-plus"></i>
-</button>
+                        <div class="flex gap-2 w-full">
+                            <button onclick="buyProduct('{{ p.stock_key }}', {{ p.price_egp }}, {{ p.price_usd }}, '{{ p.name }}', '{{ cat.icon }}')" class="flex-1 bg-gradient-to-r from-szgreen to-szcyan text-black font-bold py-2.5 md:py-3 rounded-xl hover:opacity-90 transition text-sm md:text-base btn-glow">
+                                Buy Now
+                            </button>
+                            <button onclick="addToCart('{{ p.stock_key }}', {{ p.price_egp }}, {{ p.price_usd }}, '{{ p.name }}', '{{ cat.icon }}')" class="bg-gray-800 text-szcyan border border-gray-700 font-bold py-2.5 px-4 md:py-3 md:px-5 rounded-xl hover:bg-szcyan hover:text-white transition flex items-center justify-center">
+                                <i class="fas fa-cart-plus"></i>
+                            </button>
+                        </div>
                         {% else %}
                         <button disabled class="w-full bg-gray-900 text-gray-600 font-bold py-2.5 md:py-3 rounded-xl cursor-not-allowed border border-gray-800 text-sm md:text-base">UNAVAILABLE</button>
                         {% endif %}
@@ -462,13 +474,11 @@
 
             <input type="file" id="avatar-file-input" accept="image/*" class="hidden" onchange="handleAvatarChange(this)">
 
-            <!-- Header -->
             <div class="flex items-center justify-between p-5 border-b border-gray-800 shrink-0">
                 <h2 class="text-lg font-black text-white tracking-widest"><i class="fas fa-user-circle text-szcyan mr-2"></i>Profile</h2>
                 <button onclick="closeModal('profile-modal')" class="text-gray-500 hover:text-red-500 transition"><i class="fas fa-times text-xl"></i></button>
             </div>
 
-            <!-- Tab buttons -->
             <div class="flex border-b border-gray-800 shrink-0 px-4 overflow-x-auto">
                 <button id="ptab-btn-overview"  onclick="switchProfileTab('overview')"  class="prof-tab-btn active  py-3 px-3 text-xs font-bold whitespace-nowrap transition"><i class="fas fa-user mr-1"></i>Overview</button>
                 <button id="ptab-btn-edit"      onclick="switchProfileTab('edit')"      class="prof-tab-btn inactive py-3 px-3 text-xs font-bold whitespace-nowrap transition"><i class="fas fa-edit mr-1"></i>Edit</button>
@@ -476,12 +486,9 @@
                 <button id="ptab-btn-history"   onclick="switchProfileTab('history')"   class="prof-tab-btn inactive py-3 px-3 text-xs font-bold whitespace-nowrap transition"><i class="fas fa-history mr-1"></i>History</button>
             </div>
 
-            <!-- Tab panels — relative wrapper, each panel absolute inset-0 -->
             <div class="flex-1 relative min-h-0">
 
-                <!-- OVERVIEW -->
                 <div id="ptab-overview" class="prof-tab-panel absolute inset-0 overflow-y-auto p-5 space-y-4">
-                    <!-- Avatar card -->
                     <div class="flex items-center gap-4 bg-black border border-gray-800 rounded-2xl p-4">
                         <div class="relative shrink-0 cursor-pointer group" onclick="switchProfileTab('edit')">
                             <div class="w-16 h-16 rounded-full bg-gray-900 border-2 border-gray-700 overflow-hidden flex items-center justify-center">
@@ -499,7 +506,6 @@
                             <i class="fas fa-edit mr-1"></i>Edit
                         </button>
                     </div>
-                    <!-- Details grid -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="bg-black border border-gray-800 rounded-xl p-4 space-y-3">
                             <h3 class="text-[10px] text-gray-500 uppercase font-bold tracking-wider pb-2 border-b border-gray-800">Account Info</h3>
@@ -522,7 +528,6 @@
                     </div>
                 </div>
 
-                <!-- EDIT -->
                 <div id="ptab-edit" class="prof-tab-panel absolute inset-0 overflow-y-auto p-5 hidden">
                     <div class="flex flex-col items-center mb-5">
                         <div class="relative cursor-pointer group" onclick="triggerAvatarUpload()">
@@ -557,10 +562,8 @@
                     </form>
                 </div>
 
-                <!-- SECURITY -->
                 <div id="ptab-security" class="prof-tab-panel absolute inset-0 overflow-y-auto p-5 hidden">
                     <div id="sec-status" class="text-xs font-bold text-center min-h-[1rem] mb-4"></div>
-                    <!-- Password -->
                     <div class="bg-black border border-gray-800 rounded-xl p-4 mb-4">
                         <h3 class="text-xs font-black text-white uppercase mb-3 flex items-center gap-2"><i class="fas fa-key text-szgreen"></i>Change Password</h3>
                         <form id="pass-change-form" onsubmit="doChangePassword(event)" class="space-y-3">
@@ -573,7 +576,6 @@
                             <button type="submit" id="btn-change-pass" class="w-full bg-szgreen text-black py-2.5 rounded-lg font-bold uppercase text-sm hover:opacity-90 transition">Update Password</button>
                         </form>
                     </div>
-                    <!-- Email change -->
                     <div class="bg-black border border-gray-800 rounded-xl p-4">
                         <h3 class="text-xs font-black text-white uppercase mb-1 flex items-center gap-2"><i class="fas fa-envelope text-szcyan"></i>Change Email</h3>
                         <p class="text-[10px] text-gray-500 mb-3">A code is sent to your new email to confirm.</p>
@@ -593,7 +595,6 @@
                     </div>
                 </div>
 
-                <!-- HISTORY -->
                 <div id="ptab-history" class="prof-tab-panel absolute inset-0 overflow-y-auto p-5 hidden">
                     <div id="orders-loading" class="text-center text-szcyan py-10 font-bold hidden"><i class="fas fa-spinner fa-spin text-3xl mb-2"></i><br>Loading...</div>
                     <div class="border border-gray-800 rounded-xl bg-black overflow-x-auto">
@@ -606,8 +607,7 @@
                     </div>
                 </div>
 
-            </div><!-- /tab panels wrapper -->
-        </div>
+            </div></div>
     </div>
 
     <script src="/static/js/core.js"></script>
