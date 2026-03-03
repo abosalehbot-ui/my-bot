@@ -123,10 +123,10 @@
                         <form onsubmit="submitAjax(event, '/api/catalog/category/add', 'catalog')" class="space-y-3">
                             <div><label class="text-[10px] text-gray-500 uppercase mb-1 block">Category ID</label><input type="text" name="cat_id" required class="w-full bg-[#050505] border border-gray-800 text-white p-2.5 rounded-lg outline-none focus:border-szcyan font-mono text-sm"></div>
                             <div><label class="text-[10px] text-gray-500 uppercase mb-1 block">Display Name</label><input type="text" name="name" required class="w-full bg-[#050505] border border-gray-800 text-white p-2.5 rounded-lg outline-none focus:border-szcyan text-sm"></div>
-                            <div><label class="text-[10px] text-gray-500 uppercase mb-1 block">Category Logo URL</label><input type="text" name="logo" placeholder="https://..." class="w-full bg-[#050505] border border-gray-800 text-white p-2.5 rounded-lg outline-none focus:border-szcyan text-sm"></div>
+                            <div><label class="text-[10px] text-gray-500 uppercase mb-1 block">Category Logo (File)</label><input type="file" accept="image/*" name="logo" class="w-full bg-[#050505] border border-gray-800 text-white p-2 rounded-lg outline-none focus:border-szcyan text-sm"></div>
                             <div class="flex gap-2">
                                 <div class="w-1/3"><label class="text-[10px] text-gray-500 uppercase mb-1 block">Icon</label><input type="text" name="icon" value="fa-gamepad" class="w-full bg-[#050505] border border-gray-800 text-gray-400 p-2.5 rounded-lg outline-none focus:border-szcyan font-mono text-xs"></div>
-                                <div class="w-2/3"><label class="text-[10px] text-gray-500 uppercase mb-1 block">Banner Image URL</label><input type="text" name="image" placeholder="https://..." class="w-full bg-[#050505] border border-gray-800 text-white p-2.5 rounded-lg outline-none focus:border-szcyan text-xs"></div>
+                                <div class="w-2/3"><label class="text-[10px] text-gray-500 uppercase mb-1 block">Banner Image (File)</label><input type="file" accept="image/*" name="image" class="w-full bg-[#050505] border border-gray-800 text-white p-2 rounded-lg outline-none focus:border-szcyan text-xs"></div>
                             </div>
                             <button type="submit" class="w-full bg-szcyan text-black font-bold py-2.5 rounded-lg btn-glow text-sm mt-2">Create Category</button>
                         </form>
@@ -217,7 +217,7 @@
                                         <input type="hidden" name="cat_id" value="{{ cat._id }}">
                                         <input type="text" name="stock_key" required placeholder="Key (e.g. 60_uc)" class="w-full bg-black border border-gray-800 text-white px-3 py-2 rounded-lg text-xs outline-none focus:border-szgreen font-mono">
                                         <input type="text" name="name" required placeholder="Display Name (e.g. 60 UC)" class="w-full bg-black border border-gray-800 text-white px-3 py-2 rounded-lg text-xs outline-none focus:border-szgreen">
-                                        <input type="text" name="image" placeholder="Product Image URL (Opt)" class="w-full bg-black border border-gray-800 text-white px-3 py-2 rounded-lg text-xs outline-none focus:border-szcyan">
+                                        <div class="flex items-center gap-2"><label class="text-[10px] text-gray-500 w-1/3">Image (File)</label><input type="file" accept="image/*" name="image" class="w-2/3 bg-black border border-gray-800 text-white px-2 py-1.5 rounded-lg text-[10px] outline-none focus:border-szcyan"></div>
                                         <div class="grid grid-cols-2 gap-2">
                                             {% for curr in currencies %}
                                             <input type="number" step="0.01" name="price_{{ curr._id }}" placeholder="{{ curr._id }}" required class="w-full bg-black border border-gray-800 text-white px-3 py-2 rounded-lg text-xs outline-none focus:border-yellow-500 text-center">
@@ -393,11 +393,10 @@
             <button onclick="closeModal('edit-cat-modal')" class="absolute top-4 right-4 text-gray-500 hover:text-red-500"><i class="fas fa-times text-xl"></i></button>
             <h3 class="text-xl font-bold text-white mb-4 border-b border-gray-800 pb-2">Edit Category</h3>
             <form onsubmit="submitAjax(event, '/api/catalog/category/edit', 'catalog')" class="space-y-4">
-                <input type="hidden" id="edit-cat-id" name="cat_id">
-                <div><label class="text-xs text-gray-500 mb-1 block">Display Name</label><input type="text" id="edit-cat-name" name="name" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500"></div>
-                <div><label class="text-xs text-gray-500 mb-1 block">Category Logo URL</label><input type="text" id="edit-cat-logo" name="logo" class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500 font-mono text-sm"></div>
-                <div><label class="text-xs text-gray-500 mb-1 block">Banner Image URL</label><input type="text" id="edit-cat-image" name="image" class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500 text-xs"></div>
                 <input type="hidden" id="edit-cat-icon" name="icon">
+                <div><label class="text-xs text-gray-500 mb-1 block">Display Name</label><input type="text" id="edit-cat-name" name="name" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500"></div>
+                <div><label class="text-xs text-gray-500 mb-1 block">New Logo (File, optional)</label><input type="file" accept="image/*" id="edit-cat-logo" name="logo" class="w-full bg-[#050505] border border-gray-800 text-white p-2 rounded-lg outline-none focus:border-yellow-500 text-sm"></div>
+                <div><label class="text-xs text-gray-500 mb-1 block">New Banner (File, optional)</label><input type="file" accept="image/*" id="edit-cat-image" name="image" class="w-full bg-[#050505] border border-gray-800 text-white p-2 rounded-lg outline-none focus:border-yellow-500 text-sm"></div>
                 <button type="submit" class="w-full bg-yellow-500 text-black font-bold py-3 rounded-lg mt-2 btn-glow">Save Changes</button>
             </form>
         </div>
@@ -410,8 +409,9 @@
             <form onsubmit="submitAjax(event, '/api/catalog/product/edit', 'catalog')" class="space-y-4">
                 <input type="hidden" id="edit-prod-cat-id" name="cat_id">
                 <input type="hidden" id="edit-prod-key" name="stock_key">
+                <input type="hidden" id="edit-prod-image-db" name="image">
                 <div><label class="text-xs text-gray-500 mb-1 block">Product Name</label><input type="text" id="edit-prod-name" name="name" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500"></div>
-                <div><label class="text-xs text-gray-500 mb-1 block">Product Image URL</label><input type="text" id="edit-prod-image" name="image" class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500"></div>
+                <div><label class="text-xs text-gray-500 mb-1 block">New Product Image (File, optional)</label><input type="file" accept="image/*" id="edit-prod-image" name="image_file" onchange="document.getElementById('edit-prod-image-file').name = 'image'; document.getElementById('edit-prod-image-db').name = ''; document.getElementById('edit-prod-image-file').id = 'edit-prod-image';" id="edit-prod-image-file" class="w-full bg-[#050505] border border-gray-800 text-white p-2 rounded-lg outline-none focus:border-yellow-500 text-sm"></div>
                 <div class="grid grid-cols-2 gap-3" id="edit-prod-prices-container">
                     {% for curr in currencies %}
                     <div>
@@ -581,10 +581,6 @@
             document.getElementById('edit-cat-id').value = id; 
             document.getElementById('edit-cat-name').value = name;
             document.getElementById('edit-cat-icon').value = icon; 
-            const imgEl = document.getElementById('edit-cat-image');
-            if(imgEl) imgEl.value = image || '';
-            const logoEl = document.getElementById('edit-cat-logo');
-            if(logoEl) logoEl.value = logo || '';
             document.getElementById('edit-cat-modal').classList.remove('hidden');
         }
 
@@ -592,8 +588,9 @@
             document.getElementById('edit-prod-cat-id').value = catId; 
             document.getElementById('edit-prod-key').value = stockKey;
             document.getElementById('edit-prod-name').value = name; 
-            const imgEl = document.getElementById('edit-prod-image');
-            if(imgEl) imgEl.value = image || '';
+            
+            const imgDbEl = document.getElementById('edit-prod-image-db');
+            if(imgDbEl) imgDbEl.value = image || '';
             
             const prices = JSON.parse(pricesStr);
             for (const [curr, val] of Object.entries(prices)) {

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Form, Response, status
+from fastapi import APIRouter, Request, Form, Response, status, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 import motor.motor_asyncio
@@ -228,7 +228,9 @@ async def get_my_orders(request: Request):
     
     orders = await db.store_orders.find({"email": email}).sort("date", -1).to_list(100)
     for o in orders:
-        if '_id' in o: o['order_id'] = str(o['_id'])
+        if '_id' in o: 
+            o['order_id'] = str(o['_id'])
+            o['_id'] = str(o['_id'])
     return JSONResponse({"success": True, "orders": orders})
 
 # ==========================================
@@ -258,10 +260,14 @@ async def update_profile(request: Request, name: str = Form(...)):
     return JSONResponse({"success": True, "msg": "Profile updated!"})
 
 @router.post("/api/store/update-avatar")
-async def update_avatar(request: Request, avatar_b64: str = Form("")):
+async def update_avatar(request: Request, avatar: UploadFile = File(None)):
     email = request.cookies.get("store_session")
     if not email: return JSONResponse({"success": False, "msg": "Unauthorized"})
-    await db.store_customers.update_one({"email": email}, {"$set": {"avatar": avatar_b64}})
+    
+    from web import save_upload
+    if avatar and avatar.filename:
+        avatar_url = await save_upload(avatar)
+        await db.store_customers.update_one({"email": email}, {"$set": {"avatar": avatar_url}})
     return JSONResponse({"success": True, "msg": "Avatar updated!"})
 
 @router.post("/api/store/change-email-request")
@@ -297,6 +303,11 @@ async def store_admin_page(request: Request):
     store_customers = await db.store_customers.find().sort("created_at", -1).to_list(100)
     store_orders = await db.store_orders.find().sort("date", -1).to_list(200)
     
+    for c in store_customers:
+        if '_id' in c: c['_id'] = str(c['_id'])
+    for o in store_orders:
+        if '_id' in o: o['_id'] = str(o['_id'])
+        
     currencies = await db.store_currencies.find().to_list(100)
     if not currencies:
         currencies = [{"_id": "EGP", "symbol": "EGP"}, {"_id": "USD", "symbol": "USD"}]
@@ -307,6 +318,18 @@ async def store_admin_page(request: Request):
         "store_orders": store_orders,
         "currencies": currencies
     })
+
+@router.post("/api/store/admin/set-avatar")
+async def admin_set_avatar(request: Request, email: str = Form(...), avatar: UploadFile = File(None), avatar_b64: str = Form("")):
+    if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauthorized"})
+    
+    if avatar and avatar.filename:
+        from web import save_upload
+        avatar_url = await save_upload(avatar)
+        await db.store_customers.update_one({"email": email}, {"$set": {"avatar": avatar_url}})
+    elif avatar_b64 == "":
+        await db.store_customers.update_one({"email": email}, {"$set": {"avatar": ""}})
+    return JSONResponse({"success": True, "msg": "Avatar updated!"})
 
 @router.post("/api/store/manage_balance")
 async def store_manage_balance(request: Request, email: str = Form(...), amount: float = Form(...), action: str = Form(...), currency: str = Form(...)):
