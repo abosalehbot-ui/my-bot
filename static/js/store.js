@@ -326,21 +326,52 @@ function updateUIDynamic(name, balances) {
         const profEl = $(`prof-bal-${curr.toLowerCase()}`);
         if (profEl) profEl.innerText = val;
     }
-}
-
 function openProfileModal() {
     if($('prof-name')) $('prof-name').innerText = localStorage.getItem('store_name');
     if($('prof-email')) $('prof-email').innerText = localStorage.getItem('store_email');
     if($('edit-name')) $('edit-name').value = localStorage.getItem('store_name') || '';
 
     const avImg = $('prof-avatar-img'), avIcon = $('prof-avatar-icon');
+    const editImg = $('edit-avatar-preview'), editIcon = $('edit-avatar-icon');
+    
     if (localStorage.getItem('store_avatar')) {
         if(avImg) { avImg.src = localStorage.getItem('store_avatar'); avImg.classList.remove('hidden'); }
         if(avIcon) avIcon.classList.add('hidden');
+        if(editImg) { editImg.src = localStorage.getItem('store_avatar'); editImg.classList.remove('hidden'); }
+        if(editIcon) editIcon.classList.add('hidden');
     }
     openModal('profile-modal');
 }
+    function previewAvatar(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = $('edit-avatar-preview');
+            const icon = $('edit-avatar-icon');
+            if(img) { img.src = e.target.result; img.classList.remove('hidden'); }
+            if(icon) { icon.classList.add('hidden'); }
+        }
+        reader.readAsDataURL(input.files[0]);
+    }
+}
 
+async function doChangePassword(e) {
+    e.preventDefault();
+    const btn = e.target.querySelector('button'), orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; btn.disabled = true;
+    const fd = new FormData();
+    fd.append('old_password', $('edit-old-pass').value);
+    fd.append('new_password', $('edit-new-pass').value);
+    try {
+        const res = await (await fetch('/api/store/change-password', { method: 'POST', body: fd })).json();
+        if (res.success) {
+            Core.showToast(res.msg, 'success');
+            $('edit-old-pass').value = '';
+            $('edit-new-pass').value = '';
+        } else { Core.showToast(res.msg, 'error'); }
+    } catch { Core.showToast('Network Error!', 'error'); }
+    btn.innerHTML = orig; btn.disabled = false;
+}
 async function doUpdateProfile(e) {
     e.preventDefault();
     const name = $('edit-name').value;
