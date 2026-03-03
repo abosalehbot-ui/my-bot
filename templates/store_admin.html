@@ -34,7 +34,6 @@
 <body class="min-h-screen">
 <div id="toast-container" class="fixed top-4 right-4 z-[200] flex flex-col gap-2 pointer-events-none"></div>
 
-<!-- ══ HEADER ═══════════════════════════════════════════════════════════ -->
 <header class="bg-panelbg border-b border-gray-800 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
     <div class="flex items-center gap-3">
         <a href="/admin" class="text-gray-500 hover:text-white transition text-sm"><i class="fas fa-arrow-left mr-1"></i>Dashboard</a>
@@ -52,7 +51,6 @@
     </div>
 </header>
 
-<!-- ══ STATS ════════════════════════════════════════════════════════════ -->
 {% set total_egp = namespace(v=0) %}{% set total_usd = namespace(v=0) %}
 {% set today = namespace(egp=0, usd=0, sales=0) %}
 {% for o in store_orders %}
@@ -78,7 +76,6 @@
     </div>
 </div>
 
-<!-- ══ MAIN TABS ════════════════════════════════════════════════════════ -->
 <div class="max-w-7xl mx-auto px-6">
     <div class="flex gap-5 border-b border-gray-800 mb-6">
         <button onclick="switchMainTab('customers')" id="main-tab-btn-customers" class="tab-btn active pb-3 font-bold text-sm">
@@ -89,7 +86,6 @@
         </button>
     </div>
 
-    <!-- ── CUSTOMERS TAB ─────────────────────────────────────────────── -->
     <div id="main-tab-customers">
         <div class="flex items-center gap-3 mb-4">
             <div class="relative flex-1 max-w-sm">
@@ -105,10 +101,9 @@
                         <th class="px-4 py-3">Avatar</th>
                         <th class="px-4 py-3">Name / Username</th>
                         <th class="px-4 py-3">Email</th>
-                        <th class="px-4 py-3">ID</th>
+                        <th class="px-4 py-3">Status</th>
                         <th class="px-4 py-3">EGP</th>
                         <th class="px-4 py-3">USD</th>
-                        <th class="px-4 py-3">Joined</th>
                         <th class="px-4 py-3">Actions</th>
                     </tr>
                 </thead>
@@ -127,10 +122,15 @@
                             <div class="text-xs text-gray-500">{% if c.get('username') %}@{{ c.username }}{% else %}<span class="text-red-500/70 italic">no username</span>{% endif %}</div>
                         </td>
                         <td class="px-4 py-3 font-mono text-xs text-szcyan">{{ c.email }}</td>
-                        <td class="px-4 py-3 font-mono text-xs text-gray-500">#{{ c.get('user_id','—') }}</td>
+                        <td class="px-4 py-3">
+                            {% if c.get('is_banned', false) %}
+                            <span class="text-[10px] bg-red-900/40 text-red-400 px-2 py-1 rounded font-bold">Banned</span>
+                            {% else %}
+                            <span class="text-[10px] bg-szgreen/20 text-szgreen px-2 py-1 rounded font-bold">Active</span>
+                            {% endif %}
+                        </td>
                         <td class="px-4 py-3"><span class="badge-egp px-2 py-1 rounded text-xs font-black">{{ c.balance_egp or 0 }}</span></td>
                         <td class="px-4 py-3"><span class="badge-usd px-2 py-1 rounded text-xs font-black">{{ c.balance_usd or 0 }}</span></td>
-                        <td class="px-4 py-3 text-xs text-gray-500">{{ c.get('created_at','—') }}</td>
                         <td class="px-4 py-3">
                             <button onclick='openCustomerModal({{ c | tojson }})'
                                 class="bg-szgreen/10 text-szgreen border border-szgreen/20 px-3 py-1 rounded text-xs font-bold hover:bg-szgreen hover:text-black transition">
@@ -144,7 +144,6 @@
         </div>
     </div>
 
-    <!-- ── ORDERS TAB ────────────────────────────────────────────────── -->
     <div id="main-tab-orders" style="display:none">
         <div class="flex items-center gap-3 mb-4">
             <div class="relative flex-1 max-w-sm">
@@ -199,11 +198,9 @@
     </div>
 </div>
 
-<!-- ══ CUSTOMER DETAIL MODAL ════════════════════════════════════════════ -->
 <div id="customer-modal" class="fixed inset-0 bg-black/90 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
     <div class="w-full max-w-xl bg-panelbg border border-gray-800 rounded-2xl shadow-2xl fade-in flex flex-col max-h-[92vh]">
 
-        <!-- Modal header -->
         <div class="flex items-center justify-between p-5 border-b border-gray-800 shrink-0">
             <div class="flex items-center gap-3">
                 <div class="w-11 h-11 rounded-full bg-gray-900 border border-gray-700 overflow-hidden flex items-center justify-center" id="cm-avatar-wrap">
@@ -218,10 +215,9 @@
             <button onclick="closeCustomerModal()" class="text-gray-500 hover:text-red-500 transition"><i class="fas fa-times text-xl"></i></button>
         </div>
 
-        <!-- Modal sub-tabs -->
         <div class="flex border-b border-gray-800 shrink-0 px-4 gap-4 overflow-x-auto">
             <button onclick="switchDetailTab('info')" id="dt-btn-info" class="tab-btn active py-3 text-xs font-bold whitespace-nowrap">
-                <i class="fas fa-id-card mr-1"></i>Info & Balance
+                <i class="fas fa-id-card mr-1"></i>Wallet & Controls
             </button>
             <button onclick="switchDetailTab('edit')" id="dt-btn-edit" class="tab-btn py-3 text-xs font-bold whitespace-nowrap">
                 <i class="fas fa-edit mr-1"></i>Edit Profile
@@ -234,16 +230,13 @@
             </button>
         </div>
 
-        <!-- Modal content -->
         <div class="flex-1 overflow-y-auto p-5 min-h-0">
 
-            <!-- ── INFO & BALANCE ──────────────────────────────────────── -->
             <div id="dt-info" class="detail-modal-tab show space-y-4">
                 <div id="cm-status" class="text-xs font-bold text-center h-4"></div>
 
-                <!-- Info display -->
                 <div class="bg-black border border-gray-800 rounded-xl p-4 space-y-3 text-sm">
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-2 gap-3 pb-3 border-b border-gray-800">
                         <div>
                             <div class="text-[10px] text-gray-500 uppercase">User ID</div>
                             <div class="text-white font-mono font-bold" id="cm-uid">—</div>
@@ -261,29 +254,25 @@
                             <div class="text-white font-bold" id="cm-orders-count">—</div>
                         </div>
                     </div>
-                    <div class="grid grid-cols-2 gap-3 pt-2 border-t border-gray-800">
-                        <div class="bg-gray-900 border border-yellow-500/20 rounded-lg p-3 text-center">
-                            <div class="text-[10px] text-gray-500 mb-1">EGP Balance</div>
-                            <div class="text-yellow-500 font-black text-xl" id="cm-bal-egp">0</div>
+                    
+                    <div class="text-xs text-gray-500 uppercase font-bold mt-2">Current Wallets</div>
+                    <div id="cm-balances-container" class="grid grid-cols-2 gap-3">
                         </div>
-                        <div class="bg-gray-900 border border-szcyan/20 rounded-lg p-3 text-center">
-                            <div class="text-[10px] text-gray-500 mb-1">USD Balance</div>
-                            <div class="text-szcyan font-black text-xl" id="cm-bal-usd">0</div>
-                        </div>
-                    </div>
                 </div>
 
-                <!-- Balance control -->
                 <div class="bg-black border border-gray-800 rounded-xl p-4">
-                    <div class="text-xs text-gray-500 uppercase font-bold mb-3">Adjust Balance</div>
+                    <div class="text-xs text-gray-500 uppercase font-bold mb-3">Adjust Balance (Add custom currency!)</div>
                     <div class="flex gap-2 mb-2">
-                        <select id="bal-currency" class="flex-1 bg-[#0a0a0a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-szgreen">
-                            <option value="egp">🇪🇬 EGP</option><option value="usd">🇺🇸 USD</option>
-                        </select>
+                        <input type="text" id="bal-currency" list="currency-list" placeholder="Currency (EGP, USD, SAR...)" 
+                               class="flex-1 bg-[#0a0a0a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white uppercase outline-none focus:border-szgreen" value="EGP">
+                        <datalist id="currency-list">
+                            <option value="EGP">
+                            <option value="USD">
+                        </datalist>
+                        
                         <select id="bal-action" class="flex-1 bg-[#0a0a0a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-szgreen">
                             <option value="add">➕ Add</option>
                             <option value="sub">➖ Subtract</option>
-                            <option value="set">🎯 Set Exact</option>
                         </select>
                     </div>
                     <div class="flex gap-2">
@@ -291,21 +280,29 @@
                             class="flex-1 bg-[#0a0a0a] border border-gray-700 rounded-lg px-4 py-2 text-sm text-white outline-none focus:border-szgreen">
                         <button onclick="submitBalance()" id="bal-btn"
                             class="bg-szgreen text-black font-bold px-4 py-2 rounded-lg text-sm hover:opacity-90 transition">
-                            Apply
+                            Apply Balance
                         </button>
                     </div>
                 </div>
 
-                <!-- Danger zone -->
                 <div class="border border-red-900/40 rounded-xl p-4">
-                    <div class="text-xs text-red-400 uppercase font-bold mb-3"><i class="fas fa-exclamation-triangle mr-1"></i>Danger Zone</div>
+                    <div class="text-xs text-red-400 uppercase font-bold mb-3"><i class="fas fa-exclamation-triangle mr-1"></i>Account Controls</div>
+                    
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <button onclick="toggleCustomerStatus('ban')" id="cm-btn-ban" class="w-full bg-orange-900/20 text-orange-400 border border-orange-900/30 py-2 rounded-lg text-xs font-bold hover:bg-orange-900/40 transition">
+                            <i class="fas fa-ban mr-1"></i>Suspend Account
+                        </button>
+                        <button onclick="toggleCustomerStatus('freeze')" id="cm-btn-freeze" class="w-full bg-blue-900/20 text-blue-400 border border-blue-900/30 py-2 rounded-lg text-xs font-bold hover:bg-blue-900/40 transition">
+                            <i class="fas fa-snowflake mr-1"></i>Freeze Balance
+                        </button>
+                    </div>
+
                     <button onclick="deleteCustomer()" class="w-full bg-red-900/20 text-red-400 border border-red-900/30 py-2 rounded-lg text-sm font-bold hover:bg-red-900/40 transition">
                         <i class="fas fa-trash mr-2"></i>Delete Customer Account
                     </button>
                 </div>
             </div>
 
-            <!-- ── EDIT PROFILE ──────────────────────────────────────── -->
             <div id="dt-edit" class="detail-modal-tab space-y-4">
                 <div id="cm-edit-status" class="text-xs font-bold text-center h-4"></div>
                 <form onsubmit="adminUpdateProfile(event)" class="space-y-3">
@@ -333,7 +330,6 @@
                         Save Changes
                     </button>
                 </form>
-                <!-- Change email section -->
                 <div class="border-t border-gray-800 pt-4">
                     <div class="text-xs text-gray-500 uppercase font-bold mb-2"><i class="fas fa-envelope mr-1"></i>Change Email (sends OTP to new email)</div>
                     <div class="flex gap-2">
@@ -355,7 +351,6 @@
                 </div>
             </div>
 
-            <!-- ── AVATAR ─────────────────────────────────────────────── -->
             <div id="dt-avatar" class="detail-modal-tab space-y-4 text-center">
                 <div class="flex flex-col items-center gap-4">
                     <div class="w-28 h-28 rounded-full bg-gray-900 border-2 border-gray-700 overflow-hidden flex items-center justify-center">
@@ -376,7 +371,6 @@
                 </div>
             </div>
 
-            <!-- ── ORDERS ─────────────────────────────────────────────── -->
             <div id="dt-orders" class="detail-modal-tab">
                 <div id="cm-orders-loading" class="text-center py-6 text-szcyan hidden">
                     <i class="fas fa-spinner fa-spin text-2xl mb-2"></i><br>Loading...
@@ -397,8 +391,7 @@
                 </div>
             </div>
 
-        </div><!-- /content -->
-    </div>
+        </div></div>
 </div>
 
 <script src="/static/js/core.js"></script>
@@ -436,6 +429,7 @@ function switchMainTab(tab) {
 
 // ─── Customer Modal State ────────────────────────────────────────────────
 let _cEmail = '', _cOrdersLoaded = false;
+let _cIsBanned = false, _cIsFrozen = false;
 
 function switchDetailTab(tab) {
     ['info','edit','avatar','orders'].forEach(t => {
@@ -449,6 +443,8 @@ function switchDetailTab(tab) {
 function openCustomerModal(c) {
     _cEmail = c.email || '';
     _cOrdersLoaded = false;
+    _cIsBanned = c.is_banned || false;
+    _cIsFrozen = c.balance_frozen || false;
 
     // Fill header
     setText('cm-name',  c.name);
@@ -473,11 +469,14 @@ function openCustomerModal(c) {
     setText('cm-uid',     c.user_id ? '#'+c.user_id : '—');
     setText('cm-username', c.username ? '@'+c.username : '— (none)');
     setText('cm-joined',   c.created_at || '—');
-    setText('cm-bal-egp',  c.balance_egp ?? 0);
-    setText('cm-bal-usd',  c.balance_usd ?? 0);
-    // Count orders from orders list
+    
+    // Count orders
     const orderCount = document.querySelectorAll('.order-row[data-search*="'+c.email.toLowerCase()+'"]').length;
     setText('cm-orders-count', orderCount + ' orders');
+
+    // Dynamic Balances Rendering
+    renderBalances(c);
+    updateStatusButtons();
 
     // Edit tab prefill
     const en=$('cm-edit-name'), eu=$('cm-edit-username'), ep=$('cm-edit-password');
@@ -498,13 +497,79 @@ function openCustomerModal(c) {
 function closeCustomerModal() { $('customer-modal').classList.add('hidden'); }
 $('customer-modal')?.addEventListener('click', e => { if(e.target===$('customer-modal')) closeCustomerModal(); });
 
+function renderBalances(data) {
+    const container = $('cm-balances-container');
+    container.innerHTML = '';
+    let hasBal = false;
+    
+    for (const key in data) {
+        if (key.startsWith('balance_')) {
+            hasBal = true;
+            const cur = key.split('_')[1].toUpperCase();
+            let color = 'text-white';
+            let border = 'border-gray-700';
+            if (cur === 'EGP') { color = 'text-yellow-500'; border = 'border-yellow-500/20'; }
+            if (cur === 'USD') { color = 'text-szcyan'; border = 'border-szcyan/20'; }
+            
+            container.innerHTML += `
+                <div class="bg-gray-900 border ${border} rounded-lg p-3 text-center">
+                    <div class="text-[10px] text-gray-500 mb-1">${cur} Balance</div>
+                    <div class="${color} font-black text-xl">${data[key]}</div>
+                </div>
+            `;
+        }
+    }
+    if (!hasBal) container.innerHTML = '<div class="col-span-2 text-center text-gray-500 text-xs py-2">No balance records</div>';
+}
+
+function updateStatusButtons() {
+    const btnBan = $('cm-btn-ban');
+    const btnFreeze = $('cm-btn-freeze');
+    
+    if (_cIsBanned) {
+        btnBan.innerHTML = '<i class="fas fa-check-circle mr-1"></i>Unban Account';
+        btnBan.className = 'w-full bg-szgreen/20 text-szgreen border border-szgreen/30 py-2 rounded-lg text-sm font-bold hover:bg-szgreen/40 transition';
+    } else {
+        btnBan.innerHTML = '<i class="fas fa-ban mr-1"></i>Suspend Account';
+        btnBan.className = 'w-full bg-orange-900/20 text-orange-400 border border-orange-900/30 py-2 rounded-lg text-sm font-bold hover:bg-orange-900/40 transition';
+    }
+    
+    if (_cIsFrozen) {
+        btnFreeze.innerHTML = '<i class="fas fa-unlock mr-1"></i>Unfreeze Balance';
+        btnFreeze.className = 'w-full bg-szgreen/20 text-szgreen border border-szgreen/30 py-2 rounded-lg text-sm font-bold hover:bg-szgreen/40 transition';
+    } else {
+        btnFreeze.innerHTML = '<i class="fas fa-snowflake mr-1"></i>Freeze Balance';
+        btnFreeze.className = 'w-full bg-blue-900/20 text-blue-400 border border-blue-900/30 py-2 rounded-lg text-sm font-bold hover:bg-blue-900/40 transition';
+    }
+}
+
+async function toggleCustomerStatus(action) {
+    if(!confirm(`Are you sure you want to ${action} this account?`)) return;
+    const fd = new FormData();
+    fd.append('email', _cEmail);
+    fd.append('action', action);
+    try {
+        const d = await (await fetch('/api/store/admin/toggle-status', {method:'POST', body:fd})).json();
+        if (d.success) {
+            showToast(d.msg);
+            if (action === 'ban') _cIsBanned = d.new_status;
+            if (action === 'freeze') _cIsFrozen = d.new_status;
+            updateStatusButtons();
+        } else showToast(d.msg, 'error');
+    } catch { showToast('Error!', 'error'); }
+}
+
 // ─── Balance ─────────────────────────────────────────────────────────────
 async function submitBalance() {
     const amount = parseFloat($('bal-amount').value);
     if (!amount || amount <= 0) return showToast('Enter a valid amount', 'error');
-    const currency = $('bal-currency').value, action = $('bal-action').value;
+    const currency = $('bal-currency').value.trim();
+    if (!currency) return showToast('Enter a valid currency', 'error');
+    
+    const action = $('bal-action').value;
     const btn = $('bal-btn'), orig = btn.innerText;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; btn.disabled = true;
+    
     const fd = new FormData();
     fd.append('email', _cEmail); fd.append('amount', amount);
     fd.append('action', action); fd.append('currency', currency);
@@ -512,12 +577,9 @@ async function submitBalance() {
         const d = await (await fetch('/api/store/manage_balance',{method:'POST',body:fd})).json();
         if (d.success) {
             showToast(d.msg);
-            // Update displayed balance
+            // جلب الأرصدة الجديدة وعرضها فوراً
             const newVal = await (await fetch('/api/store/customer-info?email='+encodeURIComponent(_cEmail))).json();
-            if(newVal.success) {
-                setText('cm-bal-egp', newVal.balance_egp??0);
-                setText('cm-bal-usd', newVal.balance_usd??0);
-            }
+            if(newVal.success) renderBalances(newVal);
             $('bal-amount').value = '';
         } else showToast(d.msg,'error');
     } catch { showToast('Error!','error'); }
@@ -539,7 +601,6 @@ async function adminUpdateProfile(e) {
         const d = await (await fetch('/api/store/admin/update-customer',{method:'POST',body:fd})).json();
         if(d.success) {
             showToast(d.msg);
-            // Refresh name/username in header + info tab
             setText('cm-name',     d.name);
             setText('cm-username', '@'+d.username);
             $('cm-edit-password').value='';
