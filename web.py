@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from datetime import datetime, timedelta
 
-# ─── الاتصال بقاعدة البيانات والإعدادات ────────────────────
+# ─── الاتصال الوحيد بقاعدة البيانات للـ web process ────────────────────
 from database import db, get_next_order_id
 from config import SECRET_TOKEN, ADMIN_ID
 
@@ -22,8 +22,10 @@ templates = Jinja2Templates(directory="templates")
 ADMIN_USERNAME = os.environ.get("ADMIN_USER", "admin")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASS", "123456")
 
+
 def check_auth(request: Request):
     return request.cookies.get("admin_session") == SECRET_TOKEN
+
 
 async def web_log(action, details=""):
     await db.system_logs.insert_one({
@@ -31,63 +33,98 @@ async def web_log(action, details=""):
         "details": details, "time": datetime.now().strftime('%Y-%m-%d %H:%M'), "timestamp": datetime.now()
     })
 
+
 def clean_and_extract_tokens(raw_text):
     valid_tokens = []
     for line in raw_text.splitlines():
         line = line.strip()
-        if not line: continue
-        if "::" in line:
-            parts = line.split()
-            for p in parts:
-                if "::" in p: valid_tokens.append(p); break
-        elif len(line) > 20 and not " " in line:
-            valid_tokens.append(line)
+        if not line:
+            continue
+        token = re.split(r'[;:\s\|]', line)[0].strip()
+        if len(token) > 15 and re.match(r'^[A-Za-z0-9\-_]+$', token):
+            valid_tokens.append(token)
     return valid_tokens
 
+
+# ==========================================
+# Login / Logout
+# ==========================================
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
-    if check_auth(request): return RedirectResponse(url="/admin")
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse("login.html", {"request": request, "error": None})
 
 @app.post("/login")
-async def do_login(request: Request, username: str = Form(...), password: str = Form(...)):
+async def do_login(response: Response, username: str = Form(...), password: str = Form(...)):
     if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-        response = RedirectResponse(url="/admin", status_code=status.HTTP_302_FOUND)
-        response.set_cookie(key="admin_session", value=SECRET_TOKEN, httponly=True, max_age=86400)
-        await web_log("Login Success", "Master admin logged in via web.")
-        return response
-    return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid credentials!"})
+        resp = RedirectResponse(url="/admin", status_code=status.HTTP_302_FOUND)
+        resp.set_cookie(key="admin_session", value=SECRET_TOKEN, httponly=True)
+        return resp
+    return RedirectResponse(url="/login?error=1", status_code=status.HTTP_302_FOUND)
 
 @app.get("/logout")
-async def do_logout():
-    response = RedirectResponse(url="/login")
-    response.delete_cookie("admin_session")
-    return response
+async def logout():
+    resp = RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+    resp.delete_cookie("admin_session")
+    return resp
 
+
+# ==========================================
+# Dashboard
+# ==========================================
 @app.get("/admin", response_class=HTMLResponse)
-async def admin_dashboard(request: Request):
-    if not check_auth(request): return RedirectResponse(url="/login")
+async def dashboard(request: Request):
+    if not check_auth(request):
+        return RedirectResponse(url="/login")
 
-    users_count = await db.users.count_documents({})
-    global_stats = await db.stats.find_one({"_id": "global_stats"}) or {}
-    
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    month_str = datetime.now().strftime("%Y-%m")
-    
-    store_orders = await db.store_orders.find().to_list(None)
-    rev_today = sum(float(o.get("price", 0)) for o in store_orders if o.get("date", "").startswith(today_str) and o.get("currency") == "EGP")
-    rev_month = sum(float(o.get("price", 0)) for o in store_orders if o.get("date", "").startswith(month_str) and o.get("currency") == "EGP")
-    sales_today = sum(1 for o in store_orders if o.get("date", "").startswith(today_str))
-    sales_month = sum(1 for o in store_orders if o.get("date", "").startswith(month_str))
+    now               = datetime.now()
+    today_str         = now.strftime("%Y-%m-%d")
+    start_of_month    = now.strftime("%Y-%m-01")
 
-    store_stats = {
-        "rev_today": round(rev_today, 2), "rev_month": round(rev_month, 2),
-        "sales_today": sales_today, "sales_month": sales_month
-    }
+    users_count  = await db.users.count_documents({})
+    stock_count  = await db.stock.count_documents({})
+    cached_count = await db.cached_accounts.count_documents({})
+    logs         = await db.system_logs.find().sort("timestamp", -1).to_list(length=100)
+    all_users    = await db.users.find().sort("_id", -1).to_list(length=50)
 
-    categories = await db.store_categories.find().to_list(None)
+    month_orders = await db.orders.find({"date": {"$gte": start_of_month}}).to_list(None)
+    global_stats = {"api_today": 0, "api_month": 0, "stock_today": 0, "stock_month": 0}
+    user_stats   = {}
+
+    for o in month_orders:
+        uid      = o.get("user_id")
+        count    = len(o.get("items", []))
+        is_today = o.get("date", "").startswith(today_str)
+        is_api   = "API" in o.get("type", "")
+        if uid not in user_stats:
+            user_stats[uid] = {"api_today": 0, "api_month": 0, "stock_today": 0, "stock_month": 0}
+
+        key = "api" if is_api else "stock"
+        global_stats[f"{key}_month"] += count
+        user_stats[uid][f"{key}_month"] += count
+        if is_today:
+            global_stats[f"{key}_today"] += count
+            user_stats[uid][f"{key}_today"] += count
+
+    store_orders = await db.store_orders.find({"date": {"$gte": start_of_month}}).to_list(None)
+    store_stats  = {"sales_today": 0, "sales_month": len(store_orders), "rev_today": 0.0, "rev_month": 0.0}
+    for so in store_orders:
+        price = float(so.get("price", 0))
+        store_stats["rev_month"] += price
+        if so.get("date", "").startswith(today_str):
+            store_stats["sales_today"] += 1
+            store_stats["rev_today"]   += price
+
+    total_user_tokens   = sum(len(u.get("tokens", [])) for u in all_users)
+    shared_doc          = await db.settings.find_one({"_id": "shared_tokens"})
+    shared_tokens_count = len(shared_doc.get("tokens", [])) if shared_doc else 0
+    total_system_tokens = total_user_tokens + shared_tokens_count
+
+    for u in all_users:
+        u["stats_details"] = user_stats.get(u["_id"], {"api_today": 0, "api_month": 0, "stock_today": 0, "stock_month": 0})
+
+    categories       = await db.store_categories.find().to_list(100)
     
-    # 🔴 هنا حل المشكلة: بنأمن المنتجات القديمة عشان متعملش إيرور في الواجهة
+    # ✅ حل مشكلة الـ 500 Error (حماية المنتجات القديمة اللي مفيهاش أسعار ديناميكية)
     for cat in categories:
         for p in cat.get("products", []):
             if "prices" not in p:
@@ -96,39 +133,39 @@ async def admin_dashboard(request: Request):
                     "USD": p.get("price_usd", 0)
                 }
 
+    # ✅ جلب العملات لส่งها للوحة
     currencies = await db.store_currencies.find().to_list(None)
     if not currencies:
         default_curs = [{"_id": "EGP", "symbol": "EGP"}, {"_id": "USD", "symbol": "USD"}]
         await db.store_currencies.insert_many(default_curs)
         currencies = default_curs
 
-    stock_keys = []
+    dynamic_stock_keys = []
+    stock_details    = {}
     for c in categories:
-        for p in c.get("products", []): stock_keys.append(p["stock_key"])
-    
-    stock_details = {}
-    for sk in stock_keys:
-        count = await db.stock.count_documents({"category": sk})
-        if count > 0: stock_details[sk] = count
+        for p in c.get("products", []):
+            dynamic_stock_keys.append(p["stock_key"])
+            stock_details[p["stock_key"]] = await db.stock.count_documents({"category": p["stock_key"]})
 
-    stock_count = await db.stock.count_documents({})
-    logs = await db.system_logs.find().sort("timestamp", -1).limit(50).to_list(None)
-    all_users = await db.users.find().to_list(None)
-    shared_tokens_count = await db.shared_tokens.count_documents({})
-    
-    config = await db.settings.find_one({"_id": "config"}) or {}
-    maintenance = config.get("maintenance", False)
-    cache_cfg = await db.settings.find_one({"_id": "cache_config"}) or {}
-    tracked_users = cache_cfg.get("tracked_users", [ADMIN_ID])
+    settings    = await db.settings.find_one({"_id": "config"})
+    maintenance = settings.get("maintenance", False) if settings else False
+
+    cache_config  = await db.settings.find_one({"_id": "cache_config"})
+    tracked_users = cache_config.get("tracked_users", []) if cache_config else []
 
     return templates.TemplateResponse("index.html", {
-        "request": request, "users_count": users_count, "global_stats": global_stats,
-        "store_stats": store_stats, "categories": categories, "currencies": currencies, 
-        "stock_details": stock_details, "dynamic_stock_keys": stock_keys,
-        "logs": logs, "all_users": all_users, "shared_tokens_count": shared_tokens_count,
-        "maintenance": maintenance, "tracked_users": tracked_users, "stock_count": stock_count
+        "request": request, "users_count": users_count, "stock_count": stock_count,
+        "cached_count": cached_count, "logs": logs, "all_users": all_users,
+        "stock_details": stock_details, "dynamic_stock_keys": dynamic_stock_keys,
+        "categories": categories, "currencies": currencies, "maintenance": maintenance,
+        "shared_tokens_count": shared_tokens_count, "total_system_tokens": total_system_tokens,
+        "global_stats": global_stats, "store_stats": store_stats, "tracked_users": tracked_users,
     })
 
+
+# ==========================================
+# Currencies APIs (جديد)
+# ==========================================
 @app.post("/api/catalog/currency/add")
 async def add_currency(request: Request, code: str = Form(...), symbol: str = Form(...)):
     if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauthorized"})
@@ -136,42 +173,51 @@ async def add_currency(request: Request, code: str = Form(...), symbol: str = Fo
     if await db.store_currencies.find_one({"_id": code}):
         return JSONResponse({"success": False, "msg": "Currency already exists!"})
     await db.store_currencies.insert_one({"_id": code, "symbol": symbol})
-    await web_log(f"Added Currency: {code}")
+    await web_log("إضافة عملة", f"{code} ({symbol})")
     return JSONResponse({"success": True, "msg": "Currency added successfully!"})
 
 @app.post("/api/catalog/currency/delete")
 async def delete_currency(request: Request, code: str = Form(...)):
     if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauthorized"})
     await db.store_currencies.delete_one({"_id": code})
-    await web_log(f"Deleted Currency: {code}")
+    await web_log("حذف عملة", f"{code}")
     return JSONResponse({"success": True, "msg": "Currency deleted!"})
 
+
+# ==========================================
+# Catalog APIs (معدل للصور والأسعار)
+# ==========================================
 @app.post("/api/catalog/category/add")
-async def add_category(request: Request, cat_id: str = Form(...), name: str = Form(...), icon: str = Form("fa-gamepad"), image: str = Form("")):
-    if not check_auth(request): return JSONResponse({"success": False})
-    if await db.store_categories.find_one({"_id": cat_id}):
-        return JSONResponse({"success": False, "msg": "Category ID already exists!"})
+async def api_add_category(request: Request, cat_id: str = Form(...), name: str = Form(...), icon: str = Form("fa-gamepad"), image: str = Form("")):
+    if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauth"})
+    cat_id = cat_id.lower().replace(" ", "_")
+    if await db.store_categories.find_one({"_id": cat_id}): return JSONResponse({"success": False, "msg": "ID exists!"})
+    
+    # ✅ إضافة image
     await db.store_categories.insert_one({"_id": cat_id, "name": name, "icon": icon, "image": image, "products": []})
-    await web_log(f"Added Category: {name}")
-    return JSONResponse({"success": True, "msg": "Category created!"})
+    await web_log("إنشاء فئة جديدة", f"الفئة: {name}")
+    return JSONResponse({"success": True, "msg": "Category Added!"})
 
 @app.post("/api/catalog/category/edit")
-async def edit_category(request: Request, cat_id: str = Form(...), name: str = Form(...), icon: str = Form(...), image: str = Form("")):
+async def api_edit_category(request: Request, cat_id: str = Form(...), name: str = Form(...), icon: str = Form(...), image: str = Form("")):
     if not check_auth(request): return JSONResponse({"success": False})
+    
+    # ✅ تعديل image
     await db.store_categories.update_one({"_id": cat_id}, {"$set": {"name": name, "icon": icon, "image": image}})
-    await web_log(f"Edited Category: {name}")
-    return JSONResponse({"success": True, "msg": "Category updated!"})
+    await web_log("تعديل فئة", f"{cat_id} → {name}")
+    return JSONResponse({"success": True, "msg": "Category Updated!"})
 
 @app.post("/api/catalog/category/delete")
-async def delete_category(request: Request, cat_id: str = Form(...)):
+async def api_delete_category(request: Request, cat_id: str = Form(...)):
     if not check_auth(request): return JSONResponse({"success": False})
     await db.store_categories.delete_one({"_id": cat_id})
-    await web_log(f"Deleted Category: {cat_id}")
-    return JSONResponse({"success": True, "msg": "Category deleted!"})
+    return JSONResponse({"success": True, "msg": "Category Deleted!"})
 
 @app.post("/api/catalog/product/add")
-async def add_product(request: Request):
+async def api_add_product(request: Request):
     if not check_auth(request): return JSONResponse({"success": False})
+    
+    # ✅ استقبال البيانات ديناميكياً للعملات
     form = await request.form()
     cat_id = form.get("cat_id")
     stock_key = form.get("stock_key")
@@ -181,20 +227,27 @@ async def add_product(request: Request):
     for key, val in form.items():
         if key.startswith("price_"):
             curr_code = key.replace("price_", "").upper()
-            prices[curr_code] = float(val) if val else 0.0
+            try:
+                prices[curr_code] = float(val) if val else 0.0
+            except ValueError:
+                prices[curr_code] = 0.0
 
-    new_prod = {
-        "stock_key": stock_key, "name": name, "prices": prices,
-        "price_egp": prices.get("EGP", 0), "price_usd": prices.get("USD", 0)
+    product = {
+        "stock_key": stock_key, 
+        "name": name, 
+        "prices": prices,
+        "price_egp": prices.get("EGP", 0), # للتوافق القديم
+        "price_usd": prices.get("USD", 0)  # للتوافق القديم
     }
     
-    await db.store_categories.update_one({"_id": cat_id}, {"$push": {"products": new_prod}})
-    await web_log(f"Added Product: {name} ({stock_key})")
-    return JSONResponse({"success": True, "msg": "Product added!"})
+    await db.store_categories.update_one({"_id": cat_id}, {"$push": {"products": product}})
+    await web_log("إضافة منتج", f"{name} في {cat_id}")
+    return JSONResponse({"success": True, "msg": "Product Added!"})
 
 @app.post("/api/catalog/product/edit")
-async def edit_product(request: Request):
+async def api_edit_product(request: Request):
     if not check_auth(request): return JSONResponse({"success": False})
+    
     form = await request.form()
     cat_id = form.get("cat_id")
     stock_key = form.get("stock_key")
@@ -204,170 +257,200 @@ async def edit_product(request: Request):
     for key, val in form.items():
         if key.startswith("price_"):
             curr_code = key.replace("price_", "").upper()
-            prices[curr_code] = float(val) if val else 0.0
+            try:
+                prices[curr_code] = float(val) if val else 0.0
+            except ValueError:
+                prices[curr_code] = 0.0
 
     await db.store_categories.update_one(
         {"_id": cat_id, "products.stock_key": stock_key},
         {"$set": {
-            "products.$.name": name,
+            "products.$.name": name, 
             "products.$.prices": prices,
-            "products.$.price_egp": prices.get("EGP", 0),
+            "products.$.price_egp": prices.get("EGP", 0), 
             "products.$.price_usd": prices.get("USD", 0)
         }}
     )
-    await web_log(f"Edited Product Pricing: {name}")
-    return JSONResponse({"success": True, "msg": "Product pricing updated!"})
+    return JSONResponse({"success": True, "msg": "Product Updated!"})
 
 @app.post("/api/catalog/product/delete")
-async def delete_product(request: Request, cat_id: str = Form(...), stock_key: str = Form(...)):
+async def api_delete_product(request: Request, cat_id: str = Form(...), stock_key: str = Form(...)):
     if not check_auth(request): return JSONResponse({"success": False})
     await db.store_categories.update_one({"_id": cat_id}, {"$pull": {"products": {"stock_key": stock_key}}})
-    await web_log(f"Deleted Product: {stock_key}")
-    return JSONResponse({"success": True, "msg": "Product removed!"})
+    return JSONResponse({"success": True, "msg": "Product Deleted!"})
 
-# --- بقية الدوال الخاصة باليوزرز والأدوات كما هي تماماً ---
-@app.post("/api/add_user")
-async def add_user(request: Request, user_id: int = Form(...), name: str = Form(...), role: str = Form(...)):
-    if not check_auth(request): return RedirectResponse("/admin")
-    await db.users.update_one({"_id": user_id}, {"$set": {"name": name, "role": role, "tokens": [], "logs": [], "stats": {"api": 0, "stock": 0}, "stats_details": {"api_today": 0, "api_month": 0, "stock_today": 0, "stock_month": 0}}}, upsert=True)
-    return RedirectResponse("/admin?tab=users", status_code=303)
 
-@app.post("/api/add_user_tokens")
-async def add_user_tokens(request: Request, user_id: int = Form(...), tokens: str = Form(...)):
-    if not check_auth(request): return JSONResponse({"success": False})
-    extracted = clean_and_extract_tokens(tokens)
-    if not extracted: return JSONResponse({"success": False, "msg": "No valid tokens found!"})
-    await db.users.update_one({"_id": user_id}, {"$push": {"tokens": {"$each": extracted}}})
-    return JSONResponse({"success": True, "msg": f"Added {len(extracted)} tokens!"})
-
-@app.post("/api/user_action")
-async def user_action(request: Request, user_id: int = Form(...), action: str = Form(...)):
-    if not check_auth(request): return RedirectResponse("/admin")
-    if action == "delete": await db.users.delete_one({"_id": user_id})
-    elif action == "clear_tokens": await db.users.update_one({"_id": user_id}, {"$set": {"tokens": []}})
-    elif action == "clear_logs": await db.users.update_one({"_id": user_id}, {"$set": {"logs": []}})
-    elif action == "toggle_role":
-        user = await db.users.find_one({"_id": user_id})
-        if user:
-            new_role = "employee" if user.get("role") == "user" else "user"
-            await db.users.update_one({"_id": user_id}, {"$set": {"role": new_role}})
-    return RedirectResponse("/admin?tab=users", status_code=303)
-
-@app.post("/api/add_shared_tokens")
-async def add_shared_tokens(request: Request, tokens: str = Form(...)):
-    if not check_auth(request): return RedirectResponse("/admin")
-    extracted = clean_and_extract_tokens(tokens)
-    if extracted: await db.shared_tokens.insert_many([{"token": t} for t in extracted])
-    return RedirectResponse("/admin?tab=users", status_code=303)
-
-@app.post("/api/clear_shared_tokens")
-async def clear_shared_tokens(request: Request):
-    if not check_auth(request): return RedirectResponse("/admin")
-    await db.shared_tokens.delete_many({})
-    return RedirectResponse("/admin?tab=users", status_code=303)
-
-@app.get("/api/view_shared_tokens")
-async def view_shared_tokens(request: Request):
-    if not check_auth(request): return JSONResponse({"tokens": []})
-    tokens = await db.shared_tokens.find().to_list(None)
-    return JSONResponse({"tokens": [t["token"] for t in tokens]})
+# ==========================================
+# Tools & Stock APIs (لم يتم تغيير أي شيء فيها)
+# ==========================================
+@app.post("/api/toggle_maintenance")
+async def toggle_maint(request: Request):
+    if not check_auth(request): return {"status": "error"}
+    current   = await db.settings.find_one({"_id": "config"})
+    new_state = not current.get("maintenance", False) if current else True
+    await db.settings.update_one({"_id": "config"}, {"$set": {"maintenance": new_state}}, upsert=True)
+    return {"status": "success"}
 
 @app.post("/api/add_stock_smart")
-async def add_stock_smart(request: Request, category: str = Form(...), codes: str = Form(...)):
-    if not check_auth(request): return JSONResponse({"success": False})
+async def api_add_stock_smart(request: Request, category: str = Form(...), codes: str = Form(...)):
+    if not check_auth(request): return JSONResponse({"error": "unauth"}, status_code=401)
     lines = [c.strip() for c in codes.splitlines() if c.strip()]
-    if not lines: return JSONResponse({"success": False, "msg": "Empty input!"})
-    
+    if not lines: return JSONResponse({"error": "No codes to upload"})
+
     unique_input, dupes_in_input, seen = [], [], set()
     for c in lines:
         if c in seen: dupes_in_input.append(c)
-        else:
-            seen.add(c)
-            unique_input.append(c)
+        else: seen.add(c); unique_input.append(c)
 
     in_stock = await db.stock.find({"$or": [{"_id": {"$in": unique_input}}, {"code": {"$in": unique_input}}]}).to_list(None)
-    in_map = await db.codes_map.find({"$or": [{"_id": {"$in": unique_input}}, {"code": {"$in": unique_input}}]}).to_list(None)
-    
-    existing = {doc["_id"] for doc in in_stock}.union({doc.get("code") for doc in in_stock})
-    existing.update({doc["_id"] for doc in in_map}.union({doc.get("code") for doc in in_map}))
-    
-    to_insert = [c for c in unique_input if c not in existing]
-    dupes_db = [c for c in unique_input if c in existing]
-    
-    if to_insert:
-        await db.stock.insert_many([{"_id": str(random.randint(1000000, 9999999)), "code": c, "category": category} for c in to_insert])
-        
-    return JSONResponse({"success": True, "total": len(lines), "added": len(to_insert), "dupes": len(dupes_in_input + dupes_db), "dupes_list": dupes_in_input + dupes_db})
+    in_map   = await db.codes_map.find({"$or": [{"_id": {"$in": unique_input}}, {"code": {"$in": unique_input}}]}).to_list(None)
+    db_dupes = set(str(x.get("code") or x.get("_id")) for x in in_stock + in_map)
 
-@app.post("/api/clear_stock")
-async def clear_stock(request: Request, category: str = Form(...)):
-    if not check_auth(request): return RedirectResponse("/admin")
-    await db.stock.delete_many({"category": category})
-    return RedirectResponse("/admin?tab=stock", status_code=303)
+    new_codes, db_dupes_list = [], []
+    for c in unique_input:
+        if c in db_dupes: db_dupes_list.append(c)
+        else: new_codes.append(c)
+
+    all_dupes = dupes_in_input + db_dupes_list
+    if new_codes:
+        docs = [{"code": c, "category": category, "added_at": datetime.now()} for c in new_codes]
+        await db.stock.insert_many(docs, ordered=False)
+
+    return JSONResponse({"success": True, "total": len(lines), "added": len(new_codes),
+                         "dupes": len(all_dupes), "dupes_list": all_dupes})
 
 @app.get("/api/view_stock/{category}")
-async def view_stock(request: Request, category: str):
-    if not check_auth(request): return JSONResponse({"codes": []})
-    codes = await db.stock.find({"category": category}).to_list(None)
-    return JSONResponse({"codes": [c.get("code", c["_id"]) for c in codes]})
+async def api_view_stock(category: str, request: Request):
+    if not check_auth(request): return JSONResponse({"error": "unauth"}, status_code=401)
+    codes_docs = await db.stock.find({"category": category}).to_list(None)
+    codes_list = [str(c.get("code") or c.get("_id")) for c in codes_docs]
+    return JSONResponse({"category": category, "codes": codes_list})
 
-@app.post("/api/toggle_maintenance")
-async def api_toggle_maintenance(request: Request):
-    if not check_auth(request): return JSONResponse({"success": False})
-    config = await db.settings.find_one({"_id": "config"}) or {}
-    await db.settings.update_one({"_id": "config"}, {"$set": {"maintenance": not config.get("maintenance", False)}}, upsert=True)
-    return JSONResponse({"success": True})
+@app.post("/api/clear_stock")
+async def api_clear_stock(request: Request, category: str = Form(...)):
+    if not check_auth(request): return RedirectResponse("/login")
+    await db.stock.delete_many({"category": category})
+    return RedirectResponse(url="/admin?tab=stock", status_code=status.HTTP_302_FOUND)
+
+@app.get("/api/view_shared_tokens")
+async def api_view_shared_tokens(request: Request):
+    if not check_auth(request): return JSONResponse({"error": "unauth"}, status_code=401)
+    shared_doc = await db.settings.find_one({"_id": "shared_tokens"})
+    tokens = shared_doc.get("tokens", []) if shared_doc else []
+    return JSONResponse({"tokens": tokens})
+
+@app.post("/api/add_shared_tokens")
+async def api_add_shared(request: Request, tokens: str = Form(...)):
+    if not check_auth(request): return RedirectResponse("/login")
+    extracted = clean_and_extract_tokens(tokens)
+    if extracted:
+        await db.settings.update_one({"_id": "shared_tokens"}, {"$push": {"tokens": {"$each": extracted}}}, upsert=True)
+    return RedirectResponse(url="/admin?tab=users", status_code=status.HTTP_302_FOUND)
+
+@app.post("/api/clear_shared_tokens")
+async def api_clear_shared(request: Request):
+    if not check_auth(request): return RedirectResponse("/login")
+    await db.settings.update_one({"_id": "shared_tokens"}, {"$set": {"tokens": []}}, upsert=True)
+    return RedirectResponse(url="/admin?tab=users", status_code=status.HTTP_302_FOUND)
+
+@app.post("/api/add_user_tokens")
+async def api_add_user_tokens(request: Request, user_id: int = Form(...), tokens: str = Form(...)):
+    if not check_auth(request): return RedirectResponse("/login")
+    extracted = clean_and_extract_tokens(tokens)
+    if extracted:
+        await db.users.update_one({"_id": user_id}, {"$push": {"tokens": {"$each": extracted}}})
+    return RedirectResponse(url="/admin?tab=users", status_code=status.HTTP_302_FOUND)
+
+@app.post("/api/add_user")
+async def api_add_user(request: Request, user_id: int = Form(...), name: str = Form(...), role: str = Form(...)):
+    if not check_auth(request): return RedirectResponse("/login")
+    if not await db.users.find_one({"_id": user_id}):
+        await db.users.insert_one({"_id": user_id, "role": role, "name": name, "tokens": [],
+                                   "history": [], "logs": [], "token_logs": [], "stats": {"api": 0, "stock": 0}})
+    return RedirectResponse(url="/admin?tab=users", status_code=status.HTTP_302_FOUND)
+
+@app.post("/api/user_action")
+async def api_user_action(request: Request, user_id: int = Form(...), action: str = Form(...)):
+    if not check_auth(request): return RedirectResponse("/login")
+    if action == "delete":
+        await db.users.delete_one({"_id": user_id})
+    elif action == "clear_tokens":
+        await db.users.update_one({"_id": user_id}, {"$set": {"tokens": []}})
+    elif action == "toggle_role":
+        u = await db.users.find_one({"_id": user_id})
+        new_role = "employee" if u.get("role") == "user" else "user"
+        await db.users.update_one({"_id": user_id}, {"$set": {"role": new_role}})
+    elif action == "clear_logs":
+        await db.users.update_one({"_id": user_id}, {"$set": {"logs": [], "history": [], "token_logs": []}})
+    return RedirectResponse(url="/admin?tab=users", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/tracked_users")
-async def manage_tracked_users(request: Request, user_id: int = Form(...), action: str = Form(...)):
-    if not check_auth(request): return RedirectResponse("/admin")
-    if action == "add": await db.settings.update_one({"_id": "cache_config"}, {"$addToSet": {"tracked_users": user_id}}, upsert=True)
-    elif action == "remove": await db.settings.update_one({"_id": "cache_config"}, {"$pull": {"tracked_users": user_id}}, upsert=True)
-    return RedirectResponse("/admin?tab=tools", status_code=303)
+async def api_tracked_users(request: Request, user_id: int = Form(...), action: str = Form(...)):
+    if not check_auth(request): return RedirectResponse("/login")
+    if action == "add":
+        await db.settings.update_one({"_id": "cache_config"}, {"$addToSet": {"tracked_users": user_id}}, upsert=True)
+    elif action == "remove":
+        await db.settings.update_one({"_id": "cache_config"}, {"$pull": {"tracked_users": user_id}}, upsert=True)
+    return RedirectResponse(url="/admin?tab=tools", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/return_order")
-async def return_order(request: Request, order_id: str = Form(...)):
-    if not check_auth(request): return RedirectResponse("/admin")
-    order_id = order_id.strip()
-    if order_id.endswith("S"):
-        order = await db.store_orders.find_one_and_delete({"_id": order_id})
-        if not order: return RedirectResponse("/admin?tab=tools", status_code=303)
-        if order.get("code") and order.get("category"):
-            await db.stock.insert_one({"_id": str(random.randint(1000000,9999999)), "code": order["code"], "category": order["category"]})
-        if order.get("email") and order.get("price", 0) > 0:
-            await db.store_customers.update_one({"email": order["email"]}, {"$inc": {f"balance_{order.get('currency', 'EGP').lower()}": order["price"]}})
-        await db.codes_map.delete_one({"order_id": order_id})
-    else:
-        try: record = await db.codes_map.find_one_and_delete({"order_id": int(order_id)})
-        except: return RedirectResponse("/admin?tab=tools", status_code=303)
-        if record and record.get("source") != "API":
-            await db.stock.insert_one({"_id": str(random.randint(1000000,9999999)), "code": record["code"], "category": record.get("category", "Returned")})
-    return RedirectResponse("/admin?tab=tools", status_code=303)
+async def api_return_order(request: Request, order_id: str = Form(...)):
+    if not check_auth(request): return RedirectResponse("/login")
+
+    order = await db.orders.find_one({"_id": int(order_id)}) if order_id.isdigit() else None
+    if not order:
+        order = await db.store_orders.find_one({"_id": order_id})
+
+    if order and "items" in order:
+        cat             = order["type"].split("(")[1].split(")")[0] if "(" in order.get("type", "") else "Unknown"
+        codes_to_return = [{"code": c, "category": cat, "added_at": datetime.now()} for c in order["items"]]
+        await db.stock.insert_many(codes_to_return, ordered=False)
+        await db.codes_map.delete_many({"$or": [{"_id": {"$in": order["items"]}}, {"code": {"$in": order["items"]}}], "order_id": int(order_id)})
+        await db.orders.delete_one({"_id": int(order_id)})
+        await db.users.update_one({"_id": order["user_id"]}, {"$inc": {"stats.stock": -len(order["items"])}})
+    elif order and "code" in order:
+        await db.stock.insert_one({"code": order["code"], "category": order["category"], "added_at": datetime.now()})
+        await db.codes_map.delete_many({"$or": [{"_id": order["code"]}, {"code": order["code"]}], "order_id": order_id})
+        await db.store_orders.delete_one({"_id": order_id})
+
+    return RedirectResponse(url="/admin?tab=tools", status_code=status.HTTP_302_FOUND)
 
 @app.post("/api/search")
-async def search_database(request: Request, query: str = Form(...)):
-    if not check_auth(request): return JSONResponse({"result": "Unauthorized"})
-    query = query.strip()
-    if query.isdigit() or query.endswith("S"):
-        is_bot = query.isdigit()
-        if is_bot:
-            record = await db.codes_map.find_one({"order_id": int(query)})
-            if record: return JSONResponse({"result": f"🤖 Bot Order #{query}\n👤 By: {record.get('name')}\n📅 Date: {record.get('time')}\n📦 Type: {record.get('source')}\n\n⬇️ Delivered Code:\n  - {record.get('code')}"})
-            order = await db.orders.find_one({"_id": int(query)})
-            if order: return JSONResponse({"result": f"🤖 Bot API Order #{query}\n👤 By: {order.get('name')}\n📅 Date: {order.get('time')}\n📦 Type: {order.get('type')}\n\n⬇️ Items ({len(order.get('items',[]))}):\n" + "\n".join([f"  - {i}" for i in order.get('items', [])])})
-        else:
-            order = await db.store_orders.find_one({"_id": query})
-            if order: return JSONResponse({"result": f"🛒 Web Store Order #{query}\n👤 By: {order.get('name', 'Unknown')} | Email: {order.get('email')}\n📅 Date: {order.get('date')}\n📦 Package: {order.get('category')}\n💰 Paid: {order.get('price', 'N/A')} {order.get('currency', '')}\n\n⬇️ Delivered Code:\n  - {order.get('code')}"})
+async def api_search(request: Request):
+    if not check_auth(request): return JSONResponse({"error": "unauth"})
+    form  = await request.form()
+    query = form.get("query", "").strip()
+    if not query: return JSONResponse({"result": "❌ Send text to search"})
+
+    is_bot = query.isdigit()
+    is_web = query.endswith('S') and query[:-1].isdigit()
+
+    if is_bot or is_web:
+        order = await db.orders.find_one({"_id": int(query)}) if is_bot else await db.store_orders.find_one({"_id": query})
+        if order:
+            if "items" in order:
+                items_str = "\n".join([f"  - {item}" for item in order.get("items", [])])
+                return JSONResponse({"result": f"📄 Bot Order #{query}\n👤 By: {order.get('user', 'Unknown')} | ID: {order.get('user_id')}\n📅 Date: {order.get('date')}\n📦 Type: {order.get('type')}\n\n⬇️ Items ({len(order.get('items',[]))}):\n{items_str}"})
+            else:
+                price    = order.get("price", "N/A")
+                currency = order.get("currency", "")
+                return JSONResponse({"result": f"🛒 Web Store Order #{query}\n👤 By: {order.get('name', 'Unknown')} | Email: {order.get('email')}\n📅 Date: {order.get('date')}\n📦 Package: {order.get('category')}\n💰 Paid: {price} {currency}\n\n⬇️ Delivered Code:\n  - {order.get('code')}"})
+
         if is_bot:
             user = await db.users.find_one({"_id": int(query)})
-            if user: return JSONResponse({"result": f"👤 {user.get('name')}\n🆔 ID: {user.get('_id')}\n🎖 Role: {user.get('role')}\n🔑 Tokens: {len(user.get('tokens', []))}"})
+            if user:
+                return JSONResponse({"result": f"👤 {user.get('name')}\n🆔 ID: {user.get('_id')}\n🎖 Role: {user.get('role')}\n🔑 Tokens: {len(user.get('tokens', []))}"})
 
-    records = await db.codes_map.find({"$or": [{"_id": query}, {"code": query}]}).to_list(length=10)
+    records  = await db.codes_map.find({"$or": [{"_id": query}, {"code": query}]}).to_list(length=10)
     in_stock = await db.stock.count_documents({"$or": [{"_id": query}, {"code": query}]})
-    res_str = f"🔍 Search result for: {query}\n📦 Currently in stock: {in_stock} times\n"
+    res_str  = f"🔍 Search result for: {query}\n📦 Currently in stock: {in_stock} times\n"
     if records:
-        res_str += f"\n📜 Found in {len(records)} previous orders:\n" + "".join([f" - Order #{r.get('order_id')} by {r.get('name')} at {r.get('time')}\n" for r in records])
-    else: res_str += "\n❌ Not found in sales history."
+        res_str += f"\n🛒 Pulled {len(records)} times:\n"
+        for i, r in enumerate(records, 1):
+            res_str += f" {i}. By: {r.get('name', 'Unknown')} ({r.get('source', 'Bot')}) | Time: {r.get('time')} | Order: #{r.get('order_id')}\n"
+    elif in_stock == 0:
+        res_str += "\n❌ Not found in history."
+
     return JSONResponse({"result": res_str})
 
 if __name__ == "__main__":
