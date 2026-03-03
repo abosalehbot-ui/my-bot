@@ -269,7 +269,117 @@ function copyPurchasedCode() {
     const code = $('purchased-code')?.innerText;
     if (code) Core.copy(code);
 }
+// ─── مصفوفة السلة ──────────────────────────────────────────────────
+let cart = [];
 
+function addToCart(stock_key, pEgp, pUsd, name, iconClass) {
+    if (!localStorage.getItem('store_email')) { openAuthModal('signin'); toggleSidebarMobile(); return; }
+    
+    // لو المنتج موجود أصلاً، زود العدد
+    const existing = cart.find(i => i.stock_key === stock_key);
+    if (existing) {
+        existing.qty += 1;
+    } else {
+        cart.push({ stock_key, pEgp, pUsd, name, iconClass, qty: 1 });
+    }
+    updateCartUI();
+    Core.showToast('Added to cart!', 'success');
+}
+
+function removeFromCart(stock_key) {
+    cart = cart.filter(i => i.stock_key !== stock_key);
+    updateCartUI();
+    openCartModal(); // تحديث النافذة وهي مفتوحة
+}
+
+function updateCartQty(stock_key, qty) {
+    const item = cart.find(i => i.stock_key === stock_key);
+    if (item) {
+        item.qty = parseInt(qty);
+        if (item.qty <= 0) removeFromCart(stock_key);
+        else openCartModal(); 
+    }
+}
+
+function updateCartUI() {
+    const count = cart.reduce((sum, item) => sum + item.qty, 0);
+    if ($('cart-count-mobile')) $('cart-count-mobile').innerText = count;
+    if ($('cart-count-desktop')) $('cart-count-desktop').innerText = count;
+}
+
+function openCartModal() {
+    if (!localStorage.getItem('store_email')) { openAuthModal('signin'); return; }
+    const tbody = $('cart-tbody');
+    if (!tbody) return;
+    
+    if (cart.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center p-8 text-gray-500 font-bold"><i class="fas fa-shopping-cart text-3xl mb-3 block"></i> Cart is empty</td></tr>';
+        $('cart-total-price').innerText = '0.00 ' + currentCurrency;
+        openModal('cart-modal');
+        return;
+    }
+
+    let html = '';
+    let total = 0;
+    cart.forEach(item => {
+        const price = currentCurrency === 'EGP' ? item.pEgp : item.pUsd;
+        const itemTotal = price * item.qty;
+        total += itemTotal;
+        html += `
+        <tr class="border-b border-gray-800 hover:bg-[#111] transition">
+            <td class="p-4 text-white font-bold text-sm">${item.name}</td>
+            <td class="p-4"><input type="number" min="1" value="${item.qty}" onchange="updateCartQty('${item.stock_key}', this.value)" class="w-16 bg-[#050505] border border-gray-700 text-white p-1.5 rounded text-center outline-none focus:border-szcyan"></td>
+            <td class="p-4 text-szcyan font-black text-sm">${itemTotal.toFixed(2)}</td>
+            <td class="p-4 text-center"><button onclick="removeFromCart('${item.stock_key}')" class="text-red-500 hover:text-red-400 bg-red-900/20 p-2 rounded transition"><i class="fas fa-trash"></i></button></td>
+        </tr>`;
+    });
+    tbody.innerHTML = html;
+    $('cart-total-price').innerText = total.toFixed(2) + ' ' + currentCurrency;
+    openModal('cart-modal');
+}
+
+async function confirmCartPurchase() {
+    if (cart.length === 0) return;
+    if (!$('cart-terms-checkbox').checked) return alert('Please agree to the Terms of Service.');
+    
+    const btn = $('btn-confirm-cart'), orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...'; btn.disabled = true;
+    
+    // تجهيز الداتا عشان نبعتها للباك إند
+    const cartData = cart.map(i => ({
+        stock_key: i.stock_key,
+        qty: i.qty,
+        price: currentCurrency === 'EGP' ? i.pEgp : i.pUsd,
+        name: i.name
+    }));
+
+    const fd = new FormData();
+    fd.append('cart_data', JSON.stringify(cartData));
+    fd.append('currency', currentCurrency);
+
+    try {
+        const d = await (await fetch('/api/store/buy-cart', { method: 'POST', body: fd })).json();
+        if (d.success) {
+            const newEgp = d.currency === 'EGP' ? d.new_balance : localStorage.getItem('bal_egp');
+            const newUsd = d.currency === 'USD' ? d.new_balance : localStorage.getItem('bal_usd');
+            updateUI(localStorage.getItem('store_name'), newEgp, newUsd);
+            
+            cart = []; // تفريغ السلة بعد النجاح
+            updateCartUI();
+            ordersLoaded = false;
+            closeModal('cart-modal');
+            
+            // عرض الأكواد في نافذة النجاح
+            const ce = $('purchased-code');
+            if (ce) ce.innerHTML = d.codes.join('<br><br>');
+            openModal('success-modal');
+        } else {
+            alert(d.msg);
+            if (d.force_logout) logout();
+        }
+    } catch { alert('An error occurred!'); }
+    btn.innerHTML = orig; btn.disabled = false;
+}
 // ─── Profile Modal ───────────────────────────────────────────────────────
 function openProfileModal() {
     openModal('profile-modal');
