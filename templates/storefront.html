@@ -399,10 +399,12 @@
 
                             {% if stock.get(p.stock_key, 0) > 0 %}
                             <div class="flex gap-2 w-full">
-                                <button onclick='buyProduct({{ p.stock_key | tojson | safe }}, {{ (p.prices if p.prices is defined else {}) | tojson | safe }}, {{ p.name | tojson | safe }}, {{ cat.icon | tojson | safe }})' class="flex-1 bg-gradient-to-r from-szgreen to-szcyan text-black font-bold py-2.5 md:py-3 rounded-xl hover:opacity-90 transition text-sm md:text-base btn-glow">
-                                    Buy Now
-                                </button>
-                                <button onclick='addToCart({{ p.stock_key | tojson | safe }}, {{ (p.prices if p.prices is defined else {}) | tojson | safe }}, {{ p.name | tojson | safe }}, {{ cat.icon | tojson | safe }})' class="bg-gray-800 text-szcyan border border-gray-700 font-bold py-2.5 px-4 md:py-3 md:px-5 rounded-xl hover:bg-szcyan hover:text-white transition flex items-center justify-center">
+<button onclick='buyProduct({{ p.stock_key | tojson | safe }}, {{ (p.prices if p.prices is defined else {}) | tojson | safe }}, {{ p.name | tojson | safe }}, {{ cat.icon | tojson | safe }})' class="flex-1 bg-gradient-to-r from-szgreen to-szcyan text-black font-bold py-2.5 md:py-3 rounded-xl hover:opacity-90 transition text-sm md:text-base btn-glow">
+    Buy Now
+</button>
+<button onclick='addToCart({{ p.stock_key | tojson | safe }}, {{ (p.prices if p.prices is defined else {}) | tojson | safe }}, {{ p.name | tojson | safe }}, {{ cat.icon | tojson | safe }})' class="bg-gray-800 text-szcyan border border-gray-700 font-bold py-2.5 px-4 md:py-3 md:px-5 rounded-xl hover:bg-szcyan hover:text-white transition flex items-center justify-center">
+    <i class="fas fa-cart-plus"></i>
+</button>
                                     <i class="fas fa-cart-plus"></i>
                                 </button>
                             </div>
