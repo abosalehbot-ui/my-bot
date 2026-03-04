@@ -507,129 +507,84 @@ async def checkout_cart(request: Request, payload: CheckoutRequest):
 
     user = await db.store_customers.find_one({"email": email})
     if not user:
-        return JSONResponse(
-            {"success": False, "msg": "Account not found!", "force_logout": True}
-        )
+        return JSONResponse({"success": False, "msg": "Account not found!", "force_logout": True})
     if user.get("is_banned", False):
-        return JSONResponse(
-            {
-                "success": False,
-                "msg": "Your account is suspended.",
-                "force_logout": True,
-            }
-        )
+        return JSONResponse({"success": False, "msg": "Your account is suspended.", "force_logout": True})
     if user.get("balance_frozen", False):
-        return JSONResponse(
-            {
-                "success": False,
-                "msg": "Your balance is currently frozen. Please contact support.",
-            }
-        )
+        return JSONResponse({"success": False, "msg": "Your balance is currently frozen. Please contact support."})
 
-    for item in payload.cart:
-        currency  = item.currency.upper()
-        bal_field = f"balance_{currency.lower()}"
-        trusted_price = await get_server_price(item.stock_key, currency)
+    tx_id_str = payload.transaction_id if hasattr(payload, 'transaction_id') and payload.transaction_id else str(uuid.uuid4())
+    txid = await _acquire_txn_lock(tx_id_str, email, "checkout_cart")
+    if not txid:
+        return JSONResponse({"success": False, "msg": "Duplicate transaction detected."})
 
-        if item.quantity <= 0:
-            results.append({
-                "stock_key": item.stock_key,
-                "status":    "Failed",
-                "msg":       "Invalid quantity",
-            })
-            continue
+    try:
+        results = []
+        for item in payload.cart:
+            currency  = item.currency.upper()
+            bal_field = f"balance_{currency.lower()}"
+            trusted_price = await get_server_price(item.stock_key, currency)
 
-        if trusted_price is None:
-            results.append({
-                "stock_key": item.stock_key,
-                "status":    "Failed",
-                "msg":       "Invalid product or currency",
-            })
-            continue
+            if item.quantity <= 0:
+                results.append({"stock_key": item.stock_key, "status": "Failed", "msg": "Invalid quantity"})
+                continue
 
-        for _ in range(item.quantity):
-            # إعادة جلب المستخدم في كل حلقة لضمان دقة الرصيد المتبقي
-            user = await db.store_customers.find_one({"email": email})
-            if not user:
-                results.append({
-                    "stock_key": item.stock_key,
-                    "status":    "Failed",
-                    "msg":       "Account not found",
+            if trusted_price is None:
+                results.append({"stock_key": item.stock_key, "status": "Failed", "msg": "Invalid product or currency"})
+                continue
+
+            for _ in range(item.quantity):
+                user = await db.store_customers.find_one({"email": email})
+                if not user:
+                    results.append({"stock_key": item.stock_key, "status": "Failed", "msg": "Account not found"})
+                    break
+                if user.get(bal_field, 0) < trusted_price:
+                    results.append({"stock_key": item.stock_key, "status": "Failed", "msg": f"Insufficient {currency.upper()} balance"})
+                    break
+                
+                code_doc = await db.stock.find_one_and_delete({"category": item.stock_key})
+                if not code_doc:
+                    results.append({"stock_key": item.stock_key, "status": "Failed", "msg": "Out of stock"})
+                    break
+
+                code_str = str(code_doc.get("code") or code_doc["_id"])
+                seq = await get_next_order_id()
+                order_id = f"{seq}S"
+                now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+                await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: -trusted_price}})
+                await db.store_orders.insert_one({
+                    "_id": order_id, "email": email, "name": user["name"],
+                    "category": item.stock_key, "code": code_str, "price": trusted_price,
+                    "currency": currency, "date": now_str,
                 })
-                break
-
-            if user.get(bal_field, 0) < trusted_price:
+                await db.codes_map.insert_one({
+                    "code": code_str, "order_id": order_id, "name": f"{user['name']} (Web)",
+                    "time": now_str, "source": "Web Store",
+                })
+                await log_wallet_txn(email, -trusted_price, currency, f"Order #{order_id}", ref=order_id)
                 results.append({
-                    "stock_key": item.stock_key,
-                    "status": "Success",
-                    "code": unit["code"],
-                    "price": unit["price"],
-                    "currency": unit["currency"],
-                    "order_id": unit["order_id"],
+                    "stock_key": item.stock_key, "status": "Success", "code": code_str,
+                    "price": trusted_price, "currency": currency, "order_id": order_id,
                 })
 
-                results.append({
-                    "stock_key": item.stock_key,
-                    "status": "Success",
-                    "code": unit["code"],
-                    "price": unit["price"],
-                    "currency": unit["currency"],
-                    "order_id": unit["order_id"],
-                })
-                break
-
-            code_str    = str(code_doc.get("code") or code_doc["_id"])
-            seq         = await get_next_order_id()
-            order_id    = f"{seq}S"
-            now_str     = datetime.now().strftime("%Y-%m-%d %H:%M")
-
-            await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: -trusted_price}})
-
-            await db.store_orders.insert_one({
-                "_id":      order_id,
-                "email":    email,
-                "name":     user["name"],
-                "category": item.stock_key,
-                "code":     code_str,
-                "price":    trusted_price,
-                "currency": currency,
-                "date":     now_str,
-            })
-            await db.codes_map.insert_one({
-                "code":     code_str,
-                "order_id": order_id,
-                "name":     f"{user['name']} (Web)",
-                "time":     now_str,
-                "source":   "Web Store",
-            })
-            await log_wallet_txn(email, -item.price, currency, f"Order #{order_id}", ref=order_id)
-
-            results.append({
-                "stock_key": item.stock_key,
-                "status":    "Success",
-                "code":      code_str,
-                "price":     trusted_price,
-                "currency":  currency,
-                "order_id":  order_id,
-            })
-
-    # إعادة جلب أرصدة المستخدم المحدّثة بعد انتهاء كل العمليات
-           fresh_user = await db.store_customers.find_one({"email": email})
-           new_balances = {k: v for k, v in (fresh_user or {}).items() if k.startswith("balance_")}
-           await _finish_txn_lock(txid, "done", "ok")
-           return JSONResponse({
-             "success": True,
-             "results": results,
-             "new_balances": new_balances,
-             "msg": "Checkout completed!",
-             "transaction_id": txid,
-           })
+        fresh_user = await db.store_customers.find_one({"email": email})
+        new_balances = {k: v for k, v in (fresh_user or {}).items() if k.startswith("balance_")}
+        await _finish_txn_lock(txid, "done", "ok")
+        return JSONResponse({
+            "success": True, "results": results, "new_balances": new_balances,
+            "msg": "Checkout completed!", "transaction_id": txid,
+        })
     except ValueError as e:
-           await _finish_txn_lock(txid, "failed", str(e))
-           return JSONResponse({"success": False, "msg": str(e)})
-    except Exception:
-           await _finish_txn_lock(txid, "failed", "internal_error")
-           return JSONResponse({"success": False, "msg": "Checkout failed due to server error."})
+        await _finish_txn_lock(txid, "failed", str(e))
+        return JSONResponse({"success": False, "msg": str(e)})
+    except Exception as e:
+        print(f"Checkout error: {e}")
+        import traceback
+        traceback.print_exc()
+        await _finish_txn_lock(txid, "failed", "internal_error")
+        return JSONResponse({"success": False, "msg": "Checkout failed due to server error."})
+
 
 # ==========================================
 # 5. لوحة أدمن المتجر
