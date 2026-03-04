@@ -399,11 +399,11 @@
 
                             {% if stock.get(p.stock_key, 0) > 0 %}
                             <div class="flex gap-2 w-full">
-                                <button onclick="buyProduct('{{ p.stock_key }}', {{ p.prices | tojson | safe if p.prices is defined else '{}' }}, '{{ p.name }}', '{{ cat.icon }}')"
+                                <button onclick='buyProduct('{{ p.stock_key }}', {{ p.prices | tojson | safe if p.prices is defined else '{}' }}, '{{ p.name }}', '{{ cat.icon }}')"
                                     class="flex-1 bg-gradient-to-r from-szgreen to-szcyan text-black font-bold py-2.5 md:py-3 rounded-xl hover:opacity-90 transition text-sm md:text-base btn-glow">
                                     Buy Now
                                 </button>
-                                <button onclick="addToCart('{{ p.stock_key }}', {{ p.prices | tojson | safe if p.prices is defined else '{}' }}, '{{ p.name }}', '{{ cat.icon }}')"
+                                <button onclick='addToCart('{{ p.stock_key }}', {{ p.prices | tojson | safe if p.prices is defined else '{}' }}, '{{ p.name }}', '{{ cat.icon }}')"
                                     class="bg-gray-800 text-szcyan border border-gray-700 font-bold py-2.5 px-4 md:py-3 md:px-5 rounded-xl hover:bg-szcyan hover:text-white transition flex items-center justify-center">
                                     <i class="fas fa-cart-plus"></i>
                                 </button>
