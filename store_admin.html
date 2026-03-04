@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="default">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saleh Zone | Store Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = { theme: { extend: { colors: {
+            szgreen:'var(--theme-primary)', szcyan:'var(--theme-secondary)', darkbg:'#050505', panelbg:'#111'
+        }}}}
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
+        :root{--theme-primary:#7dfc89;--theme-secondary:#5eead4}
+        html[data-theme="synthwave"]{--theme-primary:#a855f7;--theme-secondary:#f97316}
+        html[data-theme="sith"]{--theme-primary:#ef4444;--theme-secondary:#dc2626}
+        html[data-theme="vip"]{--theme-primary:#eab308;--theme-secondary:#facc15}
+        body{font-family:'Cairo',sans-serif;background:#050505;color:#d1d5db}
+        ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:#333;border-radius:10px}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .fade-in{animation:fadeIn .3s ease-out forwards}
+        @keyframes fadeOut{to{opacity:0;transform:translateY(-8px)}}
+        #toast-container .toast{display:flex;align-items:center;gap:10px;background:#111;border-radius:10px;padding:10px 16px;color:#fff;font-weight:700;font-size:13px;min-width:200px;box-shadow:0 4px 20px rgba(0,0,0,.6)}
+        .tab-btn{color:#6b7280;border-bottom:2px solid transparent;transition:.2s}
+        .tab-btn.active{color:var(--theme-primary);border-bottom-color:var(--theme-primary)}
+        .badge-egp{background:#78350f22;color:#eab308;border:1px solid #78350f44}
+        .badge-usd{background:#0e4a4422;color:#5eead4;border:1px solid #0e4a4444}
+        .detail-modal-tab{display:none}
+        .detail-modal-tab.show{display:block}
+        .ticket-filter-btn.active{background:rgba(125,252,137,0.1);color:var(--theme-primary);border-color:rgba(125,252,137,0.2)}
+    </style>
+</head>
+<body class="min-h-screen">
+<div id="toast-container" class="fixed top-4 right-4 z-[200] flex flex-col gap-2 pointer-events-none"></div>
+
+<header class="bg-panelbg border-b border-gray-800 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
+    <div class="flex items-center gap-3">
+        <a href="/admin" class="text-gray-500 hover:text-white transition text-sm"><i class="fas fa-arrow-left mr-1"></i>Dashboard</a>
+        <span class="text-gray-700">|</span>
+        <span class="font-black text-white">Store <span class="text-szgreen">Admin</span></span>
+    </div>
+    <div class="flex items-center gap-3 text-xs font-bold">
+        <span class="bg-szgreen/10 text-szgreen border border-szgreen/20 px-3 py-1 rounded-full">
+            <i class="fas fa-users mr-1"></i>{{ store_customers|length }} Customers
+        </span>
+        <span class="bg-szcyan/10 text-szcyan border border-szcyan/20 px-3 py-1 rounded-full">
+            <i class="fas fa-receipt mr-1"></i>{{ store_orders|length }} Orders
+        </span>
+        {% if open_tickets %}
+        <span class="bg-red-500/10 text-red-400 border border-red-500/20 px-3 py-1 rounded-full">
+            <i class="fas fa-headset mr-1"></i>{{ open_tickets|length }} Open Tickets
+        </span>
+        {% endif %}
+        <a href="/logout" class="text-red-500 hover:text-red-400 ml-1"><i class="fas fa-power-off"></i></a>
+    </div>
+</header>
+
+{% set total_egp = namespace(v=0) %}{% set total_usd = namespace(v=0) %}
+{% set today = namespace(egp=0, usd=0, sales=0) %}
+{% for o in store_orders %}
+  {% if o.currency == 'EGP' %}{% set total_egp.v = total_egp.v + o.price %}{% endif %}
+  {% if o.currency == 'USD' %}{% set total_usd.v = total_usd.v + o.price %}{% endif %}
+{% endfor %}
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 max-w-7xl mx-auto">
+    <div class="bg-panelbg border border-gray-800 rounded-xl p-4">
+        <div class="text-xs text-gray-500 uppercase mb-1">Customers</div>
+        <div class="text-2xl font-black text-white">{{ store_customers|length }}</div>
+    </div>
+    <div class="bg-panelbg border border-gray-800 rounded-xl p-4">
+        <div class="text-xs text-gray-500 uppercase mb-1">Total Orders</div>
+        <div class="text-2xl font-black text-white">{{ store_orders|length }}</div>
+    </div>
+    <div class="bg-panelbg border border-yellow-500/20 rounded-xl p-4">
+        <div class="text-xs text-gray-500 uppercase mb-1">Revenue EGP</div>
+        <div class="text-2xl font-black text-yellow-500">{{ "%.0f"|format(total_egp.v) }}</div>
+    </div>
+    <div class="bg-panelbg border border-szcyan/20 rounded-xl p-4">
+        <div class="text-xs text-gray-500 uppercase mb-1">Revenue USD</div>
+        <div class="text-2xl font-black text-szcyan">{{ "%.2f"|format(total_usd.v) }}</div>
+    </div>
+</div>
+
+<div class="max-w-7xl mx-auto px-6">
+    <div class="flex gap-5 border-b border-gray-800 mb-6">
+        <button onclick="switchMainTab('customers')" id="main-tab-btn-customers" class="tab-btn active pb-3 font-bold text-sm">
+            <i class="fas fa-users mr-1"></i>Customers
+        </button>
+        <button onclick="switchMainTab('orders')" id="main-tab-btn-orders" class="tab-btn pb-3 font-bold text-sm">
+            <i class="fas fa-receipt mr-1"></i>Orders
+        </button>
+        <button onclick="switchMainTab('support')" id="main-tab-btn-support" class="tab-btn pb-3 font-bold text-sm relative">
+            <i class="fas fa-headset mr-1"></i>Support
+            {% if open_tickets %}
+            <span class="absolute -top-1 -right-3 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">{{ open_tickets|length }}</span>
+            {% endif %}
+        </button>
+    </div>
+
+    <!-- ── Customers Tab ───────────────────────────────────────────────── -->
+    <div id="main-tab-customers">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="relative flex-1 max-w-sm">
+                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm"></i>
+                <input id="search-customers" oninput="filterRows('search-customers','customer-row')" placeholder="Search name / email / username..."
+                    class="w-full bg-panelbg border border-gray-700 rounded-lg pl-9 pr-4 py-2 text-sm text-gray-200 outline-none focus:border-szgreen">
+            </div>
+        </div>
+        <div class="overflow-x-auto border border-gray-800 rounded-xl bg-panelbg">
+            <table class="w-full text-sm text-left">
+                <thead class="bg-black text-gray-500 uppercase text-[10px]">
+                    <tr>
+                        <th class="px-4 py-3">Avatar</th>
+                        <th class="px-4 py-3">Name / Username</th>
+                        <th class="px-4 py-3">Email</th>
+                        <th class="px-4 py-3">Status</th>
+                        <th class="px-4 py-3">EGP</th>
+                        <th class="px-4 py-3">USD</th>
+                        <th class="px-4 py-3">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-800">
+                    {% for c in store_customers %}
+                    <tr class="hover:bg-black/30 transition customer-row" data-search="{{ c.name|lower }} {{ c.email|lower }} {{ c.get('username','')|lower }}">
+                        <td class="px-4 py-3">
+                            {% if c.avatar %}
+                            <img src="{{ c.avatar }}" class="w-9 h-9 rounded-full object-cover border border-gray-700">
+                            {% else %}
+                            <div class="w-9 h-9 rounded-full bg-gray-900 border border-gray-700 flex items-center justify-center text-gray-500"><i class="fas fa-user text-xs"></i></div>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3">
+                            <div class="font-bold text-white">{{ c.name }}</div>
+                            <div class="text-xs text-gray-500">{% if c.get('username') %}@{{ c.username }}{% else %}<span class="text-red-500/70 italic">no username</span>{% endif %}</div>
+                        </td>
+                        <td class="px-4 py-3 font-mono text-xs text-szcyan">{{ c.email }}</td>
+                        <td class="px-4 py-3">
+                            {% if c.get('is_banned', false) %}
+                            <span class="text-[10px] bg-red-900/40 text-red-400 px-2 py-1 rounded font-bold">Banned</span>
+                            {% else %}
+                            <span class="text-[10px] bg-szgreen/20 text-szgreen px-2 py-1 rounded font-bold">Active</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3"><span class="badge-egp px-2 py-1 rounded text-xs font-black">{{ c.balance_egp or 0 }}</span></td>
+                        <td class="px-4 py-3"><span class="badge-usd px-2 py-1 rounded text-xs font-black">{{ c.balance_usd or 0 }}</span></td>
+                        <td class="px-4 py-3">
+                            <button onclick='openCustomerModal({{ c | tojson }})'
+                                class="bg-szgreen/10 text-szgreen border border-szgreen/20 px-3 py-1 rounded text-xs font-bold hover:bg-szgreen hover:text-black transition">
+                                <i class="fas fa-pen mr-1"></i>Manage
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ── Orders Tab ─────────────────────────────────────────────────── -->
+    <div id="main-tab-orders" style="display:none">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="relative flex-1 max-w-sm">
+                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm"></i>
+                <input id="search-orders" oninput="filterRows('search-orders','order-row')" placeholder="Search email / order ID..."
+                    class="w-full bg-panelbg border border-gray-700 rounded-lg pl-9 pr-4 py-2 text-sm text-gray-200 outline-none focus:border-szgreen">
+            </div>
+        </div>
+        <div class="overflow-x-auto border border-gray-800 rounded-xl bg-panelbg">
+            <table class="w-full text-sm text-left whitespace-nowrap">
+                <thead class="bg-black text-gray-500 uppercase text-[10px]">
+                    <tr>
+                        <th class="px-4 py-3">Order</th>
+                        <th class="px-4 py-3">Customer</th>
+                        <th class="px-4 py-3">Email</th>
+                        <th class="px-4 py-3">Package</th>
+                        <th class="px-4 py-3">Price</th>
+                        <th class="px-4 py-3">Date</th>
+                        <th class="px-4 py-3">Code</th>
+                        <th class="px-4 py-3">Return</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-800">
+                    {% for o in store_orders %}
+                    <tr class="hover:bg-black/30 transition order-row" data-search="{{ o.email|lower }} {{ o._id|lower }}">
+                        <td class="px-4 py-3 font-mono text-szcyan font-bold">#{{ o._id }}</td>
+                        <td class="px-4 py-3 font-bold text-white">{{ o.name }}</td>
+                        <td class="px-4 py-3 text-xs text-gray-400 font-mono">{{ o.email }}</td>
+                        <td class="px-4 py-3 text-gray-300">{{ o.category }}</td>
+                        <td class="px-4 py-3">
+                            {% if o.currency == 'EGP' %}<span class="badge-egp px-2 py-1 rounded text-xs font-black">{{ o.price }} EGP</span>
+                            {% else %}<span class="badge-usd px-2 py-1 rounded text-xs font-black">{{ o.price }} USD</span>{% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-xs text-gray-500">{{ o.date }}</td>
+                        <td class="px-4 py-3">
+                            <button onclick="copyText('{{ o.code }}')"
+                                class="bg-gray-900 text-szgreen border border-gray-700 px-3 py-1 rounded text-xs font-mono hover:bg-szgreen hover:text-black transition">
+                                <i class="fas fa-copy mr-1"></i>Copy
+                            </button>
+                        </td>
+                        <td class="px-4 py-3">
+                            <button onclick="returnOrder('{{ o._id }}')"
+                                class="bg-red-900/20 text-red-400 border border-red-900/30 px-3 py-1 rounded text-xs font-bold hover:bg-red-900/40 transition">
+                                <i class="fas fa-undo mr-1"></i>Return
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ── Support Tickets Tab ─────────────────────────────────────────── -->
+    <div id="main-tab-support" style="display:none">
+
+        <!-- Ticket Detail Modal -->
+        <div id="ticket-detail-modal" class="fixed inset-0 bg-black/90 z-[60] hidden flex items-center justify-center p-4 backdrop-blur-sm">
+            <div class="w-full max-w-2xl bg-panelbg border border-gray-800 rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
+                <div class="flex items-center justify-between p-5 border-b border-gray-800 shrink-0 bg-[#0a0a0a] rounded-t-2xl">
+                    <div class="flex-1 min-w-0 pr-4">
+                        <div id="tdm-ticket-id" class="font-black text-szcyan text-xs mb-0.5"></div>
+                        <div id="tdm-subject" class="font-black text-white text-base leading-tight truncate"></div>
+                        <div id="tdm-customer-info" class="text-[10px] text-gray-500 mt-0.5 font-mono"></div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <select id="tdm-status-select" onchange="adminChangeTicketStatus()" class="bg-black border border-gray-700 text-xs font-bold text-gray-300 rounded-lg px-3 py-2 outline-none focus:border-szgreen cursor-pointer">
+                            <option value="open">🟢 Open</option>
+                            <option value="in_progress">🟡 In Progress</option>
+                            <option value="closed">🔴 Closed</option>
+                        </select>
+                        <button onclick="closeTicketModal()" class="text-gray-500 hover:text-red-500 transition p-1"><i class="fas fa-times text-xl"></i></button>
+                    </div>
+                </div>
+                <div id="tdm-messages" class="flex-1 overflow-y-auto p-5 space-y-3 bg-darkbg min-h-[200px]"></div>
+                <div class="p-4 border-t border-gray-800 bg-panelbg rounded-b-2xl shrink-0">
+                    <div id="tdm-reply-status" class="text-xs font-bold text-center h-4 mb-2"></div>
+                    <div class="flex gap-2">
+                        <textarea id="tdm-reply-input" rows="2" placeholder="Type your reply as Support Team..."
+                            class="flex-1 bg-black border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-gray-200 outline-none focus:border-szgreen resize-none"></textarea>
+                        <button onclick="adminSendTicketReply()"
+                            class="bg-gradient-to-b from-szgreen to-szcyan text-black font-black px-5 rounded-xl hover:opacity-90 transition shrink-0 flex items-center justify-center">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ticket Filters & Search -->
+        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-4">
+            <div class="relative flex-1 max-w-sm">
+                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm"></i>
+                <input id="search-tickets" oninput="filterRows('search-tickets','ticket-row')" placeholder="Search subject / email..."
+                    class="w-full bg-panelbg border border-gray-700 rounded-lg pl-9 pr-4 py-2 text-sm text-gray-200 outline-none focus:border-szgreen">
+            </div>
+            <div class="flex gap-2 text-xs font-bold flex-wrap">
+                <button onclick="filterTicketsByStatus('all')"         id="tf-all"          class="ticket-filter-btn active px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:border-szgreen transition">All ({{ support_tickets|length }})</button>
+                <button onclick="filterTicketsByStatus('open')"        id="tf-open"         class="ticket-filter-btn px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:border-szgreen transition">Open</button>
+                <button onclick="filterTicketsByStatus('in_progress')" id="tf-in_progress"  class="ticket-filter-btn px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:border-szgreen transition">In Progress</button>
+                <button onclick="filterTicketsByStatus('closed')"      id="tf-closed"       class="ticket-filter-btn px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:border-szgreen transition">Closed</button>
+            </div>
+        </div>
+
+        <!-- Tickets Table -->
+        <div class="overflow-x-auto border border-gray-800 rounded-xl bg-panelbg">
+            <table class="w-full text-sm text-left">
+                <thead class="bg-black text-gray-500 uppercase text-[10px]">
+                    <tr>
+                        <th class="px-4 py-3">ID</th>
+                        <th class="px-4 py-3">Customer</th>
+                        <th class="px-4 py-3">Subject</th>
+                        <th class="px-4 py-3">Status</th>
+                        <th class="px-4 py-3">Messages</th>
+                        <th class="px-4 py-3">Date</th>
+                        <th class="px-4 py-3">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-800">
+                    {% for t in support_tickets %}
+                    <tr class="hover:bg-black/30 transition ticket-row" data-search="{{ t.subject|lower }} {{ t.email|lower }} {{ t.name|lower }}" data-status="{{ t.status }}">
+                        <td class="px-4 py-3 font-mono text-szcyan font-bold text-xs">{{ t.ticket_id }}</td>
+                        <td class="px-4 py-3">
+                            <div class="font-bold text-white text-xs">{{ t.name }}</div>
+                            <div class="text-[10px] text-gray-500 font-mono">{{ t.email }}</div>
+                        </td>
+                        <td class="px-4 py-3 text-gray-300 max-w-[220px] truncate text-xs">{{ t.subject }}</td>
+                        <td class="px-4 py-3">
+                            {% if t.status == 'open' %}
+                            <span class="bg-green-900/20 text-green-400 border border-green-900/30 px-2 py-0.5 rounded text-[10px] font-bold uppercase">Open</span>
+                            {% elif t.status == 'in_progress' %}
+                            <span class="bg-yellow-900/20 text-yellow-400 border border-yellow-900/30 px-2 py-0.5 rounded text-[10px] font-bold uppercase">In Progress</span>
+                            {% else %}
+                            <span class="bg-red-900/20 text-red-400 border border-red-900/30 px-2 py-0.5 rounded text-[10px] font-bold uppercase">Closed</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-gray-400 text-xs">{{ t.messages | length if t.messages else 0 }}</td>
+                        <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{{ t.created_at }}</td>
+                        <td class="px-4 py-3">
+                            <button onclick="openTicketModal('{{ t.ticket_id }}')"
+                                class="bg-szcyan/10 text-szcyan border border-szcyan/20 px-3 py-1 rounded text-xs font-bold hover:bg-szcyan hover:text-black transition whitespace-nowrap">
+                                <i class="fas fa-comments mr-1"></i>View
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="px-4 py-12 text-center text-gray-600 font-bold">
+                        <i class="fas fa-headset text-4xl mb-3 block opacity-30"></i>No support tickets yet.
+                    </td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- ── Customer Detail Modal ──────────────────────────────────────────────── -->
+<div id="customer-modal" class="fixed inset-0 bg-black/90 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="w-full max-w-xl bg-panelbg border border-gray-800 rounded-2xl shadow-2xl fade-in flex flex-col max-h-[92vh]">
+
+        <div class="flex items-center justify-between p-5 border-b border-gray-800 shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-full bg-gray-900 border border-gray-700 overflow-hidden flex items-center justify-center" id="cm-avatar-wrap">
+                    <i class="fas fa-user text-gray-500 cm-avatar-placeholder"></i>
+                    <img class="cm-avatar-img w-full h-full object-cover hidden" id="cm-avatar-img" src="" alt="">
+                </div>
+                <div>
+                    <div class="font-black text-white text-base" id="cm-name">—</div>
+                    <div class="text-xs text-gray-500 font-mono" id="cm-email">—</div>
+                </div>
+            </div>
+            <button onclick="closeCustomerModal()" class="text-gray-500 hover:text-red-500 transition"><i class="fas fa-times text-xl"></i></button>
+        </div>
+
+        <div class="flex border-b border-gray-800 shrink-0 px-4 gap-4 overflow-x-auto">
+            <button onclick="switchDetailTab('info')" id="dt-btn-info" class="tab-btn active py-3 text-xs font-bold whitespace-nowrap">
+                <i class="fas fa-id-card mr-1"></i>Wallet & Controls
+            </button>
+            <button onclick="switchDetailTab('edit')" id="dt-btn-edit" class="tab-btn py-3 text-xs font-bold whitespace-nowrap">
+                <i class="fas fa-edit mr-1"></i>Edit Profile
+            </button>
+            <button onclick="switchDetailTab('avatar')" id="dt-btn-avatar" class="tab-btn py-3 text-xs font-bold whitespace-nowrap">
+                <i class="fas fa-image mr-1"></i>Avatar
+            </button>
+            <button onclick="switchDetailTab('orders')" id="dt-btn-orders" class="tab-btn py-3 text-xs font-bold whitespace-nowrap">
+                <i class="fas fa-receipt mr-1"></i>Orders
+            </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-5 min-h-0">
+
+            <div id="dt-info" class="detail-modal-tab show space-y-4">
+                <div id="cm-status" class="text-xs font-bold text-center h-4"></div>
+
+                <div class="bg-black border border-gray-800 rounded-xl p-4 space-y-3 text-sm">
+                    <div class="grid grid-cols-2 gap-3 pb-3 border-b border-gray-800">
+                        <div>
+                            <div class="text-[10px] text-gray-500 uppercase">User ID</div>
+                            <div class="text-white font-mono font-bold" id="cm-uid">—</div>
+                        </div>
+                        <div>
+                            <div class="text-[10px] text-gray-500 uppercase">Username</div>
+                            <div class="text-szcyan font-bold" id="cm-username">—</div>
+                        </div>
+                        <div>
+                            <div class="text-[10px] text-gray-500 uppercase">Joined</div>
+                            <div class="text-gray-300 text-xs" id="cm-joined">—</div>
+                        </div>
+                        <div>
+                            <div class="text-[10px] text-gray-500 uppercase">Orders</div>
+                            <div class="text-white font-bold" id="cm-orders-count">—</div>
+                        </div>
+                    </div>
+                    
+                    <div class="text-xs text-gray-500 uppercase font-bold mt-2">Current Wallets</div>
+                    <div id="cm-balances-container" class="grid grid-cols-2 gap-3"></div>
+                </div>
+
+                <div class="bg-black border border-gray-800 rounded-xl p-4">
+                    <div class="text-xs text-gray-500 uppercase font-bold mb-3">Adjust Balance (Add custom currency!)</div>
+                    <div class="flex gap-2 mb-2">
+                        <input type="text" id="bal-currency" list="currency-list" placeholder="Currency (EGP, USD, SAR...)" 
+                               class="flex-1 bg-[#0a0a0a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white uppercase outline-none focus:border-szgreen" value="EGP">
+                        <datalist id="currency-list">
+                            <option value="EGP">
+                            <option value="USD">
+                        </datalist>
+                        <select id="bal-action" class="flex-1 bg-[#0a0a0a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-szgreen">
+                            <option value="add">➕ Add</option>
+                            <option value="sub">➖ Subtract</option>
+                        </select>
+                    </div>
+                    <div class="flex gap-2">
+                        <input type="number" id="bal-amount" min="0" step="0.01" placeholder="Amount..."
+                            class="flex-1 bg-[#0a0a0a] border border-gray-700 rounded-lg px-4 py-2 text-sm text-white outline-none focus:border-szgreen">
+                        <button onclick="submitBalance()" id="bal-btn"
+                            class="bg-szgreen text-black font-bold px-4 py-2 rounded-lg text-sm hover:opacity-90 transition">
+                            Apply Balance
+                        </button>
+                    </div>
+                </div>
+
+                <div class="border border-red-900/40 rounded-xl p-4">
+                    <div class="text-xs text-red-400 uppercase font-bold mb-3"><i class="fas fa-exclamation-triangle mr-1"></i>Account Controls</div>
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <button onclick="toggleCustomerStatus('ban')" id="cm-btn-ban" class="w-full bg-orange-900/20 text-orange-400 border border-orange-900/30 py-2 rounded-lg text-xs font-bold hover:bg-orange-900/40 transition">
+                            <i class="fas fa-ban mr-1"></i>Suspend Account
+                        </button>
+                        <button onclick="toggleCustomerStatus('freeze')" id="cm-btn-freeze" class="w-full bg-blue-900/20 text-blue-400 border border-blue-900/30 py-2 rounded-lg text-xs font-bold hover:bg-blue-900/40 transition">
+                            <i class="fas fa-snowflake mr-1"></i>Freeze Balance
+                        </button>
+                    </div>
+                    <button onclick="deleteCustomer()" class="w-full bg-red-900/20 text-red-400 border border-red-900/30 py-2 rounded-lg text-sm font-bold hover:bg-red-900/40 transition">
+                        <i class="fas fa-trash mr-2"></i>Delete Customer Account
+                    </button>
+                </div>
+            </div>
+
+            <div id="dt-edit" class="detail-modal-tab space-y-4">
+                <div id="cm-edit-status" class="text-xs font-bold text-center h-4"></div>
+                <form onsubmit="adminUpdateProfile(event)" class="space-y-3">
+                    <div>
+                        <label class="text-xs text-gray-500 uppercase font-bold block mb-1">Full Name</label>
+                        <input type="text" id="cm-edit-name" required
+                            class="w-full bg-black border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-gray-200 outline-none focus:border-szgreen transition">
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-500 uppercase font-bold block mb-1">Username</label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-bold">@</span>
+                            <input type="text" id="cm-edit-username" required minlength="3" maxlength="20"
+                                class="w-full bg-black border border-gray-700 rounded-lg pl-8 pr-4 py-2.5 text-sm text-gray-200 outline-none focus:border-szgreen transition">
+                        </div>
+                        <p class="text-[10px] text-gray-600 mt-1">3-20 chars · letters/numbers/_ only</p>
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-500 uppercase font-bold block mb-1">New Password <span class="text-gray-600">(leave blank to keep)</span></label>
+                        <input type="password" id="cm-edit-password" minlength="8" placeholder="Min 8 characters..."
+                            class="w-full bg-black border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-gray-200 outline-none focus:border-szcyan transition">
+                    </div>
+                    <button type="submit" id="cm-edit-btn"
+                        class="w-full bg-gradient-to-r from-szgreen to-szcyan text-black py-2.5 rounded-xl font-black uppercase text-sm hover:opacity-90 transition">
+                        Save Changes
+                    </button>
+                </form>
+                <div class="border-t border-gray-800 pt-4">
+                    <div class="text-xs text-gray-500 uppercase font-bold mb-2"><i class="fas fa-envelope mr-1"></i>Change Email (sends OTP to new email)</div>
+                    <div class="flex gap-2">
+                        <input type="email" id="cm-new-email" placeholder="new@email.com"
+                            class="flex-1 bg-black border border-gray-700 rounded-lg px-4 py-2 text-sm text-gray-200 outline-none focus:border-szgreen transition">
+                        <button onclick="adminEmailRequest()" id="cm-email-req-btn"
+                            class="bg-szcyan text-black font-bold px-4 py-2 rounded-lg text-sm hover:opacity-90 transition whitespace-nowrap">
+                            Send OTP
+                        </button>
+                    </div>
+                    <div id="cm-email-otp-row" class="hidden flex gap-2 mt-2">
+                        <input type="text" id="cm-email-otp" maxlength="6" placeholder="6-digit code"
+                            class="flex-1 bg-black border border-gray-700 rounded-lg px-4 py-2 text-sm text-szgreen text-center tracking-widest font-black outline-none focus:border-szgreen">
+                        <button onclick="adminEmailVerify()"
+                            class="bg-szgreen text-black font-bold px-4 py-2 rounded-lg text-sm hover:opacity-90 transition whitespace-nowrap">
+                            Verify
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="dt-avatar" class="detail-modal-tab space-y-4 text-center">
+                <div class="flex flex-col items-center gap-4">
+                    <div class="w-28 h-28 rounded-full bg-gray-900 border-2 border-gray-700 overflow-hidden flex items-center justify-center">
+                        <i class="fas fa-user text-5xl text-gray-600 cm-avatar-placeholder-big" id="cm-big-placeholder"></i>
+                        <img id="cm-big-avatar" class="w-full h-full object-cover hidden" src="" alt="">
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500 mb-3">Upload a new avatar for this customer · JPG/PNG · Max 1MB</p>
+                        <label class="cursor-pointer bg-szcyan/10 text-szcyan border border-szcyan/30 px-5 py-2 rounded-lg text-sm font-bold hover:bg-szcyan hover:text-black transition">
+                            <i class="fas fa-upload mr-2"></i>Choose Image
+                            <input type="file" id="admin-avatar-input" accept="image/*" class="hidden" onchange="adminAvatarUpload(this)">
+                        </label>
+                    </div>
+                    <button onclick="adminRemoveAvatar()" class="text-xs text-red-400 hover:text-red-300 transition">
+                        <i class="fas fa-trash mr-1"></i>Remove Avatar
+                    </button>
+                    <div id="cm-avatar-status" class="text-xs font-bold h-4"></div>
+                </div>
+            </div>
+
+            <div id="dt-orders" class="detail-modal-tab">
+                <div id="cm-orders-loading" class="text-center py-6 text-szcyan hidden">
+                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i><br>Loading...
+                </div>
+                <div class="overflow-x-auto border border-gray-800 rounded-xl bg-black">
+                    <table class="w-full text-xs text-left whitespace-nowrap">
+                        <thead class="bg-[#111] text-gray-500 uppercase text-[9px]">
+                            <tr>
+                                <th class="px-3 py-2">Order</th>
+                                <th class="px-3 py-2">Package</th>
+                                <th class="px-3 py-2">Price</th>
+                                <th class="px-3 py-2">Date</th>
+                                <th class="px-3 py-2">Code</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cm-orders-tbody" class="divide-y divide-gray-800 text-gray-300"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/core.js"></script>
+<script>
+// ─── Helpers ─────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const setText = (id, v) => { const e=$(id); if(e) e.innerText=v??''; };
+
+function showToast(msg, type='success') {
+    const c = $('toast-container');
+    const t = document.createElement('div');
+    const col = type==='error' ? 'border-red-500' : 'border-szgreen';
+    const ico = type==='error' ? 'fa-times-circle text-red-500' : 'fa-check-circle text-szgreen';
+    t.className = `toast border-l-4 ${col} fade-in`;
+    t.innerHTML = `<i class="fas ${ico} text-base"></i><span>${msg}</span>`;
+    c.appendChild(t);
+    setTimeout(()=>{ t.style.animation='fadeOut 0.3s forwards'; setTimeout(()=>t.remove(),300); }, 3000);
+}
+
+function copyText(txt) { navigator.clipboard.writeText(txt); showToast('Copied!'); }
+
+function filterRows(inputId, rowClass) {
+    const q = $(inputId).value.toLowerCase();
+    document.querySelectorAll('.'+rowClass).forEach(r=>{
+        const matchSearch = r.dataset.search.includes(q);
+        const matchStatus = r.dataset.status === undefined || _ticketStatusFilter === 'all' || r.dataset.status === _ticketStatusFilter;
+        r.style.display = (matchSearch && matchStatus) ? '' : 'none';
+    });
+}
+
+// ─── Main Tabs ───────────────────────────────────────────────────────────
+function switchMainTab(tab) {
+    ['customers','orders','support'].forEach(t => {
+        const el=$('main-tab-'+t), btn=$('main-tab-btn-'+t);
+        if(el) el.style.display = t===tab ? 'block' : 'none';
+        if(btn) { btn.classList.toggle('active', t===tab); }
+    });
+}
+
+// ─── Customer Modal State ────────────────────────────────────────────────
+let _cEmail = '', _cOrdersLoaded = false;
+let _cIsBanned = false, _cIsFrozen = false;
+
+function switchDetailTab(tab) {
+    ['info','edit','avatar','orders'].forEach(t => {
+        const el=$('dt-'+t), btn=$('dt-btn-'+t);
+        if(el) el.classList.toggle('show', t===tab);
+        if(btn) btn.classList.toggle('active', t===tab);
+    });
+    if(tab==='orders' && !_cOrdersLoaded) loadCustomerOrders();
+}
+
+function openCustomerModal(c) {
+    _cEmail = c.email || '';
+    _cOrdersLoaded = false;
+    _cIsBanned = c.is_banned || false;
+    _cIsFrozen = c.balance_frozen || false;
+
+    setText('cm-name',  c.name);
+    setText('cm-email', c.email);
+
+    const img = $('cm-avatar-img'), big = $('cm-big-avatar');
+    const bigPh = $('cm-big-placeholder');
+    if (c.avatar) {
+        img.src = c.avatar; img.classList.remove('hidden');
+        big.src = c.avatar; big.classList.remove('hidden');
+        document.querySelectorAll('.cm-avatar-placeholder').forEach(e=>e.classList.add('hidden'));
+        if(bigPh) bigPh.classList.add('hidden');
+    } else {
+        img.classList.add('hidden'); big.classList.add('hidden');
+        document.querySelectorAll('.cm-avatar-placeholder').forEach(e=>e.classList.remove('hidden'));
+        if(bigPh) bigPh.classList.remove('hidden');
+    }
+
+    setText('cm-uid',      c.user_id ? '#'+c.user_id : '—');
+    setText('cm-username', c.username ? '@'+c.username : '— (none)');
+    setText('cm-joined',   c.created_at || '—');
+    
+    const orderCount = document.querySelectorAll('.order-row[data-search*="'+c.email.toLowerCase()+'"]').length;
+    setText('cm-orders-count', orderCount + ' orders');
+
+    renderBalances(c);
+    updateStatusButtons();
+
+    const en=$('cm-edit-name'), eu=$('cm-edit-username'), ep=$('cm-edit-password');
+    if(en) en.value = c.name;
+    if(eu) eu.value = c.username || '';
+    if(ep) ep.value = '';
+
+    ['cm-status','cm-edit-status','cm-avatar-status'].forEach(id=>{ const el=$(id); if(el)el.innerHTML=''; });
+    $('cm-email-otp-row')?.classList.add('hidden');
+    $('cm-email-req-btn')?.classList.remove('hidden');
+    if($('cm-new-email')) $('cm-new-email').value='';
+
+    switchDetailTab('info');
+    $('customer-modal').classList.remove('hidden');
+}
+
+function closeCustomerModal() { $('customer-modal').classList.add('hidden'); }
+$('customer-modal')?.addEventListener('click', e => { if(e.target===$('customer-modal')) closeCustomerModal(); });
+
+function renderBalances(data) {
+    const container = $('cm-balances-container');
+    container.innerHTML = '';
+    let hasBal = false;
+    for (const key in data) {
+        if (key.startsWith('balance_')) {
+            hasBal = true;
+            const cur = key.split('_')[1].toUpperCase();
+            let color = 'text-white', border = 'border-gray-700';
+            if (cur === 'EGP') { color = 'text-yellow-500'; border = 'border-yellow-500/20'; }
+            if (cur === 'USD') { color = 'text-szcyan';     border = 'border-szcyan/20'; }
+            container.innerHTML += `
+                <div class="bg-gray-900 border ${border} rounded-lg p-3 text-center">
+                    <div class="text-[10px] text-gray-500 mb-1">${cur} Balance</div>
+                    <div class="${color} font-black text-xl">${data[key]}</div>
+                </div>`;
+        }
+    }
+    if (!hasBal) container.innerHTML = '<div class="col-span-2 text-center text-gray-500 text-xs py-2">No balance records</div>';
+}
+
+function updateStatusButtons() {
+    const btnBan = $('cm-btn-ban'), btnFreeze = $('cm-btn-freeze');
+    if (_cIsBanned) {
+        btnBan.innerHTML = '<i class="fas fa-check-circle mr-1"></i>Unban Account';
+        btnBan.className = 'w-full bg-szgreen/20 text-szgreen border border-szgreen/30 py-2 rounded-lg text-sm font-bold hover:bg-szgreen/40 transition';
+    } else {
+        btnBan.innerHTML = '<i class="fas fa-ban mr-1"></i>Suspend Account';
+        btnBan.className = 'w-full bg-orange-900/20 text-orange-400 border border-orange-900/30 py-2 rounded-lg text-sm font-bold hover:bg-orange-900/40 transition';
+    }
+    if (_cIsFrozen) {
+        btnFreeze.innerHTML = '<i class="fas fa-unlock mr-1"></i>Unfreeze Balance';
+        btnFreeze.className = 'w-full bg-szgreen/20 text-szgreen border border-szgreen/30 py-2 rounded-lg text-sm font-bold hover:bg-szgreen/40 transition';
+    } else {
+        btnFreeze.innerHTML = '<i class="fas fa-snowflake mr-1"></i>Freeze Balance';
+        btnFreeze.className = 'w-full bg-blue-900/20 text-blue-400 border border-blue-900/30 py-2 rounded-lg text-sm font-bold hover:bg-blue-900/40 transition';
+    }
+}
+
+async function toggleCustomerStatus(action) {
+    if(!confirm(`Are you sure you want to ${action} this account?`)) return;
+    const fd = new FormData();
+    fd.append('email', _cEmail);
+    fd.append('action', action);
+    try {
+        const d = await (await fetch('/api/store/admin/toggle-status', {method:'POST', body:fd})).json();
+        if (d.success) {
+            showToast(d.msg);
+            if (action === 'ban') _cIsBanned = d.new_status;
+            if (action === 'freeze') _cIsFrozen = d.new_status;
+            updateStatusButtons();
+        } else showToast(d.msg, 'error');
+    } catch { showToast('Error!', 'error'); }
+}
+
+// ─── Balance ─────────────────────────────────────────────────────────────
+async function submitBalance() {
+    const amount = parseFloat($('bal-amount').value);
+    if (!amount || amount <= 0) return showToast('Enter a valid amount', 'error');
+    const currency = $('bal-currency').value.trim();
+    if (!currency) return showToast('Enter a valid currency', 'error');
+    const action = $('bal-action').value;
+    const btn = $('bal-btn'), orig = btn.innerText;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; btn.disabled = true;
+    const fd = new FormData();
+    fd.append('email', _cEmail); fd.append('amount', amount);
+    fd.append('action', action); fd.append('currency', currency);
+    try {
+        const d = await (await fetch('/api/store/manage_balance',{method:'POST',body:fd})).json();
+        if (d.success) {
+            showToast(d.msg);
+            const newVal = await (await fetch('/api/store/customer-info?email='+encodeURIComponent(_cEmail))).json();
+            if(newVal.success) renderBalances(newVal);
+            $('bal-amount').value = '';
+        } else showToast(d.msg,'error');
+    } catch { showToast('Error!','error'); }
+    btn.innerText = orig; btn.disabled = false;
+}
+
+// ─── Admin Edit Profile ──────────────────────────────────────────────────
+async function adminUpdateProfile(e) {
+    e.preventDefault();
+    const btn=$('cm-edit-btn'), orig=btn.innerHTML;
+    btn.innerHTML='<i class="fas fa-spinner fa-spin"></i>'; btn.disabled=true;
+    const fd = new FormData();
+    fd.append('email',    _cEmail);
+    fd.append('name',     $('cm-edit-name').value);
+    fd.append('username', $('cm-edit-username').value);
+    const pw = $('cm-edit-password').value;
+    if(pw) fd.append('new_password', pw);
+    try {
+        const d = await (await fetch('/api/store/admin/update-customer',{method:'POST',body:fd})).json();
+        if(d.success) {
+            showToast(d.msg);
+            setText('cm-name',     d.name);
+            setText('cm-username', '@'+d.username);
+            $('cm-edit-password').value='';
+            setFormStatus('cm-edit-status', d.msg, false);
+        } else setFormStatus('cm-edit-status', d.msg, true);
+    } catch { setFormStatus('cm-edit-status','Error!',true); }
+    btn.innerHTML=orig; btn.disabled=false;
+}
+
+// ─── Admin Email Change ───────────────────────────────────────────────────
+async function adminEmailRequest() {
+    const btn=$('cm-email-req-btn'), orig=btn.innerText;
+    btn.innerText='...'; btn.disabled=true;
+    const fd=new FormData(); fd.append('email',_cEmail); fd.append('new_email',$('cm-new-email').value);
+    try {
+        const d=await(await fetch('/api/store/admin/email-request',{method:'POST',body:fd})).json();
+        if(d.success){ $('cm-email-otp-row').classList.remove('hidden'); btn.classList.add('hidden'); showToast(d.msg); }
+        else showToast(d.msg,'error');
+    } catch { showToast('Error!','error'); }
+    btn.innerText=orig; btn.disabled=false;
+}
+
+async function adminEmailVerify() {
+    const fd=new FormData(); fd.append('email',_cEmail); fd.append('code',$('cm-email-otp').value);
+    try {
+        const d=await(await fetch('/api/store/admin/email-verify',{method:'POST',body:fd})).json();
+        if(d.success){
+            _cEmail=d.new_email;
+            setText('cm-email',d.new_email);
+            showToast(d.msg);
+            $('cm-email-otp-row').classList.add('hidden');
+            $('cm-email-req-btn').classList.remove('hidden');
+            $('cm-new-email').value='';
+        } else showToast(d.msg,'error');
+    } catch { showToast('Error!','error'); }
+}
+
+// ─── Avatar ───────────────────────────────────────────────────────────────
+async function adminAvatarUpload(input) {
+    const file=input.files[0]; if(!file) return;
+    if(file.size>1_000_000) return showToast('Max 1MB!','error');
+    const reader=new FileReader();
+    reader.onload=async e=>{
+        const b64=e.target.result;
+        const fd=new FormData(); fd.append('email',_cEmail); fd.append('avatar_b64',b64);
+        try {
+            const d=await(await fetch('/api/store/admin/set-avatar',{method:'POST',body:fd})).json();
+            if(d.success){
+                $('cm-avatar-img').src=b64; $('cm-avatar-img').classList.remove('hidden');
+                $('cm-big-avatar').src=b64; $('cm-big-avatar').classList.remove('hidden');
+                document.querySelectorAll('.cm-avatar-placeholder').forEach(e=>e.classList.add('hidden'));
+                $('cm-big-placeholder')?.classList.add('hidden');
+                setFormStatus('cm-avatar-status',d.msg,false);
+            } else setFormStatus('cm-avatar-status',d.msg,true);
+        } catch { setFormStatus('cm-avatar-status','Error!',true); }
+    };
+    reader.readAsDataURL(file);
+}
+
+async function adminRemoveAvatar() {
+    if(!confirm('Remove this customer\'s avatar?')) return;
+    const fd=new FormData(); fd.append('email',_cEmail); fd.append('avatar_b64','');
+    try {
+        const d=await(await fetch('/api/store/admin/set-avatar',{method:'POST',body:fd})).json();
+        if(d.success){
+            $('cm-avatar-img').classList.add('hidden'); $('cm-big-avatar').classList.add('hidden');
+            document.querySelectorAll('.cm-avatar-placeholder').forEach(e=>e.classList.remove('hidden'));
+            $('cm-big-placeholder')?.classList.remove('hidden');
+            showToast('Avatar removed');
+        } else showToast(d.msg,'error');
+    } catch { showToast('Error!','error'); }
+}
+
+// ─── Customer Orders ──────────────────────────────────────────────────────
+async function loadCustomerOrders() {
+    const tbody=$('cm-orders-tbody'), loader=$('cm-orders-loading');
+    if(loader) loader.classList.remove('hidden');
+    if(tbody) tbody.innerHTML='';
+    try {
+        const d=await(await fetch('/api/store/admin/customer-orders?email='+encodeURIComponent(_cEmail))).json();
+        if(loader) loader.classList.add('hidden');
+        if(d.success && d.orders.length>0){
+            tbody.innerHTML=d.orders.map(o=>{
+                const pc=o.currency==='USD'?'text-szcyan':'text-yellow-500';
+                return `<tr class="hover:bg-[#111] transition">
+                    <td class="px-3 py-2 font-mono text-szcyan">#${o.order_id}</td>
+                    <td class="px-3 py-2 font-bold text-white">${o.category}</td>
+                    <td class="px-3 py-2 font-black ${pc}">${o.price} <span class="text-[10px] text-gray-500">${o.currency}</span></td>
+                    <td class="px-3 py-2 text-gray-500">${o.date}</td>
+                    <td class="px-3 py-2"><button onclick="copyText('${String(o.code).replace(/'/g,"\\'")}')"
+                        class="bg-gray-900 text-szgreen border border-gray-700 px-2 py-1 rounded text-[10px] font-mono hover:bg-szgreen hover:text-black transition">Copy</button></td>
+                </tr>`;
+            }).join('');
+            _cOrdersLoaded=true;
+        } else if(tbody){
+            tbody.innerHTML='<tr><td colspan="5" class="px-3 py-6 text-center text-gray-500">No orders found.</td></tr>';
+        }
+    } catch { if(loader) loader.innerHTML='<span class="text-red-500">Error</span>'; }
+}
+
+// ─── Delete Customer ──────────────────────────────────────────────────────
+async function deleteCustomer() {
+    if(!confirm(`Delete account for ${_cEmail}? This cannot be undone.`)) return;
+    const fd=new FormData(); fd.append('email',_cEmail);
+    try {
+        const d=await(await fetch('/api/store/admin/delete-customer',{method:'POST',body:fd})).json();
+        if(d.success){ showToast(d.msg); closeCustomerModal(); setTimeout(()=>location.reload(),1200); }
+        else showToast(d.msg,'error');
+    } catch { showToast('Error!','error'); }
+}
+
+// ─── Return Order ─────────────────────────────────────────────────────────
+async function returnOrder(orderId) {
+    if(!confirm(`Return order #${orderId}? The code will go back to stock.`)) return;
+    const fd=new FormData(); fd.append('order_id',orderId);
+    try {
+        const res=await fetch('/api/return_order',{method:'POST',body:fd});
+        if(res.redirected||res.ok){ showToast('Order returned to stock!'); setTimeout(()=>location.reload(),1200); }
+    } catch { showToast('Error!','error'); }
+}
+
+// ─── Support Tickets — Admin ──────────────────────────────────────────────
+let _activeTicketId       = '';
+let _ticketStatusFilter   = 'all';
+
+async function openTicketModal(ticketId) {
+    _activeTicketId = ticketId;
+    const modal = $('ticket-detail-modal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    $('tdm-messages').innerHTML = '<div class="flex items-center justify-center py-12 text-szcyan"><i class="fas fa-spinner fa-spin text-3xl"></i></div>';
+    if ($('tdm-reply-input'))  $('tdm-reply-input').value = '';
+    if ($('tdm-reply-status')) $('tdm-reply-status').innerHTML = '';
+    try {
+        const d = await (await fetch(`/api/store/admin/tickets/view?ticket_id=${encodeURIComponent(ticketId)}`)).json();
+        if (!d.success) { showToast(d.msg, 'error'); closeTicketModal(); return; }
+        const t = d.ticket;
+        setText('tdm-ticket-id',       '#' + t.ticket_id);
+        setText('tdm-subject',          t.subject);
+        setText('tdm-customer-info',    t.name + ' · ' + t.email);
+        if ($('tdm-status-select')) $('tdm-status-select').value = t.status || 'open';
+        renderAdminTicketMessages(t.messages || []);
+    } catch { showToast('Failed to load ticket!', 'error'); closeTicketModal(); }
+}
+
+function renderAdminTicketMessages(messages) {
+    const container = $('tdm-messages');
+    if (!messages.length) {
+        container.innerHTML = '<p class="text-center text-gray-600 py-10 font-bold">No messages yet.</p>';
+        return;
+    }
+    container.innerHTML = messages.map(m => {
+        const isAdmin = m.sender === 'admin';
+        const wrapCls = isAdmin ? 'ml-8 bg-szgreen/10 border-szgreen/20' : 'mr-8 bg-szcyan/10 border-szcyan/20';
+        const nameClr = isAdmin ? 'text-szgreen' : 'text-szcyan';
+        const icon    = isAdmin ? '<i class="fas fa-shield-alt ml-1 text-[10px]"></i>' : '';
+        return `<div class="${wrapCls} border rounded-xl p-3">
+            <div class="flex items-center justify-between gap-3 mb-1.5">
+                <span class="text-xs font-black ${nameClr}">${m.name}${icon}</span>
+                <span class="text-[10px] text-gray-600 shrink-0">${m.time}</span>
+            </div>
+            <p class="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">${m.message}</p>
+        </div>`;
+    }).join('');
+    container.scrollTop = container.scrollHeight;
+}
+
+function closeTicketModal() {
+    $('ticket-detail-modal')?.classList.add('hidden');
+    _activeTicketId = '';
+}
+$('ticket-detail-modal')?.addEventListener('click', e => { if(e.target===$('ticket-detail-modal')) closeTicketModal(); });
+
+async function adminSendTicketReply() {
+    if (!_activeTicketId) return;
+    const input    = $('tdm-reply-input');
+    const statusEl = $('tdm-reply-status');
+    const msg      = input?.value.trim();
+    if (!msg) { showToast('Reply cannot be empty.', 'error'); return; }
+
+    statusEl.innerHTML = '<span class="text-gray-400"><i class="fas fa-spinner fa-spin mr-1"></i>Sending...</span>';
+    const fd = new FormData();
+    fd.append('ticket_id', _activeTicketId);
+    fd.append('message',   msg);
+    try {
+        const d = await (await fetch('/api/store/admin/tickets/reply', { method: 'POST', body: fd })).json();
+        if (d.success) {
+            input.value = '';
+            statusEl.innerHTML = '';
+            showToast('Reply sent!');
+            await openTicketModal(_activeTicketId); // refresh conversation
+        } else {
+            statusEl.innerHTML = `<span class="text-red-500">${d.msg}</span>`;
+        }
+    } catch { statusEl.innerHTML = '<span class="text-red-500">Error sending reply!</span>'; }
+}
+
+async function adminChangeTicketStatus() {
+    if (!_activeTicketId) return;
+    const status = $('tdm-status-select').value;
+    const fd = new FormData();
+    fd.append('ticket_id', _activeTicketId);
+    fd.append('status',    status);
+    try {
+        const d = await (await fetch('/api/store/admin/tickets/change-status', { method: 'POST', body: fd })).json();
+        if (d.success) showToast(d.msg);
+        else { showToast(d.msg, 'error'); }
+    } catch { showToast('Error!', 'error'); }
+}
+
+function filterTicketsByStatus(status) {
+    _ticketStatusFilter = status;
+    // Update button styles
+    document.querySelectorAll('.ticket-filter-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    const active = $('tf-' + status);
+    if (active) active.classList.add('active');
+    // Filter rows
+    document.querySelectorAll('.ticket-row').forEach(row => {
+        const rowStatus = row.dataset.status || '';
+        const searchQ   = $('search-tickets')?.value.toLowerCase() || '';
+        const matchSearch = row.dataset.search.includes(searchQ);
+        const matchStatus = status === 'all' || rowStatus === status;
+        row.style.display = (matchSearch && matchStatus) ? '' : 'none';
+    });
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────
+function setFormStatus(id, msg, isError) {
+    const el=$(id); if(!el) return;
+    el.innerHTML=isError
+        ? `<span class="text-red-500"><i class="fas fa-times-circle mr-1"></i>${msg}</span>`
+        : `<span class="text-szgreen"><i class="fas fa-check-circle mr-1"></i>${msg}</span>`;
+}
+</script>
+</body>
+</html>
