@@ -65,6 +65,11 @@ async def public_storefront(request: Request):
         settings    = await db.settings.find_one({"_id": "config"})
         maintenance = settings.get("maintenance", False) if settings else False
 
+        user = None
+        email = request.cookies.get("store_session")
+        if email:
+            user = await db.store_customers.find_one({"email": email})
+
         categories    = await db.store_categories.find().to_list(100)
         stock_details = {}
         
@@ -99,6 +104,7 @@ async def public_storefront(request: Request):
             "client_id":   GOOGLE_CLIENT_ID,
             "maintenance": maintenance,
             "currencies":  currencies,
+            "user":        user,
         })
     except Exception as e:
         # 6. طباعة الخطأ بالكامل على الشاشة بدل الإيرور 500 المزعج
@@ -115,6 +121,7 @@ async def public_storefront(request: Request):
         "stock":       stock_details,
         "client_id":   GOOGLE_CLIENT_ID,
         "maintenance": maintenance,
+        "user":        user if 'user' in locals() else None,
     })
 
 # ==========================================
