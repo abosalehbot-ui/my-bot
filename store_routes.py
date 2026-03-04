@@ -29,25 +29,17 @@ async def generate_unique_id():
             return new_id
 
 # ==========================================
-# 1. الواجهة الرئيسية للمتجر
+# 1. الواجهة الرئيسية للمتجر (تجلب العملات والأقسام)
 # ==========================================
 @router.get("/", response_class=HTMLResponse)
 async def public_storefront(request: Request):
     try:
-        settings    = await db.settings.find_one({"_id": "config"})
+        settings = await db.settings.find_one({"_id": "config"})
         maintenance = settings.get("maintenance", False) if settings else False
 
         categories = await db.store_categories.find().to_list(100)
         
-        # ✅ كود التوافق السحري للمنتجات القديمة
-        for cat in categories:
-            for p in cat.get("products", []):
-                if "prices" not in p:
-                    p["prices"] = {
-                        "EGP": p.get("price_egp", 0),
-                        "USD": p.get("price_usd", 0)
-                    }
-
+        # جلب قائمة العملات من الداتا بيز
         currencies = await db.store_currencies.find().to_list(100)
         if not currencies:
             currencies = [{"_id": "EGP", "symbol": "EGP"}, {"_id": "USD", "symbol": "USD"}]
@@ -62,7 +54,7 @@ async def public_storefront(request: Request):
         return templates.TemplateResponse("storefront.html", {
             "request": request, 
             "categories": categories, 
-            "currencies": currencies,
+            "currencies": currencies, # تم التمرير بنجاح
             "stock": stock_details, 
             "client_id": GOOGLE_CLIENT_ID,
             "maintenance": maintenance
@@ -75,6 +67,7 @@ async def public_storefront(request: Request):
 # 2. أنظمة التسجيل والمصادقة الموحدة
 # ==========================================
 def get_user_data(user):
+    # هنجيب كل الأرصدة الموجودة للمستخدم بشكل ديناميكي (أي حاجة بتبدأ بـ balance_)
     data = {"email": user["email"], "name": user["name"], "username": user.get("username", "")}
     for key, val in user.items():
         if key.startswith("balance_"):
@@ -189,7 +182,7 @@ async def reset_password(request: Request, email: str = Form(...), code: str = F
     return JSONResponse({"success": True, "msg": "Password updated successfully! You can now login."})
 
 # ==========================================
-# 4. الشراء وجلب سجل الطلبات للعميل
+# 4. الشراء وجلب سجل الطلبات للعميل (بيدعم كل العملات الديناميكية)
 # ==========================================
 @router.post("/api/store/buy")
 async def customer_buy_uc(request: Request, stock_key: str = Form(...), price: float = Form(...), currency: str = Form(...)):
@@ -199,6 +192,7 @@ async def customer_buy_uc(request: Request, stock_key: str = Form(...), price: f
     user = await db.store_customers.find_one({"email": email})
     if not user: return JSONResponse({"success": False, "msg": "Account not found!", "force_logout": True})
     
+    # المحفظة الديناميكية بناءً على العملة
     bal_field = f"balance_{currency.lower()}"
     if user.get(bal_field, 0) < price: 
         return JSONResponse({"success": False, "msg": f"Insufficient {currency.upper()} balance! Please recharge."})
@@ -237,7 +231,7 @@ async def get_my_orders(request: Request):
     return JSONResponse({"success": True, "orders": orders})
 
 # ==========================================
-# 5. لوحة أدمن الاستور (لإدارة العملاء)
+# 5. لوحة أدمن الاستور (لإدارة العملاء بأي عملة)
 # ==========================================
 @router.get("/store-admin", response_class=HTMLResponse)
 async def store_admin_page(request: Request):
@@ -245,6 +239,7 @@ async def store_admin_page(request: Request):
     store_customers = await db.store_customers.find().sort("created_at", -1).to_list(100)
     store_orders = await db.store_orders.find().sort("date", -1).to_list(200)
     
+    # إرسال العملات للوحة الـ CRM عشان يقدر يضيف رصيد بأي عملة
     currencies = await db.store_currencies.find().to_list(100)
     if not currencies:
         currencies = [{"_id": "EGP", "symbol": "EGP"}, {"_id": "USD", "symbol": "USD"}]
@@ -260,6 +255,7 @@ async def store_admin_page(request: Request):
 async def store_manage_balance(request: Request, email: str = Form(...), amount: float = Form(...), action: str = Form(...), currency: str = Form(...)):
     if not check_auth(request): return JSONResponse({"success": False})
     
+    # العملة الديناميكية
     bal_field = f"balance_{currency.lower()}"
     if action == "add": await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: amount}})
     elif action == "set": await db.store_customers.update_one({"email": email}, {"$set": {bal_field: amount}})

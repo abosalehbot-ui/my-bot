@@ -74,9 +74,11 @@ async def do_logout():
 async def admin_dashboard(request: Request):
     if not check_auth(request): return RedirectResponse(url="/login")
 
+    # 1. إحصائيات البوت والعمليات (Bot Stats)
     users_count = await db.users.count_documents({})
     global_stats = await db.stats.find_one({"_id": "global_stats"}) or {}
     
+    # 2. إحصائيات متجر الويب (Web Store Stats)
     today_str = datetime.now().strftime("%Y-%m-%d")
     month_str = datetime.now().strftime("%Y-%m")
     
@@ -91,23 +93,15 @@ async def admin_dashboard(request: Request):
         "sales_today": sales_today, "sales_month": sales_month
     }
 
+    # 3. جلب الأقسام والعملات
     categories = await db.store_categories.find().to_list(None)
-    
-    # ✅ كود التوافق السحري للمنتجات القديمة عشان ميحصلش كراش
-    for cat in categories:
-        for p in cat.get("products", []):
-            if "prices" not in p:
-                p["prices"] = {
-                    "EGP": p.get("price_egp", 0),
-                    "USD": p.get("price_usd", 0)
-                }
-
     currencies = await db.store_currencies.find().to_list(None)
     if not currencies:
         default_curs = [{"_id": "EGP", "symbol": "EGP"}, {"_id": "USD", "symbol": "USD"}]
         await db.store_currencies.insert_many(default_curs)
         currencies = default_curs
 
+    # 4. جلب المخزن
     stock_keys = []
     for c in categories:
         for p in c.get("products", []): stock_keys.append(p["stock_key"])
@@ -120,9 +114,11 @@ async def admin_dashboard(request: Request):
     stock_count = await db.stock.count_documents({})
     logs = await db.system_logs.find().sort("timestamp", -1).limit(50).to_list(None)
     
+    # 5. إدارة الموظفين
     all_users = await db.users.find().to_list(None)
     shared_tokens_count = await db.shared_tokens.count_documents({})
     
+    # 6. إعدادات النظام
     config = await db.settings.find_one({"_id": "config"}) or {}
     maintenance = config.get("maintenance", False)
     
@@ -138,7 +134,7 @@ async def admin_dashboard(request: Request):
     })
 
 # ==========================================
-# Currencies Manager
+# Currencies Manager (جديد)
 # ==========================================
 @app.post("/api/catalog/currency/add")
 async def add_currency(request: Request, code: str = Form(...), symbol: str = Form(...)):
@@ -158,7 +154,7 @@ async def delete_currency(request: Request, code: str = Form(...)):
     return JSONResponse({"success": True, "msg": "Currency deleted!"})
 
 # ==========================================
-# Catalog Manager
+# Catalog Manager (تحديث الصور والأسعار)
 # ==========================================
 @app.post("/api/catalog/category/add")
 async def add_category(request: Request, cat_id: str = Form(...), name: str = Form(...), icon: str = Form("fa-gamepad"), image: str = Form("")):
@@ -191,12 +187,14 @@ async def add_product(request: Request):
     stock_key = form.get("stock_key")
     name = form.get("name")
     
+    # سحب الأسعار الديناميكية بناءً على العملات
     prices = {}
     for key, val in form.items():
         if key.startswith("price_"):
             curr_code = key.replace("price_", "").upper()
             prices[curr_code] = float(val) if val else 0.0
 
+    # دعم النظام القديم لو كان الفورم بيبعت egp و usd بس
     price_egp = float(form.get("price_EGP", form.get("price_egp", 0)))
     price_usd = float(form.get("price_USD", form.get("price_usd", 0)))
     
@@ -206,7 +204,7 @@ async def add_product(request: Request):
     new_prod = {
         "stock_key": stock_key, "name": name, 
         "prices": prices,
-        "price_egp": price_egp, "price_usd": price_usd
+        "price_egp": price_egp, "price_usd": price_usd # للتوافق العكسي
     }
     
     await db.store_categories.update_one({"_id": cat_id}, {"$push": {"products": new_prod}})
@@ -399,6 +397,7 @@ async def return_order(request: Request, order_id: str = Form(...)):
     order_id = order_id.strip()
     
     if order_id.endswith("S"):
+        # طلب من متجر الويب
         order = await db.store_orders.find_one_and_delete({"_id": order_id})
         if not order: return RedirectResponse("/admin?tab=tools", status_code=303)
         code = order.get("code")
@@ -418,6 +417,7 @@ async def return_order(request: Request, order_id: str = Form(...)):
         return RedirectResponse("/admin?tab=tools", status_code=303)
         
     else:
+        # طلب من البوت
         try: order_id_int = int(order_id)
         except: return RedirectResponse("/admin?tab=tools", status_code=303)
         
@@ -425,7 +425,7 @@ async def return_order(request: Request, order_id: str = Form(...)):
         if not record: return RedirectResponse("/admin?tab=tools", status_code=303)
         
         if record.get("source") == "API":
-            pass 
+            pass # لا يمكن إرجاع API
         else:
             cat = record.get("category", "Returned")
             await db.stock.insert_one({"_id": str(random.randint(1000000,9999999)), "code": record["code"], "category": cat})
@@ -438,6 +438,7 @@ async def search_database(request: Request, query: str = Form(...)):
     if not check_auth(request): return JSONResponse({"result": "Unauthorized"})
     query = query.strip()
     
+    # البحث برقم الطلب
     if query.isdigit() or query.endswith("S"):
         is_bot = query.isdigit()
         if is_bot:
@@ -452,18 +453,20 @@ async def search_database(request: Request, query: str = Form(...)):
         else:
             order = await db.store_orders.find_one({"_id": query})
             if order:
-                price    = order.get("price", "N/A")
+                price = order.get("price", "N/A")
                 currency = order.get("currency", "")
                 return JSONResponse({"result": f"🛒 Web Store Order #{query}\n👤 By: {order.get('name', 'Unknown')} | Email: {order.get('email')}\n📅 Date: {order.get('date')}\n📦 Package: {order.get('category')}\n💰 Paid: {price} {currency}\n\n⬇️ Delivered Code:\n  - {order.get('code')}"})
 
+        # البحث بـ Telegram ID
         if is_bot:
             user = await db.users.find_one({"_id": int(query)})
             if user:
                 return JSONResponse({"result": f"👤 {user.get('name')}\n🆔 ID: {user.get('_id')}\n🎖 Role: {user.get('role')}\n🔑 Tokens: {len(user.get('tokens', []))}"})
 
-    records  = await db.codes_map.find({"$or": [{"_id": query}, {"code": query}]}).to_list(length=10)
+    # البحث بالكود نفسه في المخزن والسجل
+    records = await db.codes_map.find({"$or": [{"_id": query}, {"code": query}]}).to_list(length=10)
     in_stock = await db.stock.count_documents({"$or": [{"_id": query}, {"code": query}]})
-    res_str  = f"🔍 Search result for: {query}\n📦 Currently in stock: {in_stock} times\n"
+    res_str = f"🔍 Search result for: {query}\n📦 Currently in stock: {in_stock} times\n"
     if records:
         res_str += f"\n📜 Found in {len(records)} previous orders:\n"
         for r in records:
