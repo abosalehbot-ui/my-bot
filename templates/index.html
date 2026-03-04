@@ -45,6 +45,7 @@
                 <button onclick="switchTab('stock')" id="btn-stock" class="text-gray-500 text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-box-open w-6"></i> Stock Manager</button>
                 <button onclick="switchTab('users')" id="btn-users" class="text-gray-500 text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-user-tie w-6"></i> Staff & Tokens</button>
                 <button onclick="switchTab('tools')" id="btn-tools" class="text-gray-500 text-left px-4 py-3 rounded-r-lg text-sm font-semibold hover:text-white transition"><i class="fas fa-tools w-6"></i> Advanced Tools</button>
+                
                 <div class="my-4 border-t border-gray-800"></div>
                 <a href="/store-admin" class="text-yellow-500 text-left px-4 py-3 rounded-lg text-sm font-bold hover:bg-yellow-500 hover:text-black transition border border-yellow-500/30 flex items-center"><i class="fas fa-shopping-cart w-6"></i> Go to Store ERP</a>
             </nav>
@@ -72,9 +73,17 @@
                     <div class="bg-[#0a0a0a] border border-purple-500/30 p-4 rounded-xl text-center"><div class="text-purple-400 text-[10px] font-bold uppercase mb-1">API Pulled (Today/Month)</div><div class="text-2xl font-black text-purple-400">{{ global_stats.api_today }} <span class="text-sm text-gray-500">/ {{ global_stats.api_month }}</span></div></div>
                 </div>
 
+                <h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-shopping-cart text-yellow-500 mr-2"></i> Storefront Sales (B2C)</h3>
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <div class="bg-panelbg border border-yellow-500/30 p-4 rounded-xl text-center"><div class="text-yellow-500 text-[10px] font-bold uppercase mb-1">Revenue Today</div><div class="text-2xl font-black text-yellow-500">+{{ store_stats.rev_today }} <span class="text-xs">EGP</span></div></div>
+                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center hover:border-gray-600 transition"><div class="text-gray-500 text-[10px] font-bold uppercase mb-1">Revenue Month</div><div class="text-2xl font-black text-white">+{{ store_stats.rev_month }} <span class="text-xs text-gray-600">EGP</span></div></div>
+                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center hover:border-gray-600 transition"><div class="text-gray-500 text-[10px] font-bold uppercase mb-1">Orders Today</div><div class="text-2xl font-black text-white">{{ store_stats.sales_today }}</div></div>
+                    <div class="bg-panelbg border border-gray-800 p-4 rounded-xl text-center hover:border-gray-600 transition"><div class="text-gray-500 text-[10px] font-bold uppercase mb-1">Orders Month</div><div class="text-2xl font-black text-white">{{ store_stats.sales_month }}</div></div>
+                </div>
+
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                     <div class="bg-panelbg border border-gray-800 p-6 rounded-xl lg:col-span-2 relative overflow-hidden">
-                        <h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-chart-pie text-szcyan mr-2"></i> Stock Distribution</h3>
+                        <h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-chart-donut text-szcyan mr-2"></i> Stock Distribution</h3>
                         <div id="stockChart" class="w-full flex justify-center h-64"></div>
                     </div>
                     <div class="bg-panelbg border border-gray-800 p-6 rounded-xl relative overflow-hidden flex flex-col justify-center items-center text-center">
@@ -106,114 +115,69 @@
             </div>
 
             <div id="tab-catalog" class="tab-content hidden">
-                <h2 class="text-2xl font-black text-white mb-6 flex items-center"><i class="fas fa-layer-group text-szcyan mr-3"></i> System Catalog</h2>
-                
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                    <div class="bg-panelbg border border-gray-800 p-6 rounded-xl shadow-2xl">
-                        <h3 class="font-bold text-white uppercase text-sm mb-4 border-b border-gray-800 pb-3"><i class="fas fa-folder-plus text-szcyan mr-2"></i> Add Category</h3>
-                        <form onsubmit="submitAjax(event, '/api/catalog/category/add', 'catalog')" class="space-y-3">
-                            <div><label class="text-[10px] text-gray-500 uppercase mb-1 block">Category ID</label><input type="text" name="cat_id" required class="w-full bg-[#050505] border border-gray-800 text-white p-2.5 rounded-lg outline-none focus:border-szcyan font-mono text-sm"></div>
-                            <div><label class="text-[10px] text-gray-500 uppercase mb-1 block">Display Name</label><input type="text" name="name" required class="w-full bg-[#050505] border border-gray-800 text-white p-2.5 rounded-lg outline-none focus:border-szcyan text-sm"></div>
-                            <div class="flex gap-2">
-                                <div class="w-1/3"><label class="text-[10px] text-gray-500 uppercase mb-1 block">Icon</label><input type="text" name="icon" value="fa-gamepad" class="w-full bg-[#050505] border border-gray-800 text-gray-400 p-2.5 rounded-lg outline-none focus:border-szcyan font-mono text-xs"></div>
-                                <div class="w-2/3"><label class="text-[10px] text-gray-500 uppercase mb-1 block">Image URL (For Store Card)</label><input type="text" name="image" placeholder="https://..." class="w-full bg-[#050505] border border-gray-800 text-white p-2.5 rounded-lg outline-none focus:border-szcyan text-xs"></div>
-                            </div>
-                            <button type="submit" class="w-full bg-szcyan text-black font-bold py-2.5 rounded-lg btn-glow text-sm mt-2">Create Category</button>
+                <h2 class="text-2xl font-bold text-white mb-6 flex justify-between items-center">System <span class="text-szcyan">Catalog</span></h2>
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <div class="bg-panelbg border border-gray-800 p-6 rounded-xl h-fit sticky top-4">
+                        <h3 class="font-bold text-white uppercase text-sm mb-4 border-b border-gray-800 pb-3"><i class="fas fa-folder-plus text-szcyan mr-2"></i> Add Main Category</h3>
+                        <form onsubmit="submitAjax(event, '/api/catalog/category/add', 'catalog')" class="space-y-4">
+                            <div><label class="text-xs text-gray-500 mb-1 block">Category ID (e.g. pubg)</label><input type="text" name="cat_id" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-szcyan font-mono text-sm"></div>
+                            <div><label class="text-xs text-gray-500 mb-1 block">Display Name</label><input type="text" name="name" required placeholder="PUBG Mobile" class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-szcyan"></div>
+                            <div><label class="text-xs text-gray-500 mb-1 block">Icon (FontAwesome)</label><input type="text" name="icon" value="fa-gamepad" class="w-full bg-[#050505] border border-gray-800 text-gray-400 p-3 rounded-lg outline-none focus:border-szcyan font-mono text-sm"></div>
+                            <button type="submit" class="w-full bg-szcyan text-black font-bold py-3 rounded-lg btn-glow">Create Category</button>
                         </form>
                     </div>
-
-                    <div class="bg-panelbg border border-gray-800 p-6 rounded-xl shadow-2xl lg:col-span-2">
-                        <h3 class="font-bold text-white uppercase text-sm mb-4 border-b border-gray-800 pb-3"><i class="fas fa-coins text-yellow-500 mr-2"></i> Global Currencies</h3>
-                        <div class="flex flex-col md:flex-row gap-6">
-                            <div class="flex-1 space-y-2">
-                                {% for curr in currencies %}
-                                <div class="flex justify-between items-center bg-[#050505] border border-gray-800 p-3 rounded-lg">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-8 h-8 rounded bg-gray-900 flex items-center justify-center font-bold text-yellow-500">{{ curr.symbol }}</div>
-                                        <span class="font-black text-white tracking-widest">{{ curr._id }}</span>
-                                    </div>
-                                    <form onsubmit="if(confirm('Delete currency {{ curr._id }}?')) submitAjax(event, '/api/catalog/currency/delete', 'catalog'); else event.preventDefault();">
-                                        <input type="hidden" name="code" value="{{ curr._id }}">
-                                        <button class="text-red-500 hover:bg-red-900/30 p-2 rounded transition"><i class="fas fa-trash"></i></button>
+                    
+                    <div class="lg:col-span-3 space-y-6">
+                        {% for cat in categories %}
+                        <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden">
+                            <div class="bg-[#111] p-4 border-b border-gray-800 flex justify-between items-center">
+                                <div class="flex items-center gap-3">
+                                    <i class="fas {{ cat.icon }} text-2xl text-szcyan p-2 bg-szcyan/10 rounded-lg"></i>
+                                    <div><h3 class="font-bold text-white text-lg">{{ cat.name }}</h3><p class="text-xs text-gray-500 font-mono">ID: {{ cat._id }}</p></div>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button onclick="editCategory('{{ cat._id }}', '{{ cat.name }}', '{{ cat.icon }}')" class="text-yellow-500 hover:bg-yellow-500 hover:text-black p-2 rounded transition"><i class="fas fa-edit"></i></button>
+                                    <form onsubmit="if(confirm('Delete entire category?')) submitAjax(event, '/api/catalog/category/delete', 'catalog'); else event.preventDefault();">
+                                        <input type="hidden" name="cat_id" value="{{ cat._id }}"><button class="text-red-500 hover:bg-red-500 hover:text-white p-2 rounded transition"><i class="fas fa-trash"></i></button>
                                     </form>
+                                </div>
+                            </div>
+                            <div class="p-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                {% for p in cat.products %}
+                                <div class="bg-black border border-gray-800 p-4 rounded-lg relative group">
+                                    <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition flex gap-1">
+                                        <button onclick="editProduct('{{ cat._id }}', '{{ p.stock_key }}', '{{ p.name }}', '{{ p.price_egp }}', '{{ p.price_usd }}')" class="text-yellow-500 hover:text-yellow-400 p-1"><i class="fas fa-edit"></i></button>
+                                        <form onsubmit="if(confirm('Delete product?')) submitAjax(event, '/api/catalog/product/delete', 'catalog'); else event.preventDefault();">
+                                            <input type="hidden" name="cat_id" value="{{ cat._id }}"><input type="hidden" name="stock_key" value="{{ p.stock_key }}"><button class="text-red-500 hover:text-red-400 p-1"><i class="fas fa-trash"></i></button>
+                                        </form>
+                                    </div>
+                                    <div class="font-bold text-white mb-1">{{ p.name }}</div>
+                                    <div class="text-[10px] font-mono text-gray-500 mb-2">Key: <span class="text-szgreen">{{ p.stock_key }}</span></div>
+                                    <div class="flex justify-between items-center bg-gray-900 p-2 rounded border border-gray-800">
+                                        <div class="text-center w-1/2 border-r border-gray-800"><div class="font-black text-yellow-500">{{ p.price_egp }}</div><div class="text-[9px] text-gray-500 uppercase">EGP</div></div>
+                                        <div class="text-center w-1/2"><div class="font-black text-szcyan">{{ p.price_usd }}</div><div class="text-[9px] text-gray-500 uppercase">USD</div></div>
+                                    </div>
                                 </div>
                                 {% endfor %}
-                            </div>
-                            <div class="flex-1 bg-gray-900 border border-gray-800 p-4 rounded-lg h-fit">
-                                <h4 class="text-xs text-gray-400 font-bold uppercase mb-3">Add New Currency</h4>
-                                <form onsubmit="submitAjax(event, '/api/catalog/currency/add', 'catalog')" class="flex gap-2">
-                                    <input type="text" name="code" required placeholder="Code (e.g. SAR)" maxlength="4" class="w-1/2 bg-black border border-gray-700 text-white p-2 rounded outline-none focus:border-yellow-500 text-sm font-mono uppercase">
-                                    <input type="text" name="symbol" required placeholder="Sym (e.g. ر.س)" class="w-1/4 bg-black border border-gray-700 text-white p-2 rounded outline-none focus:border-yellow-500 text-sm text-center">
-                                    <button class="w-1/4 bg-yellow-500 text-black font-bold rounded hover:opacity-90 transition">+</button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="space-y-6">
-                    {% for cat in categories %}
-                    <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden shadow-xl">
-                        <div class="bg-[#111] p-4 border-b border-gray-800 flex justify-between items-center relative overflow-hidden">
-                            {% if cat.image %}
-                            <div class="absolute inset-0 opacity-20 bg-cover bg-center" style="background-image: url('{{ cat.image }}');"></div>
-                            <div class="absolute inset-0 bg-gradient-to-r from-[#111] to-transparent"></div>
-                            {% endif %}
-                            
-                            <div class="flex items-center gap-4 relative z-10">
-                                <div class="w-12 h-12 rounded-lg bg-szcyan/10 border border-szcyan/30 flex items-center justify-center text-szcyan text-2xl shadow-[0_0_15px_rgba(94,234,212,0.2)]"><i class="fas {{ cat.icon }}"></i></div>
-                                <div><h3 class="font-black text-white text-xl uppercase tracking-wider">{{ cat.name }}</h3><p class="text-[10px] text-gray-500 font-mono">ID: {{ cat._id }}</p></div>
-                            </div>
-                            <div class="flex gap-2 relative z-10">
-                                <button onclick="editCategory('{{ cat._id }}', '{{ cat.name }}', '{{ cat.icon }}', '{{ cat.image }}')" class="bg-black border border-gray-700 text-yellow-500 hover:border-yellow-500 px-3 py-1.5 rounded transition"><i class="fas fa-edit"></i> Edit</button>
-                                <form onsubmit="if(confirm('Delete entire category?')) submitAjax(event, '/api/catalog/category/delete', 'catalog'); else event.preventDefault();">
-                                    <input type="hidden" name="cat_id" value="{{ cat._id }}"><button class="bg-black border border-gray-700 text-red-500 hover:border-red-500 px-3 py-1.5 rounded transition"><i class="fas fa-trash"></i></button>
-                                </form>
-                            </div>
-                        </div>
-                        
-                        <div class="p-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 bg-[#0a0a0a]">
-                            {% for p in cat.products %}
-                            <div class="bg-black border border-gray-800 p-4 rounded-xl relative group hover:border-szcyan transition">
-                                <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition flex gap-1 z-10 bg-black/80 rounded p-1 backdrop-blur">
-                                    <button onclick="editProduct('{{ cat._id }}', '{{ p.stock_key }}', '{{ p.name }}', '{{ p.prices | tojson | forceescape }}')" class="text-yellow-500 hover:text-yellow-400 p-1.5"><i class="fas fa-edit"></i></button>
-                                    <form onsubmit="if(confirm('Delete product?')) submitAjax(event, '/api/catalog/product/delete', 'catalog'); else event.preventDefault();">
-                                        <input type="hidden" name="cat_id" value="{{ cat._id }}"><input type="hidden" name="stock_key" value="{{ p.stock_key }}"><button class="text-red-500 hover:text-red-400 p-1.5"><i class="fas fa-trash"></i></button>
+                                
+                                <div class="border border-dashed border-gray-700 p-4 rounded-lg bg-white/5 flex flex-col justify-center">
+                                    <form onsubmit="submitAjax(event, '/api/catalog/product/add', 'catalog')" class="space-y-2">
+                                        <input type="hidden" name="cat_id" value="{{ cat._id }}">
+                                        <input type="text" name="stock_key" required placeholder="Key (e.g. 60_uc)" class="w-full bg-black border border-gray-800 text-white px-2 py-1.5 rounded text-xs outline-none focus:border-szgreen font-mono">
+                                        <input type="text" name="name" required placeholder="Name (e.g. 60 UC)" class="w-full bg-black border border-gray-800 text-white px-2 py-1.5 rounded text-xs outline-none focus:border-szgreen">
+                                        <div class="flex gap-2">
+                                            <input type="number" step="0.01" name="price_egp" required placeholder="EGP" class="w-1/2 bg-black border border-gray-800 text-yellow-500 px-2 py-1.5 rounded text-xs outline-none focus:border-yellow-500">
+                                            <input type="number" step="0.01" name="price_usd" required placeholder="USD" class="w-1/2 bg-black border border-gray-800 text-szcyan px-2 py-1.5 rounded text-xs outline-none focus:border-szcyan">
+                                        </div>
+                                        <button class="w-full bg-gray-800 hover:bg-szgreen hover:text-black text-white text-xs font-bold py-2 rounded transition mt-1">Add Product</button>
                                     </form>
                                 </div>
-                                <div class="font-black text-white text-lg mb-1">{{ p.name }}</div>
-                                <div class="text-[10px] font-mono text-gray-500 mb-3 bg-gray-900 inline-block px-2 py-0.5 rounded">Key: <span class="text-szgreen">{{ p.stock_key }}</span></div>
-                                
-                                <div class="grid grid-cols-2 gap-2 mt-2">
-                                    {% for curr in currencies %}
-                                    <div class="bg-[#111] border border-gray-800 p-2 rounded text-center">
-                                        <div class="font-bold text-white">{{ p.prices.get(curr._id, p.get('price_' + curr._id|lower, 0)) }}</div>
-                                        <div class="text-[9px] text-gray-500 uppercase font-bold">{{ curr.symbol }} {{ curr._id }}</div>
-                                    </div>
-                                    {% endfor %}
-                                </div>
-                            </div>
-                            {% endfor %}
-                            
-                            <div class="border border-dashed border-gray-700 p-4 rounded-xl bg-white/5 flex flex-col justify-center">
-                                <h4 class="text-xs text-gray-400 font-bold uppercase mb-3 text-center"><i class="fas fa-plus text-szcyan"></i> Add Package</h4>
-                                <form onsubmit="submitAjax(event, '/api/catalog/product/add', 'catalog')" class="space-y-2">
-                                    <input type="hidden" name="cat_id" value="{{ cat._id }}">
-                                    <input type="text" name="stock_key" required placeholder="Key (e.g. 60_uc)" class="w-full bg-black border border-gray-800 text-white px-3 py-2 rounded-lg text-xs outline-none focus:border-szgreen font-mono">
-                                    <input type="text" name="name" required placeholder="Display Name (e.g. 60 UC)" class="w-full bg-black border border-gray-800 text-white px-3 py-2 rounded-lg text-xs outline-none focus:border-szgreen">
-                                    <div class="grid grid-cols-2 gap-2">
-                                        {% for curr in currencies %}
-                                        <input type="number" step="0.01" name="price_{{ curr._id }}" placeholder="{{ curr._id }}" required class="w-full bg-black border border-gray-800 text-white px-3 py-2 rounded-lg text-xs outline-none focus:border-yellow-500 text-center">
-                                        {% endfor %}
-                                    </div>
-                                    <button class="w-full bg-gray-800 hover:bg-szgreen hover:text-black text-white text-xs font-bold py-2.5 rounded-lg transition mt-2">Save Package</button>
-                                </form>
                             </div>
                         </div>
+                        {% else %}
+                        <div class="bg-panelbg border border-gray-800 rounded-xl p-10 text-center text-gray-500">No categories found.</div>
+                        {% endfor %}
                     </div>
-                    {% else %}
-                    <div class="bg-panelbg border border-gray-800 rounded-xl p-10 text-center text-gray-500">No categories found. Start by adding one above.</div>
-                    {% endfor %}
                 </div>
             </div>
 
@@ -231,6 +195,7 @@
                     </div>
                     {% endfor %}
                 </div>
+                
                 <div class="bg-panelbg border border-gray-800 rounded-xl p-6 max-w-2xl">
                     <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-magic text-szgreen mr-2"></i> Smart Database Upload</h3>
                     <form id="smart-stock-form" onsubmit="submitSmartStock(event)">
@@ -246,6 +211,7 @@
             <div id="tab-users" class="tab-content hidden">
                 <h2 class="text-2xl font-bold text-white mb-6">Staff & <span class="text-szcyan">Tokens Pool</span></h2>
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                    
                     <div class="bg-panelbg border border-gray-800 p-6 rounded-xl h-fit">
                         <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-user-plus text-szgreen mr-2"></i> Add Staff</h3>
                         <form action="/api/add_user" method="POST">
@@ -256,7 +222,9 @@
                             </select>
                             <button type="submit" class="w-full bg-szgreen text-black font-bold py-2 rounded-lg btn-glow">Create User</button>
                         </form>
+                        
                         <hr class="border-gray-800 my-6">
+                        
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="font-bold text-white uppercase text-sm text-szcyan"><i class="fas fa-users mr-2"></i> Shared Tokens</h3>
                             <div class="flex gap-3">
@@ -270,6 +238,7 @@
                             <button class="w-full bg-szcyan text-black font-bold py-2 rounded-lg btn-glow">Extract & Add Tokens</button>
                         </form>
                     </div>
+                    
                     <div class="bg-panelbg border border-gray-800 rounded-xl overflow-hidden lg:col-span-2 flex flex-col h-[700px]">
                         <div class="px-6 py-4 border-b border-gray-800"><h3 class="font-bold text-white uppercase text-sm">Staff Management & Detailed Stats</h3></div>
                         <div class="overflow-x-auto flex-1 p-2">
@@ -283,8 +252,12 @@
                                             <div class="text-[10px] text-gray-500 font-mono mt-1">{{ u._id }} | 🔑 Tokens: <span class="text-white">{{ u.tokens|length }}</span></div>
                                         </td>
                                         <td class="px-4 py-3 text-xs font-mono">
-                                            <div class="mb-1 bg-black px-2 py-1 rounded inline-block border border-gray-800"><span class="text-[9px] text-gray-500 uppercase mr-1">API:</span><span class="text-purple-400 font-bold">{{ u.stats_details.api_today }}</span> / <span class="text-gray-500">{{ u.stats_details.api_month }}</span></div>
-                                            <div class="bg-black px-2 py-1 rounded inline-block border border-gray-800"><span class="text-[9px] text-gray-500 uppercase mr-1">Codes:</span><span class="text-szcyan font-bold">{{ u.stats_details.stock_today }}</span> / <span class="text-gray-500">{{ u.stats_details.stock_month }}</span></div>
+                                            <div class="mb-1 bg-black px-2 py-1 rounded inline-block border border-gray-800">
+                                                <span class="text-[9px] text-gray-500 uppercase mr-1">API:</span><span class="text-purple-400 font-bold">{{ u.stats_details.api_today }}</span> / <span class="text-gray-500">{{ u.stats_details.api_month }}</span>
+                                            </div>
+                                            <div class="bg-black px-2 py-1 rounded inline-block border border-gray-800">
+                                                <span class="text-[9px] text-gray-500 uppercase mr-1">Codes:</span><span class="text-szcyan font-bold">{{ u.stats_details.stock_today }}</span> / <span class="text-gray-500">{{ u.stats_details.stock_month }}</span>
+                                            </div>
                                         </td>
                                         <td class="px-4 py-3">
                                             <form action="/api/add_user_tokens" method="POST" class="flex gap-2">
@@ -311,25 +284,48 @@
             <div id="tab-tools" class="tab-content hidden">
                 <h2 class="text-2xl font-bold text-white mb-6">Advanced <span class="text-szgreen">Tools</span></h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    
                     <div class="bg-panelbg border border-gray-800 p-6 rounded-xl">
-                        <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-search text-szgreen mr-2"></i> Unified Search</h3>
+                        <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-search text-szgreen mr-2"></i> Unified Search (Bot & Web)</h3>
                         <div class="flex gap-2 mb-4">
-                            <input type="text" id="search-input" placeholder="Order ID or Code..." class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-szgreen">
+                            <input type="text" id="search-input" placeholder="Order ID (1005 or 1005S), User ID, or Code..." class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-szgreen transition">
                             <button onclick="performSearch()" class="bg-szgreen text-black font-bold px-6 rounded-lg btn-glow"><i class="fas fa-search"></i></button>
                         </div>
                         <div id="search-result" class="bg-black border border-gray-800 rounded-lg p-4 text-sm font-mono text-szcyan whitespace-pre-wrap hidden h-48 overflow-y-auto leading-relaxed fade-in"></div>
                     </div>
+                    
                     <div class="space-y-6">
                         <div class="bg-panelbg border border-gray-800 p-6 rounded-xl flex flex-col items-center text-center">
                             <i class="fas fa-hammer text-4xl mb-4 {% if maintenance %}text-red-500 floating{% else %}text-gray-600{% endif %}"></i>
+                            <h3 class="font-bold text-white uppercase text-lg mb-2">Bot Maintenance</h3>
                             <button onclick="toggleMaintenance()" class="py-3 px-8 w-full rounded-lg font-bold transition {% if maintenance %}bg-red-900 text-red-300 border border-red-900{% else %}bg-gray-800 text-white hover:bg-szgreen hover:text-black{% endif %}">{% if maintenance %}TURN MAINTENANCE OFF{% else %}TURN MAINTENANCE ON{% endif %}</button>
                         </div>
                         <div class="bg-panelbg border border-gray-800 p-6 rounded-xl">
-                            <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-undo text-yellow-500 mr-2"></i> Return Order</h3>
-                            <form action="/api/return_order" method="POST" class="flex gap-2" onsubmit="return confirm('Return this order to stock?');">
-                                <input type="text" name="order_id" placeholder="Order ID" required class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-yellow-500">
+                            <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-undo text-yellow-500 mr-2"></i> Return Order (Bot or Web)</h3>
+                            <form action="/api/return_order" method="POST" class="flex gap-2" onsubmit="return confirm('Are you sure you want to return this order to stock?');">
+                                <input type="text" name="order_id" placeholder="Order ID (1001 or 1001S)" required class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg focus:outline-none focus:border-yellow-500">
                                 <button class="bg-yellow-500 text-black font-bold px-6 rounded-lg hover:bg-white transition">Return</button>
                             </form>
+                        </div>
+                    </div>
+
+                    <div class="bg-panelbg border border-gray-800 p-6 rounded-xl md:col-span-2">
+                        <h3 class="font-bold text-white uppercase text-sm mb-4"><i class="fas fa-robot text-purple-500 mr-2"></i> Auto-Cache System</h3>
+                        <div class="flex gap-4">
+                            <form action="/api/tracked_users" method="POST" class="flex-1 flex gap-2">
+                                <input type="hidden" name="action" value="add"><input type="number" name="user_id" placeholder="Telegram ID" required class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg text-sm outline-none focus:border-purple-500"><button class="bg-purple-600 text-white font-bold px-6 rounded-lg hover:bg-purple-500 transition">Add ID</button>
+                            </form>
+                            <form action="/api/tracked_users" method="POST" class="flex-1 flex gap-2">
+                                <input type="hidden" name="action" value="remove"><input type="number" name="user_id" placeholder="Telegram ID" required class="flex-1 bg-[#0a0a0a] border border-gray-800 text-white p-3 rounded-lg text-sm outline-none focus:border-red-500"><button class="bg-gray-800 text-red-500 font-bold px-6 rounded-lg hover:bg-red-900 border border-gray-700 transition">Remove</button>
+                            </form>
+                        </div>
+                        <div class="mt-4 p-4 bg-black border border-gray-800 rounded-lg">
+                            <h4 class="text-xs text-gray-400 mb-2 uppercase">Tracked IDs:</h4>
+                            <div class="flex flex-wrap gap-2">
+                                {% for tid in tracked_users %}
+                                <span class="bg-gray-800 text-white px-3 py-1 rounded-full text-xs font-mono border border-gray-700"><i class="fas fa-id-badge mr-1 text-purple-400"></i> {{ tid }}</span>
+                                {% else %}<span class="text-xs text-gray-600">No tracked users found.</span>{% endfor %}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -344,9 +340,8 @@
             <h3 class="text-xl font-bold text-white mb-4 border-b border-gray-800 pb-2">Edit Category</h3>
             <form onsubmit="submitAjax(event, '/api/catalog/category/edit', 'catalog')" class="space-y-4">
                 <input type="hidden" id="edit-cat-id" name="cat_id">
-                <div><label class="text-[10px] text-gray-500 uppercase mb-1 block">Display Name</label><input type="text" id="edit-cat-name" name="name" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500"></div>
-                <div><label class="text-[10px] text-gray-500 uppercase mb-1 block">Icon</label><input type="text" id="edit-cat-icon" name="icon" class="w-full bg-[#050505] border border-gray-800 text-gray-400 p-3 rounded-lg outline-none focus:border-yellow-500 font-mono text-sm"></div>
-                <div><label class="text-[10px] text-gray-500 uppercase mb-1 block">Image URL</label><input type="text" id="edit-cat-image" name="image" class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500 text-xs"></div>
+                <div><label class="text-xs text-gray-500 mb-1 block">Display Name</label><input type="text" id="edit-cat-name" name="name" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500"></div>
+                <div><label class="text-xs text-gray-500 mb-1 block">Icon (FontAwesome)</label><input type="text" id="edit-cat-icon" name="icon" class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500 font-mono text-sm"></div>
                 <button type="submit" class="w-full bg-yellow-500 text-black font-bold py-3 rounded-lg mt-2 btn-glow">Save Changes</button>
             </form>
         </div>
@@ -359,19 +354,42 @@
             <form onsubmit="submitAjax(event, '/api/catalog/product/edit', 'catalog')" class="space-y-4">
                 <input type="hidden" id="edit-prod-cat-id" name="cat_id">
                 <input type="hidden" id="edit-prod-key" name="stock_key">
-                <div><label class="text-[10px] text-gray-500 uppercase mb-1 block">Product Name</label><input type="text" id="edit-prod-name" name="name" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500"></div>
-                
-                <div class="grid grid-cols-2 gap-3" id="edit-prod-prices-container">
-                    {% for curr in currencies %}
-                    <div>
-                        <label class="text-[10px] text-yellow-500 font-bold uppercase mb-1 block">{{ curr._id }} Price</label>
-                        <input type="number" step="0.01" id="edit-price-{{ curr._id }}" name="price_{{ curr._id }}" required class="w-full bg-[#050505] border border-gray-800 text-white font-bold p-3 rounded-lg outline-none focus:border-yellow-500 text-center">
-                    </div>
-                    {% endfor %}
+                <div><label class="text-xs text-gray-500 mb-1 block">Product Name</label><input type="text" id="edit-prod-name" name="name" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500"></div>
+                <div class="flex gap-4">
+                    <div class="w-1/2"><label class="text-xs text-yellow-500 mb-1 block">Price (EGP)</label><input type="number" step="0.01" id="edit-prod-egp" name="price_egp" required class="w-full bg-[#050505] border border-gray-800 text-yellow-500 font-bold p-3 rounded-lg outline-none focus:border-yellow-500"></div>
+                    <div class="w-1/2"><label class="text-xs text-szcyan mb-1 block">Price (USD)</label><input type="number" step="0.01" id="edit-prod-usd" name="price_usd" required class="w-full bg-[#050505] border border-gray-800 text-szcyan font-bold p-3 rounded-lg outline-none focus:border-szcyan"></div>
                 </div>
-                
                 <button type="submit" class="w-full bg-yellow-500 text-black font-bold py-3 rounded-lg mt-2 btn-glow">Save Pricing</button>
             </form>
+        </div>
+    </div>
+
+    <div id="stock-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-panelbg border border-gray-800 w-full max-w-lg rounded-xl shadow-2xl flex flex-col max-h-[80vh] fade-in">
+            <div class="p-4 border-b border-gray-800 flex justify-between items-center"><h3 class="font-bold text-white" id="modal-title">Category Codes</h3><button onclick="closeModal('stock-modal')" class="text-gray-500 hover:text-red-500"><i class="fas fa-times text-xl"></i></button></div>
+            <div class="p-4 flex-1 overflow-hidden flex flex-col"><textarea id="modal-codes-list" class="w-full flex-1 bg-[#0a0a0a] border border-gray-800 text-szgreen p-3 rounded-lg focus:outline-none font-mono text-xs" readonly></textarea></div>
+            <div class="p-4 border-t border-gray-800 flex justify-end"><button onclick="copyModalCodes('modal-codes-list')" class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-szcyan hover:text-black font-bold"><i class="fas fa-copy mr-2"></i>Copy All</button></div>
+        </div>
+    </div>
+
+    <div id="shared-tokens-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-panelbg border border-gray-800 w-full max-w-lg rounded-xl shadow-2xl flex flex-col max-h-[80vh] fade-in">
+            <div class="p-4 border-b border-gray-800 flex justify-between items-center"><h3 class="font-bold text-white"><i class="fas fa-users mr-2 text-szcyan"></i>Shared Tokens Pool</h3><button onclick="closeModal('shared-tokens-modal')" class="text-gray-500 hover:text-red-500"><i class="fas fa-times text-xl"></i></button></div>
+            <div class="p-4 flex-1 overflow-hidden flex flex-col"><textarea id="modal-shared-tokens-list" class="w-full flex-1 bg-[#0a0a0a] border border-gray-800 text-szcyan p-3 rounded-lg focus:outline-none font-mono text-xs" readonly></textarea></div>
+            <div class="p-4 border-t border-gray-800 flex justify-end"><button onclick="copyModalCodes('modal-shared-tokens-list')" class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-szcyan hover:text-black font-bold"><i class="fas fa-copy mr-2"></i>Copy All</button></div>
+        </div>
+    </div>
+
+    <div id="report-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-panelbg border border-gray-800 w-full max-w-md rounded-xl shadow-2xl overflow-hidden fade-in">
+            <div class="p-6 text-center border-b border-gray-800"><div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-szgreen/20 text-szgreen mb-4"><i class="fas fa-check-circle text-3xl"></i></div><h3 class="text-xl font-bold text-white">Upload Complete</h3></div>
+            <div class="p-6 space-y-4">
+                <div class="flex justify-between text-sm"><span class="text-gray-400">Total Processed:</span> <span class="font-bold text-white" id="rep-total">0</span></div>
+                <div class="flex justify-between text-sm"><span class="text-gray-400">Successfully Added:</span> <span class="font-bold text-szgreen" id="rep-added">0</span></div>
+                <div class="flex justify-between text-sm"><span class="text-gray-400">Duplicates Rejected:</span> <span class="font-bold text-red-500" id="rep-dupes">0</span></div>
+                <div id="dupes-container" class="hidden mt-4 pt-4 border-t border-gray-800"><p class="text-xs text-red-400 mb-2">Rejected Codes:</p><textarea id="rep-dupes-list" class="w-full h-24 bg-[#0a0a0a] border border-red-900/50 text-red-500 p-2 rounded-lg text-xs font-mono" readonly></textarea></div>
+            </div>
+            <div class="p-4 bg-gray-900/50 text-center"><button onclick="closeReportModal()" class="bg-szgreen text-black font-bold px-8 py-2 rounded-lg transition hover:opacity-90">Done</button></div>
         </div>
     </div>
 
@@ -382,13 +400,20 @@
             document.querySelectorAll('.nav-btn').forEach(el => { el.classList.remove('nav-active'); el.classList.add('nav-inactive'); });
             if(tabId !== 'store') { document.getElementById('btn-' + tabId).classList.add('nav-active'); document.getElementById('btn-' + tabId).classList.remove('nav-inactive'); } 
             window.history.replaceState({}, '', '/admin?tab=' + tabId);
+            const sidebar = document.getElementById('sidebar');
+            if(window.innerWidth < 768 && !sidebar.classList.contains('-translate-x-full')) toggleSidebar();
         }
 
         document.addEventListener("DOMContentLoaded", () => {
             const urlParams = new URLSearchParams(window.location.search);
             switchTab(urlParams.get('tab') || 'overview');
-            if(document.querySelector("#stockChart")) renderStockChart();
+            renderStockChart(); // تشغيل الرسم البياني عند التحميل
         });
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('-translate-x-full');
+            document.getElementById('sidebar-backdrop').classList.toggle('hidden');
+        }
 
         function showToast(msg, type='success') {
             const container = document.getElementById('toast-container');
@@ -410,47 +435,131 @@
             try {
                 const res = await fetch(url, {method: 'POST', body: fd});
                 const data = await res.json();
-                if(data.success) { showToast(data.msg, 'success'); setTimeout(() => { window.location.href = '/admin?tab=' + tabReturn; }, 800); } 
-                else { showToast(data.msg || "Error", 'error'); btn.innerHTML = originalHtml; btn.disabled = false; }
+                if(data.success) {
+                    showToast(data.msg, 'success');
+                    setTimeout(() => { window.location.href = '/admin?tab=' + tabReturn; }, 800);
+                } else { showToast(data.msg || "Error", 'error'); btn.innerHTML = originalHtml; btn.disabled = false; }
             } catch(err) { showToast("Connection error!", 'error'); btn.innerHTML = originalHtml; btn.disabled = false; }
         }
 
+        function editCategory(id, name, icon) {
+            document.getElementById('edit-cat-id').value = id; document.getElementById('edit-cat-name').value = name;
+            document.getElementById('edit-cat-icon').value = icon; document.getElementById('edit-cat-modal').classList.remove('hidden');
+        }
+
+        function editProduct(catId, stockKey, name, egp, usd) {
+            document.getElementById('edit-prod-cat-id').value = catId; document.getElementById('edit-prod-key').value = stockKey;
+            document.getElementById('edit-prod-name').value = name; document.getElementById('edit-prod-egp').value = egp;
+            document.getElementById('edit-prod-usd').value = usd; document.getElementById('edit-prod-modal').classList.remove('hidden');
+        }
+
+        async function submitSmartStock(e) {
+            e.preventDefault();
+            const btn = document.getElementById('smart-btn');
+            const cat = document.getElementById('smart-cat').value;
+            const codes = document.getElementById('smart-codes').value;
+            if(!codes.trim()) return alert("Please enter codes!");
+            
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scan'; btn.disabled = true;
+            const fd = new FormData(); fd.append("category", cat); fd.append("codes", codes);
+
+            try {
+                const res = await fetch('/api/add_stock_smart', {method: 'POST', body: fd});
+                const data = await res.json();
+                document.getElementById('rep-total').innerText = data.total;
+                document.getElementById('rep-added').innerText = data.added;
+                document.getElementById('rep-dupes').innerText = data.dupes;
+                
+                if(data.dupes > 0) {
+                    document.getElementById('dupes-container').classList.remove('hidden');
+                    document.getElementById('rep-dupes-list').value = data.dupes_list.join('\n');
+                } else { document.getElementById('dupes-container').classList.add('hidden'); }
+                
+                document.getElementById('report-modal').classList.remove('hidden');
+                document.getElementById('smart-codes').value = ""; 
+            } catch(err) { showToast("Error connecting.", "error"); }
+            btn.innerHTML = '<span>Scan & Add Codes</span> <i class="fas fa-upload"></i>'; btn.disabled = false;
+        }
+
+        function closeReportModal() { closeModal('report-modal'); location.reload(); }
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
-        function editCategory(id, name, icon, image) {
-            document.getElementById('edit-cat-id').value = id; 
-            document.getElementById('edit-cat-name').value = name;
-            document.getElementById('edit-cat-icon').value = icon; 
-            document.getElementById('edit-cat-image').value = image; 
-            document.getElementById('edit-cat-modal').classList.remove('hidden');
+        function copyModalCodes(elementId) {
+            const copyText = document.getElementById(elementId);
+            copyText.select(); document.execCommand("copy");
+            showToast("Copied successfully!");
+        }
+        
+        async function openStockModal(cat) {
+            document.getElementById('stock-modal').classList.remove('hidden');
+            document.getElementById('modal-title').innerText = cat + " Current Stock";
+            document.getElementById('modal-codes-list').value = "Loading...";
+            const res = await fetch('/api/view_stock/' + cat);
+            const data = await res.json();
+            document.getElementById('modal-codes-list').value = data.codes.length > 0 ? data.codes.join('\n') : "Empty stock.";
         }
 
-        function editProduct(catId, stockKey, name, pricesStr) {
-            document.getElementById('edit-prod-cat-id').value = catId; 
-            document.getElementById('edit-prod-key').value = stockKey;
-            document.getElementById('edit-prod-name').value = name; 
-            
-            const prices = JSON.parse(pricesStr);
-            // تعبئة الأسعار الديناميكية في الحقول
-            for (const [curr, val] of Object.entries(prices)) {
-                const input = document.getElementById('edit-price-' + curr);
-                if(input) input.value = val;
-            }
-            
-            document.getElementById('edit-prod-modal').classList.remove('hidden');
+        async function openSharedTokensModal() {
+            document.getElementById('shared-tokens-modal').classList.remove('hidden');
+            document.getElementById('modal-shared-tokens-list').value = "Loading...";
+            const res = await fetch('/api/view_shared_tokens');
+            const data = await res.json();
+            document.getElementById('modal-shared-tokens-list').value = data.tokens.length > 0 ? data.tokens.join('\n') : "Empty.";
         }
 
+        async function toggleMaintenance() { await fetch('/api/toggle_maintenance', {method: 'POST'}); location.reload(); }
+
+        async function performSearch() {
+            const query = document.getElementById('search-input').value;
+            if(!query) return;
+            const resBox = document.getElementById('search-result');
+            resBox.classList.remove('hidden'); resBox.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Searching...';
+            const fd = new FormData(); fd.append("query", query);
+            const res = await fetch('/api/search', {method: 'POST', body: fd});
+            const data = await res.json();
+            resBox.innerText = data.result;
+        }
+
+        // كود إنشاء الرسم البياني (Donut Chart)
         function renderStockChart() {
             const stockLabels = [{% for key in stock_details.keys() %}'{{ key }}',{% endfor %}];
             const stockSeries = [{% for val in stock_details.values() %}{{ val }},{% endfor %}];
+
             if (stockSeries.length > 0 && stockSeries.reduce((a, b) => a + b, 0) > 0) {
                 var options = {
-                    series: stockSeries, labels: stockLabels,
-                    chart: { type: 'donut', height: 280, background: 'transparent', foreColor: '#d1d5db', fontFamily: 'Cairo' },
-                    plotOptions: { pie: { donut: { size: '75%', labels: { show: true, name: { color: '#9ca3af' }, value: { color: '#7dfc89', fontSize: '24px', fontWeight: 'bold' }, total: { show: true, label: 'Total Stock', color: '#5eead4' } } } } },
-                    stroke: { width: 0 }, theme: { mode: 'dark' }, dataLabels: { enabled: false }
+                    series: stockSeries,
+                    labels: stockLabels,
+                    chart: {
+                        type: 'donut',
+                        height: 280,
+                        background: 'transparent',
+                        foreColor: '#d1d5db',
+                        fontFamily: 'Cairo, sans-serif'
+                    },
+                    plotOptions: {
+                        pie: {
+                            donut: {
+                                size: '75%',
+                                labels: {
+                                    show: true,
+                                    name: { show: true, color: '#9ca3af' },
+                                    value: { show: true, color: '#7dfc89', fontSize: '24px', fontWeight: 'bold' },
+                                    total: { show: true, showAlways: true, label: 'Total DB Stock', color: '#5eead4' }
+                                }
+                            }
+                        }
+                    },
+                    stroke: { width: 0 },
+                    theme: { mode: 'dark' },
+                    colors: ['#7dfc89', '#5eead4', '#eab308', '#a855f7', '#ef4444', '#3b82f6'],
+                    dataLabels: { enabled: false },
+                    legend: { position: 'right', offsetY: 0, height: 230 }
                 };
-                new ApexCharts(document.querySelector("#stockChart"), options).render();
+
+                var chart = new ApexCharts(document.querySelector("#stockChart"), options);
+                chart.render();
+            } else {
+                document.querySelector("#stockChart").innerHTML = "<p class='text-gray-500 mt-10 font-bold'>No stock available to display.</p>";
             }
         }
     </script>
