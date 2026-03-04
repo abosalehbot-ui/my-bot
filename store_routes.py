@@ -42,32 +42,16 @@ async def generate_unique_id():
         if not await db.store_customers.find_one({"user_id": new_id}):
             return new_id
 
-
-async def get_server_price(stock_key: str, currency: str):
-    """Return trusted product price from DB, or None when product/currency is invalid."""
-    cur = currency.upper()
-    category = await db.store_categories.find_one(
-        {"products.stock_key": stock_key},
-        {"products": 1},
-    )
-    if not category:
-        return None
-
-    for product in category.get("products", []):
-        if product.get("stock_key") != stock_key:
-            continue
-
-        prices = product.get("prices") or {}
-        if cur in prices:
-            return float(prices[cur])
-        if cur.lower() in prices:
-            return float(prices[cur.lower()])
-
-        if cur == "EGP":
-            return float(product.get("price_egp", 0))
-        if cur == "USD":
-            return float(product.get("price_usd", 0))
-    return None
+async def log_wallet_txn(email: str, amount: float, currency: str, note: str, ref: str = ""):
+    await db.store_wallet_ledger.insert_one({
+        "email": email,
+        "amount": float(amount),
+        "currency": currency.upper(),
+        "note": note,
+        "ref": ref,
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "ts": datetime.now(),
+    })
 
 # ==========================================
 # 1. الواجهة الرئيسية للمتجر
@@ -344,6 +328,7 @@ async def customer_buy(request: Request, stock_key: str = Form(...), price: floa
         "time":     now_str,
         "source":   "Web Store",
     })
+    await log_wallet_txn(email, -price, currency, f"Order #{order_id}", ref=order_id)
 
     return JSONResponse({"success": True, "code": code_str, "new_balance": new_bal,
                          "currency": currency, "msg": "Purchase successful!"})
@@ -358,6 +343,20 @@ async def get_my_orders(request: Request):
     for o in orders:
         o["order_id"] = str(o.get("_id", ""))
     return JSONResponse({"success": True, "orders": orders})
+
+@router.get("/api/store/wallet-history")
+async def wallet_history(request: Request):
+    email = request.cookies.get("store_session")
+    if not email:
+        return JSONResponse({"success": False, "txns": []})
+
+    txns = await db.store_wallet_ledger.find({"email": email}).sort("ts", -1).to_list(200)
+    for t in txns:
+        t["id"] = str(t.get("_id", ""))
+        if "_id" in t:
+            del t["_id"]
+        t.pop("ts", None)
+    return JSONResponse({"success": True, "txns": txns})
 
 @router.post("/api/store/checkout-cart")
 async def checkout_cart(request: Request, payload: CheckoutRequest):
@@ -450,6 +449,7 @@ async def checkout_cart(request: Request, payload: CheckoutRequest):
                 "time":     now_str,
                 "source":   "Web Store",
             })
+            await log_wallet_txn(email, -item.price, currency, f"Order #{order_id}", ref=order_id)
 
             results.append({
                 "stock_key": item.stock_key,
@@ -522,8 +522,10 @@ async def store_manage_balance(request: Request, email: str = Form(...), amount:
     
     if action == "add":
         await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: amount}})
+        await log_wallet_txn(email, amount, currency, "Top-up (Admin)")
     elif action == "sub":
         await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: -amount}})
+        await log_wallet_txn(email, -amount, currency, "Manual deduction (Admin)")
 
     return JSONResponse({"success": True, "msg": f"{currency.upper()} balance updated successfully!"})
 

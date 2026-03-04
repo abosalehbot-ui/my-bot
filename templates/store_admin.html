@@ -84,13 +84,13 @@
 
 <div class="max-w-7xl mx-auto px-6">
     <div class="flex gap-5 border-b border-gray-800 mb-6">
-        <button onclick="switchMainTab('customers')" id="main-tab-btn-customers" class="tab-btn active pb-3 font-bold text-sm">
+        <button onclick='switchMainTab("customers")' id="main-tab-btn-customers" class="tab-btn active pb-3 font-bold text-sm">
             <i class="fas fa-users mr-1"></i>Customers
         </button>
-        <button onclick="switchMainTab('orders')" id="main-tab-btn-orders" class="tab-btn pb-3 font-bold text-sm">
+        <button onclick='switchMainTab("orders")' id="main-tab-btn-orders" class="tab-btn pb-3 font-bold text-sm">
             <i class="fas fa-receipt mr-1"></i>Orders
         </button>
-        <button onclick="switchMainTab('support')" id="main-tab-btn-support" class="tab-btn pb-3 font-bold text-sm relative">
+        <button onclick='switchMainTab("support")' id="main-tab-btn-support" class="tab-btn pb-3 font-bold text-sm relative">
             <i class="fas fa-headset mr-1"></i>Support
             {% if open_tickets %}
             <span class="absolute -top-1 -right-3 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">{{ open_tickets|length }}</span>
@@ -166,6 +166,16 @@
                     class="w-full bg-panelbg border border-gray-700 rounded-lg pl-9 pr-4 py-2 text-sm text-gray-200 outline-none focus:border-szgreen">
             </div>
         </div>
+
+        <div class="mb-4 bg-panelbg border border-gray-800 rounded-xl p-4">
+            <h3 class="text-sm font-black text-white mb-2"><i class="fas fa-undo-alt text-red-400 mr-2"></i>Bulk Returns</h3>
+            <p class="text-xs text-gray-500 mb-2">Paste one order ID per line (e.g. 12345S).</p>
+            <textarea id="bulk-return-ids" rows="4" class="w-full bg-black border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 outline-none focus:border-szgreen resize-y" placeholder="12345S&#10;12346S"></textarea>
+            <div class="mt-3 flex items-center gap-2">
+                <button onclick='confirmBulkReturns()' class="bg-red-900/20 text-red-400 border border-red-900/30 px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-900/40 transition"><i class="fas fa-play mr-1"></i>Process Bulk Returns</button>
+                <span id="bulk-return-status" class="text-xs font-bold text-gray-500"></span>
+            </div>
+        </div>
         <div class="overflow-x-auto border border-gray-800 rounded-xl bg-panelbg">
             <table class="w-full text-sm text-left whitespace-nowrap">
                 <thead class="bg-black text-gray-500 uppercase text-[10px]">
@@ -199,7 +209,7 @@
                             </button>
                         </td>
                         <td class="px-4 py-3">
-                            <button onclick="returnOrder('{{ o._id }}')"
+                            <button onclick='returnOrder({{ o._id | tojson | forceescape }})'
                                 class="bg-red-900/20 text-red-400 border border-red-900/30 px-3 py-1 rounded text-xs font-bold hover:bg-red-900/40 transition">
                                 <i class="fas fa-undo mr-1"></i>Return
                             </button>
@@ -538,12 +548,37 @@ function filterRows(inputId, rowClass) {
 }
 
 // ─── Main Tabs ───────────────────────────────────────────────────────────
+const ADMIN_TAB_KEY = 'sz_admin_active_tab';
+let _confirmResolver = null;
+
 function switchMainTab(tab) {
     ['customers','orders','support'].forEach(t => {
         const el=$('main-tab-'+t), btn=$('main-tab-btn-'+t);
         if(el) el.style.display = t===tab ? 'block' : 'none';
         if(btn) { btn.classList.toggle('active', t===tab); }
     });
+    localStorage.setItem(ADMIN_TAB_KEY, tab);
+    history.replaceState(null, '', `#${tab}`);
+}
+
+function showConfirmModal(message, title='Confirm Action') {
+    const modal = $('confirm-modal');
+    if (!modal) return Promise.resolve(false);
+    setText('confirm-title', title);
+    setText('confirm-message', message);
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    return new Promise(resolve => { _confirmResolver = resolve; });
+}
+
+function closeConfirmModal(result) {
+    const modal = $('confirm-modal');
+    if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+    if (_confirmResolver) {
+        const resolve = _confirmResolver;
+        _confirmResolver = null;
+        resolve(!!result);
+    }
 }
 
 // ─── Customer Modal State ────────────────────────────────────────────────
@@ -648,7 +683,7 @@ function updateStatusButtons() {
 }
 
 async function toggleCustomerStatus(action) {
-    if(!confirm(`Are you sure you want to ${action} this account?`)) return;
+    if(!(await showConfirmModal(`Are you sure you want to ${action} this account?`, 'Confirm Status Change'))) return;
     const fd = new FormData();
     fd.append('email', _cEmail);
     fd.append('action', action);
@@ -762,7 +797,7 @@ async function adminAvatarUpload(input) {
 }
 
 async function adminRemoveAvatar() {
-    if(!confirm('Remove this customer\'s avatar?')) return;
+    if(!(await showConfirmModal('Remove this customer avatar?', 'Confirm Avatar Removal'))) return;
     const fd=new FormData(); fd.append('email',_cEmail); fd.append('avatar_b64','');
     try {
         const d=await(await fetch('/api/store/admin/set-avatar',{method:'POST',body:fd})).json();
@@ -804,7 +839,7 @@ async function loadCustomerOrders() {
 
 // ─── Delete Customer ──────────────────────────────────────────────────────
 async function deleteCustomer() {
-    if(!confirm(`Delete account for ${_cEmail}? This cannot be undone.`)) return;
+    if(!(await showConfirmModal(`Delete account for ${_cEmail}? This cannot be undone.`, 'Confirm Delete'))) return;
     const fd=new FormData(); fd.append('email',_cEmail);
     try {
         const d=await(await fetch('/api/store/admin/delete-customer',{method:'POST',body:fd})).json();
@@ -815,12 +850,47 @@ async function deleteCustomer() {
 
 // ─── Return Order ─────────────────────────────────────────────────────────
 async function returnOrder(orderId) {
-    if(!confirm(`Return order #${orderId}? The code will go back to stock.`)) return;
+    if(!(await showConfirmModal(`Return order #${orderId}? The code will go back to stock.`, 'Confirm Return'))) return;
+    await returnOrderNow(orderId);
+}
+
+async function returnOrderNow(orderId) {
     const fd=new FormData(); fd.append('order_id',orderId);
     try {
-        const res=await fetch('/api/return_order',{method:'POST',body:fd});
-        if(res.redirected||res.ok){ showToast('Order returned to stock!'); setTimeout(()=>location.reload(),1200); }
+        const d=await (await fetch('/api/return_order',{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}})).json();
+        if(d.success){
+            showToast('Order returned to stock!');
+            localStorage.setItem(ADMIN_TAB_KEY, 'orders');
+            location.reload();
+        } else showToast(d.msg || 'Order not found', 'error');
     } catch { showToast('Error!','error'); }
+}
+
+async function confirmBulkReturns() {
+    const raw = $('bulk-return-ids')?.value || '';
+    const ids = raw.split(/\n|,/).map(v => v.trim()).filter(Boolean);
+    if (!ids.length) { showToast('Paste at least one order ID', 'error'); return; }
+    if(!(await showConfirmModal(`Process ${ids.length} return(s)?`, 'Confirm Bulk Returns'))) return;
+
+    const fd = new FormData();
+    fd.append('order_ids', ids.join('\n'));
+    const status = $('bulk-return-status');
+    if (status) status.innerText = 'Processing...';
+    try {
+        const d = await (await fetch('/api/return_orders_bulk', { method:'POST', body:fd })).json();
+        if (d.success) {
+            showToast(d.msg);
+            if (status) status.innerText = d.msg;
+            localStorage.setItem(ADMIN_TAB_KEY, 'orders');
+            location.reload();
+        } else {
+            if (status) status.innerText = d.msg || 'Failed';
+            showToast(d.msg || 'Failed', 'error');
+        }
+    } catch {
+        if (status) status.innerText = 'Error';
+        showToast('Error!', 'error');
+    }
 }
 
 // ─── Support Tickets — Admin ──────────────────────────────────────────────
@@ -930,7 +1000,18 @@ function filterTicketsByStatus(status) {
     });
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    const hashTab = (location.hash || '').replace('#', '').trim();
+    const allowed = ['customers','orders','support'];
+    const saved = localStorage.getItem(ADMIN_TAB_KEY) || 'customers';
+    const tab = allowed.includes(hashTab) ? hashTab : (allowed.includes(saved) ? saved : 'customers');
+    switchMainTab(tab);
+
+    $('confirm-modal')?.addEventListener('click', e => {
+        if (e.target === $('confirm-modal')) closeConfirmModal(false);
+    });
+});
+
 function setFormStatus(id, msg, isError) {
     const el=$(id); if(!el) return;
     el.innerHTML=isError
@@ -938,5 +1019,17 @@ function setFormStatus(id, msg, isError) {
         : `<span class="text-szgreen"><i class="fas fa-check-circle mr-1"></i>${msg}</span>`;
 }
 </script>
+
+<div id="confirm-modal" class="fixed inset-0 bg-black/80 hidden z-[80] items-center justify-center p-4">
+    <div class="w-full max-w-md bg-panelbg border border-gray-800 rounded-2xl p-5">
+        <h3 class="text-white font-black text-lg mb-2" id="confirm-title">Confirm Action</h3>
+        <p class="text-gray-300 text-sm mb-4" id="confirm-message">Are you sure?</p>
+        <div class="flex justify-end gap-2">
+            <button onclick='closeConfirmModal(false)' class="px-4 py-2 rounded-lg border border-gray-700 text-gray-300 hover:bg-gray-800 transition text-sm font-bold">Cancel</button>
+            <button onclick='closeConfirmModal(true)' id="confirm-ok-btn" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-500 transition text-sm font-bold">Confirm</button>
+        </div>
+    </div>
+</div>
+
 </body>
 </html>

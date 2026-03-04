@@ -8,6 +8,7 @@ let pendingPurchase  = null;
 let ordersLoaded     = false;
 let _forgotEmail     = '';
 let _profileLoaded   = false;
+const STORE_PROFILE_TAB_KEY = 'sz_active_profile_tab';
 
 // ─── Cart State — persisted in localStorage under 'sz_cart' ──────────────
 let cart = [];
@@ -562,14 +563,31 @@ async function confirmCartPurchase() {
 }
 
 // ─── Profile Modal ───────────────────────────────────────────────────────
+function _isStoreLoggedIn() {
+    return !!localStorage.getItem('store_email');
+}
+
+function _applyProfileAuthGuard() {
+    const authContent = $('profile-auth-content');
+    const required    = $('profile-login-required');
+    const loggedIn    = _isStoreLoggedIn();
+    if (authContent) authContent.classList.toggle('hidden', !loggedIn);
+    if (required) required.classList.toggle('hidden', loggedIn);
+}
+
 function openProfileModal() {
     openModal('profile-modal');
-    switchProfileTab('overview');
+    _applyProfileAuthGuard();
+    if (!_isStoreLoggedIn()) return;
+
+    const remembered = localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview';
+    switchProfileTab(remembered);
     if (!_profileLoaded) { _profileLoaded = true; fetchAndApplyProfile(); }
     else _applyLocalProfile();
 }
 
 function switchProfileTab(tab) {
+    if (!_isStoreLoggedIn()) return;
     ['overview', 'edit', 'security', 'history', 'support'].forEach(t => {
         $('ptab-' + t)?.classList.add('hidden');
         const btn = $('ptab-btn-' + t);
@@ -578,7 +596,15 @@ function switchProfileTab(tab) {
     $('ptab-' + tab)?.classList.remove('hidden');
     const ab = $('ptab-btn-' + tab);
     if (ab) { ab.classList.add('active'); ab.classList.remove('inactive'); }
-    if (tab === 'history' && !ordersLoaded) fetchMyOrders();
+
+    localStorage.setItem(STORE_PROFILE_TAB_KEY, tab);
+    if (tab === 'overview') history.replaceState(null, '', location.pathname + location.search);
+    else history.replaceState(null, '', `#${tab}`);
+
+    if (tab === 'history' && !ordersLoaded) {
+        fetchMyOrders();
+        fetchWalletHistory();
+    }
     if (tab === 'support' && !_ticketsLoaded) loadMyTickets();
 }
 
@@ -743,6 +769,38 @@ async function fetchMyOrders() {
             tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500 font-bold">No purchases found.</td></tr>';
         }
     } catch { if (loader) loader.innerHTML = '<span class="text-red-500">Error loading orders.</span>'; }
+}
+
+
+async function fetchWalletHistory() {
+    const list = $('wallet-history-list');
+    const loader = $('wallet-loading');
+    if (!list) return;
+    if (loader) loader.classList.remove('hidden');
+    list.innerHTML = '';
+    try {
+        const d = await (await fetch('/api/store/wallet-history')).json();
+        if (loader) loader.classList.add('hidden');
+        if (!d.success || !d.txns.length) {
+            list.innerHTML = '<div class="text-center text-gray-500 text-xs py-4">No wallet transactions yet.</div>';
+            return;
+        }
+        list.innerHTML = d.txns.map(t => {
+            const isPlus = Number(t.amount) >= 0;
+            const amount = `${isPlus ? '+' : '-'} ${Math.abs(Number(t.amount)).toFixed(2)} ${t.currency}`;
+            const amountClr = isPlus ? 'text-szgreen' : 'text-red-400';
+            return `<div class="border border-gray-800 rounded-xl p-3 flex items-center justify-between gap-3 bg-[#080808]">
+                <div>
+                    <div class="text-xs font-black ${amountClr}">${amount}</div>
+                    <div class="text-[11px] text-gray-300 mt-0.5">${t.note || 'Wallet transaction'}</div>
+                </div>
+                <div class="text-[10px] text-gray-500 whitespace-nowrap">${t.created_at || ''}</div>
+            </div>`;
+        }).join('');
+    } catch {
+        if (loader) loader.classList.add('hidden');
+        list.innerHTML = '<div class="text-center text-red-500 text-xs py-4">Failed to load wallet ledger.</div>';
+    }
 }
 
 // ============================================================
@@ -940,6 +998,15 @@ document.addEventListener('DOMContentLoaded', () => {
         updateUI(name, localStorage.getItem('bal_egp') || '0', localStorage.getItem('bal_usd') || '0');
         _applyAvatar(localStorage.getItem('store_avatar') || '');
         fetchAndApplyProfile();
+    }
+    _applyProfileAuthGuard();
+
+    const hashTab = (location.hash || '').replace('#', '').trim();
+    const allowed = ['overview', 'edit', 'security', 'history', 'support'];
+    const initialTab = allowed.includes(hashTab) ? hashTab : (localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview');
+    if (allowed.includes(initialTab) && email && name) {
+        openProfileModal();
+        switchProfileTab(initialTab);
     }
 
     // Scroll-to-top button

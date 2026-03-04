@@ -142,7 +142,7 @@
                     </button>
                 </li>
                 
-                <li id="sidebar-user" class="hidden bg-[#050505] p-4 rounded-lg border border-gray-800 fade-in cursor-pointer hover:border-szgreen transition" onclick="openProfileModal(); toggleSidebarMobile();">
+                <li id="sidebar-user" class="hidden bg-[#050505] p-4 rounded-lg border border-gray-800 fade-in cursor-pointer hover:border-szgreen transition" onclick='openProfileModal(); toggleSidebarMobile();'>
                     <div class="flex items-center justify-between mb-3">
                         <div class="flex items-center gap-3">
                             <div class="w-10 h-10 rounded-full border border-gray-700 overflow-hidden flex items-center justify-center bg-gray-900 shrink-0">
@@ -176,7 +176,7 @@
                 </li>
                 
                 <li>
-                    <a href="#" onclick="openProfileModal(); toggleSidebarMobile();" class="flex items-center p-3 w-full text-base font-bold text-gray-400 rounded-lg transition group hover:bg-gray-900 hover:text-white">
+                    <a href="#" onclick='openProfileModal(); toggleSidebarMobile();' class="flex items-center p-3 w-full text-base font-bold text-gray-400 rounded-lg transition group hover:bg-gray-900 hover:text-white">
                         <i class="fas fa-wallet w-6 text-yellow-500 group-hover:text-yellow-400 transition"></i>
                         <span class="flex-1 ml-3 text-left whitespace-nowrap">My Wallet</span>
                     </a>
@@ -228,7 +228,7 @@
                     <i class="fas fa-shopping-cart text-xl"></i>
                     <span class="absolute -top-1.5 -right-2 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full" id="cart-count-mobile">0</span>
                 </button>
-                <button onclick="openProfileModal()" class="text-szgreen"><i class="fas fa-user-circle text-xl"></i></button>
+                <button onclick='openProfileModal()' class="text-szgreen"><i class="fas fa-user-circle text-xl"></i></button>
             </div>
         </header>
         
@@ -641,15 +641,16 @@
                 <button onclick="closeModal('profile-modal')" class="text-gray-500 hover:text-red-500 transition"><i class="fas fa-times text-xl"></i></button>
             </div>
 
-            <div class="flex border-b border-gray-800 shrink-0 px-4 overflow-x-auto">
-                <button id="ptab-btn-overview"  onclick="switchProfileTab('overview')"  class="prof-tab-btn active  py-3 px-3 text-xs font-bold whitespace-nowrap transition"><i class="fas fa-user mr-1"></i>Overview</button>
-                <button id="ptab-btn-edit"      onclick="switchProfileTab('edit')"      class="prof-tab-btn inactive py-3 px-3 text-xs font-bold whitespace-nowrap transition"><i class="fas fa-edit mr-1"></i>Edit</button>
-                <button id="ptab-btn-security"  onclick="switchProfileTab('security')"  class="prof-tab-btn inactive py-3 px-3 text-xs font-bold whitespace-nowrap transition"><i class="fas fa-shield-alt mr-1"></i>Security</button>
-                <button id="ptab-btn-history"   onclick="switchProfileTab('history')"   class="prof-tab-btn inactive py-3 px-3 text-xs font-bold whitespace-nowrap transition"><i class="fas fa-history mr-1"></i>History</button>
-                <button id="ptab-btn-support"   onclick="switchProfileTab('support')"   class="prof-tab-btn inactive py-3 px-3 text-xs font-bold whitespace-nowrap transition"><i class="fas fa-headset mr-1"></i>Support</button>
-            </div>
+            <div id="profile-auth-content">
+                <div class="flex border-b border-gray-800 shrink-0 px-4 overflow-x-auto">
+                    <button id="ptab-btn-overview"  onclick='switchProfileTab("overview")'  class="prof-tab-btn active  py-3 px-3 text-xs font-bold whitespace-nowrap transition"><i class="fas fa-user mr-1"></i>Overview</button>
+                    <button id="ptab-btn-edit"      onclick='switchProfileTab("edit")'      class="prof-tab-btn inactive py-3 px-3 text-xs font-bold whitespace-nowrap transition"><i class="fas fa-edit mr-1"></i>Edit</button>
+                    <button id="ptab-btn-security"  onclick='switchProfileTab("security")'  class="prof-tab-btn inactive py-3 px-3 text-xs font-bold whitespace-nowrap transition"><i class="fas fa-shield-alt mr-1"></i>Security</button>
+                    <button id="ptab-btn-history"   onclick='switchProfileTab("history")'   class="prof-tab-btn inactive py-3 px-3 text-xs font-bold whitespace-nowrap transition"><i class="fas fa-history mr-1"></i>History</button>
+                    <button id="ptab-btn-support"   onclick='switchProfileTab("support")'   class="prof-tab-btn inactive py-3 px-3 text-xs font-bold whitespace-nowrap transition"><i class="fas fa-headset mr-1"></i>Support</button>
+                </div>
 
-            <div class="flex-1 relative min-h-0">
+                <div class="flex-1 relative min-h-0">
 
                 <!-- Overview Tab -->
                 <div id="ptab-overview" class="prof-tab-panel absolute inset-0 overflow-y-auto p-5 space-y-4">
@@ -764,13 +765,19 @@
                 <!-- History Tab -->
                 <div id="ptab-history" class="prof-tab-panel absolute inset-0 overflow-y-auto p-5 hidden">
                     <div id="orders-loading" class="text-center text-szcyan py-10 font-bold hidden"><i class="fas fa-spinner fa-spin text-3xl mb-2"></i><br>Loading...</div>
-                    <div class="border border-gray-800 rounded-xl bg-black overflow-x-auto">
+                    <div class="border border-gray-800 rounded-xl bg-black overflow-x-auto mb-4">
                         <table class="w-full text-left text-sm whitespace-nowrap">
                             <thead class="bg-[#111] text-gray-400 uppercase text-[10px]">
                                 <tr><th class="px-4 py-3">Order</th><th class="px-4 py-3">Date</th><th class="px-4 py-3">Item</th><th class="px-4 py-3">Price</th><th class="px-4 py-3">Code</th></tr>
                             </thead>
                             <tbody id="orders-table-body" class="divide-y divide-gray-800 text-gray-300"></tbody>
                         </table>
+                    </div>
+
+                    <div class="bg-black border border-gray-800 rounded-xl p-4">
+                        <h3 class="text-sm font-black text-white mb-3"><i class="fas fa-wallet text-yellow-500 mr-2"></i>Wallet Ledger</h3>
+                        <div id="wallet-loading" class="text-center text-szcyan py-4 font-bold hidden"><i class="fas fa-spinner fa-spin"></i></div>
+                        <div id="wallet-history-list" class="space-y-2"></div>
                     </div>
                 </div>
 
@@ -818,6 +825,14 @@
                     </div>
 
                 </div>
+            </div>
+
+            <div id="profile-login-required" class="hidden flex-1 p-6 flex flex-col items-center justify-center text-center">
+                <i class="fas fa-lock text-4xl text-szcyan mb-3"></i>
+                <h3 class="text-white font-black text-lg mb-1">Login Required</h3>
+                <p class="text-gray-400 text-sm mb-4">Please login or create an account to access wallet, profile editing, order history, and support.</p>
+                <button onclick='closeModal("profile-modal"); openAuthModal("signin")' class="bg-gradient-to-r from-szgreen to-szcyan text-black font-bold px-5 py-2.5 rounded-xl hover:opacity-90 transition">Login / Register</button>
+            </div>
 
             </div>
         </div>

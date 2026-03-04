@@ -481,10 +481,18 @@ async def api_tracked_users(request: Request, user_id: int = Form(...), action: 
         await db.settings.update_one({"_id": "cache_config"}, {"$pull": {"tracked_users": user_id}}, upsert=True)
     return RedirectResponse(url="/admin?tab=tools", status_code=status.HTTP_302_FOUND)
 
-@app.post("/api/return_order")
-async def api_return_order(request: Request, order_id: str = Form(...)):
-    if not check_auth(request): return RedirectResponse("/login")
+async def _log_store_wallet_txn(email: str, amount: float, currency: str, note: str, ref: str = ""):
+    await db.store_wallet_ledger.insert_one({
+        "email": email,
+        "amount": float(amount),
+        "currency": currency.upper(),
+        "note": note,
+        "ref": ref,
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "ts": datetime.now(),
+    })
 
+async def _process_return_order(order_id: str):
     order = await db.orders.find_one({"_id": int(order_id)}) if order_id.isdigit() else None
     if not order:
         order = await db.store_orders.find_one({"_id": order_id})
@@ -496,12 +504,54 @@ async def api_return_order(request: Request, order_id: str = Form(...)):
         await db.codes_map.delete_many({"$or": [{"_id": {"$in": order["items"]}}, {"code": {"$in": order["items"]}}], "order_id": int(order_id)})
         await db.orders.delete_one({"_id": int(order_id)})
         await db.users.update_one({"_id": order["user_id"]}, {"$inc": {"stats.stock": -len(order["items"])}})
+        return True, "Bot order returned"
     elif order and "code" in order:
         await db.stock.insert_one({"code": order["code"], "category": order["category"], "added_at": datetime.now()})
         await db.codes_map.delete_many({"$or": [{"_id": order["code"]}, {"code": order["code"]}], "order_id": order_id})
         await db.store_orders.delete_one({"_id": order_id})
 
-    return RedirectResponse(url="/admin?tab=tools", status_code=status.HTTP_302_FOUND)
+        email = order.get("email")
+        price = float(order.get("price", 0) or 0)
+        currency = (order.get("currency") or "EGP").upper()
+        if email and price > 0:
+            bal_field = f"balance_{currency.lower()}"
+            await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: price}})
+            await _log_store_wallet_txn(email, price, currency, f"Return refund #{order_id}", ref=order_id)
+
+        return True, "Store order returned"
+
+    return False, "Order not found"
+
+@app.post("/api/return_order")
+async def api_return_order(request: Request, order_id: str = Form(...)):
+    if not check_auth(request): return RedirectResponse("/login")
+    ok, _ = await _process_return_order(order_id)
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JSONResponse({"success": ok, "msg": "Order returned to stock!" if ok else "Order not found"})
+    return RedirectResponse(url="/store-admin", status_code=status.HTTP_302_FOUND)
+
+@app.post("/api/return_orders_bulk")
+async def api_return_orders_bulk(request: Request, order_ids: str = Form(...)):
+    if not check_auth(request):
+        return JSONResponse({"success": False, "msg": "Unauthorized"}, status_code=401)
+
+    ids = [x.strip() for x in order_ids.replace(',', '\\n').splitlines() if x.strip()]
+    if not ids:
+        return JSONResponse({"success": False, "msg": "No order IDs provided"})
+
+    done, failed = [], []
+    for oid in ids:
+        ok, msg = await _process_return_order(oid)
+        (done if ok else failed).append(oid if ok else f"{oid} ({msg})")
+
+    return JSONResponse({
+        "success": True,
+        "processed": len(done),
+        "failed": len(failed),
+        "done": done,
+        "errors": failed,
+        "msg": f"Processed {len(done)} returns, {len(failed)} failed.",
+    })
 
 @app.post("/api/search")
 async def api_search(request: Request):
