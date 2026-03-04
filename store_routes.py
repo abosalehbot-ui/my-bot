@@ -476,25 +476,22 @@ async def checkout_cart(request: Request, payload: CheckoutRequest):
             })
 
     # إعادة جلب أرصدة المستخدم المحدّثة بعد انتهاء كل العمليات
-    user = await db.store_customers.find_one({"email": email})
-    new_balances = {k: v for k, v in user.items() if k.startswith("balance_")}
-
-        fresh_user = await db.store_customers.find_one({"email": email})
-        new_balances = {k: v for k, v in (fresh_user or {}).items() if k.startswith("balance_")}
-        await _finish_txn_lock(txid, "done", "ok")
-        return JSONResponse({
-            "success": True,
-            "results": results,
-            "new_balances": new_balances,
-            "msg": "Checkout completed!",
-            "transaction_id": txid,
-        })
+           fresh_user = await db.store_customers.find_one({"email": email})
+           new_balances = {k: v for k, v in (fresh_user or {}).items() if k.startswith("balance_")}
+           await _finish_txn_lock(txid, "done", "ok")
+           return JSONResponse({
+             "success": True,
+             "results": results,
+             "new_balances": new_balances,
+             "msg": "Checkout completed!",
+             "transaction_id": txid,
+           })
     except ValueError as e:
-        await _finish_txn_lock(txid, "failed", str(e))
-        return JSONResponse({"success": False, "msg": str(e)})
+           await _finish_txn_lock(txid, "failed", str(e))
+           return JSONResponse({"success": False, "msg": str(e)})
     except Exception:
-        await _finish_txn_lock(txid, "failed", "internal_error")
-        return JSONResponse({"success": False, "msg": "Checkout failed due to server error."})
+           await _finish_txn_lock(txid, "failed", "internal_error")
+           return JSONResponse({"success": False, "msg": "Checkout failed due to server error."})
 
 # ==========================================
 # 5. لوحة أدمن المتجر
