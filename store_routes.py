@@ -6,12 +6,14 @@ import random
 import httpx
 import traceback
 from datetime import datetime
+import uuid
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 # ─── Shared imports (no duplicate connections) ──────────────────────────
 from database import db, get_next_order_id
 from config import SECRET_TOKEN, MONGO_URI
+from pymongo.errors import DuplicateKeyError
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
@@ -28,6 +30,7 @@ class CartItem(BaseModel):
 
 class CheckoutRequest(BaseModel):
     cart: List[CartItem]
+    transaction_id: Optional[str] = None
 
 
 def hash_password(password: str) -> str:
@@ -41,6 +44,39 @@ async def generate_unique_id():
         new_id = random.randint(10000000, 99999999)
         if not await db.store_customers.find_one({"user_id": new_id}):
             return new_id
+
+async def log_wallet_txn(email: str, amount: float, currency: str, note: str, ref: str = ""):
+    await db.store_wallet_ledger.insert_one({
+        "email": email,
+        "amount": float(amount),
+        "currency": currency.upper(),
+        "note": note,
+        "ref": ref,
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "ts": datetime.now(),
+    })
+
+async def ensure_store_security_indexes():
+    await db.store_transactions.create_index("created_at")
+
+async def acquire_transaction_lock(tx_id: str, email: str, route: str):
+    try:
+        await db.store_transactions.insert_one({
+            "_id": tx_id,
+            "email": email,
+            "route": route,
+            "status": "processing",
+            "created_at": datetime.now(),
+        })
+        return True
+    except DuplicateKeyError:
+        return False
+
+async def set_transaction_status(tx_id: str, status: str, extra: dict | None = None):
+    payload = {"status": status, "updated_at": datetime.now()}
+    if extra:
+        payload.update(extra)
+    await db.store_transactions.update_one({"_id": tx_id}, {"$set": payload})
 
 # ==========================================
 # 1. الواجهة الرئيسية للمتجر
@@ -264,36 +300,67 @@ async def reset_password(request: Request, email: str = Form(...), code: str = F
 # 4. الشراء وسجل الطلبات
 # ==========================================
 @router.post("/api/store/buy")
-async def customer_buy(request: Request, stock_key: str = Form(...), price: float = Form(...), currency: str = Form(...)):
+async def customer_buy(
+    request: Request,
+    stock_key: str = Form(...),
+    price: float = Form(...),
+    currency: str = Form(...),
+    transaction_id: str = Form(""),
+):
     email = request.cookies.get("store_session")
     if not email:
         return JSONResponse({"success": False, "msg": "Unauthorized! Please login again.", "force_logout": True})
 
+    if price <= 0:
+        return JSONResponse({"success": False, "msg": "Invalid amount."})
+    if not stock_key.strip():
+        return JSONResponse({"success": False, "msg": "Invalid product."})
+
+    currency = currency.upper().strip()
+    if not currency.isalpha() or len(currency) < 3:
+        return JSONResponse({"success": False, "msg": "Invalid currency."})
+
+    tx_id = (transaction_id or "").strip() or f"BUY-{email}-{uuid.uuid4().hex}"
+    await ensure_store_security_indexes()
+    if not await acquire_transaction_lock(tx_id, email, "buy"):
+        return JSONResponse({"success": False, "msg": "Duplicate transaction detected. This payment was already processed."})
+
     user = await db.store_customers.find_one({"email": email})
     if not user:
+        await set_transaction_status(tx_id, "failed", {"reason": "user_not_found"})
         return JSONResponse({"success": False, "msg": "Account not found!", "force_logout": True})
-    
-    if user.get("is_banned", False):
-        return JSONResponse({"success": False, "msg": "Your account is suspended.", "force_logout": True})
-        
-    if user.get("balance_frozen", False):
-        return JSONResponse({"success": False, "msg": "Your balance is currently frozen. Please contact support."})
 
-    bal_field = f"balance_{currency.lower()}"
-    if user.get(bal_field, 0) < price:
-        return JSONResponse({"success": False, "msg": f"Insufficient {currency.upper()} balance! Please recharge."})
+    if user.get("is_banned", False):
+        await set_transaction_status(tx_id, "failed", {"reason": "banned"})
+        return JSONResponse({"success": False, "msg": "Your account is suspended.", "force_logout": True})
+
+    if user.get("balance_frozen", False):
+        await set_transaction_status(tx_id, "failed", {"reason": "frozen"})
+        return JSONResponse({"success": False, "msg": "Your balance is currently frozen. Please contact support."})
 
     code_doc = await db.stock.find_one_and_delete({"category": stock_key})
     if not code_doc:
+        await set_transaction_status(tx_id, "failed", {"reason": "out_of_stock"})
         return JSONResponse({"success": False, "msg": "Sorry, this product is out of stock."})
 
-    code_str    = str(code_doc.get("code") or code_doc["_id"])
-    seq         = await get_next_order_id()
-    order_id    = f"{seq}S"
-    now_str     = datetime.now().strftime("%Y-%m-%d %H:%M")
+    bal_field = f"balance_{currency.lower()}"
+    bal_res = await db.store_customers.update_one(
+        {"email": email, bal_field: {"$gte": price}},
+        {"$inc": {bal_field: -price}}
+    )
+    if bal_res.modified_count == 0:
+        await db.stock.insert_one({
+            "code": code_doc.get("code") or code_doc.get("_id"),
+            "category": stock_key,
+            "added_at": datetime.now(),
+        })
+        await set_transaction_status(tx_id, "failed", {"reason": "insufficient_balance"})
+        return JSONResponse({"success": False, "msg": f"Insufficient {currency} balance! Please recharge."})
 
-    await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: -price}})
-    new_bal = user.get(bal_field, 0) - price
+    code_str = str(code_doc.get("code") or code_doc["_id"])
+    seq      = await get_next_order_id()
+    order_id = f"{seq}S"
+    now_str  = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     await db.store_orders.insert_one({
         "_id":      order_id,
@@ -302,7 +369,7 @@ async def customer_buy(request: Request, stock_key: str = Form(...), price: floa
         "category": stock_key,
         "code":     code_str,
         "price":    price,
-        "currency": currency.upper(),
+        "currency": currency,
         "date":     now_str,
     })
     await db.codes_map.insert_one({
@@ -312,9 +379,14 @@ async def customer_buy(request: Request, stock_key: str = Form(...), price: floa
         "time":     now_str,
         "source":   "Web Store",
     })
+    await log_wallet_txn(email, -price, currency, f"Order #{order_id}", ref=order_id)
+
+    fresh_user = await db.store_customers.find_one({"email": email}, {bal_field: 1})
+    new_bal = (fresh_user or {}).get(bal_field, 0)
+    await set_transaction_status(tx_id, "success", {"order_id": order_id})
 
     return JSONResponse({"success": True, "code": code_str, "new_balance": new_bal,
-                         "currency": currency.upper(), "msg": "Purchase successful!"})
+                         "currency": currency, "msg": "Purchase successful!"})
 
 @router.get("/api/store/my-orders")
 async def get_my_orders(request: Request):
@@ -327,55 +399,83 @@ async def get_my_orders(request: Request):
         o["order_id"] = str(o.get("_id", ""))
     return JSONResponse({"success": True, "orders": orders})
 
+@router.get("/api/store/wallet-history")
+async def wallet_history(request: Request):
+    email = request.cookies.get("store_session")
+    if not email:
+        return JSONResponse({"success": False, "txns": []})
+
+    txns = await db.store_wallet_ledger.find({"email": email}).sort("ts", -1).to_list(200)
+    for t in txns:
+        t["id"] = str(t.get("_id", ""))
+        if "_id" in t:
+            del t["_id"]
+        t.pop("ts", None)
+    return JSONResponse({"success": True, "txns": txns})
+
 @router.post("/api/store/checkout-cart")
 async def checkout_cart(request: Request, payload: CheckoutRequest):
-    """شراء أكثر من منتج في عملية واحدة (Checkout Cart)."""
+    """شراء أكثر من منتج في عملية واحدة (Checkout Cart) مع حماية من السباق والازدواج."""
     email = request.cookies.get("store_session")
     if not email:
         return JSONResponse({"success": False, "msg": "Unauthorized! Please login again.", "force_logout": True})
 
+    tx_id = (payload.transaction_id or "").strip() or f"CART-{email}-{uuid.uuid4().hex}"
+    await ensure_store_security_indexes()
+    if not await acquire_transaction_lock(tx_id, email, "checkout_cart"):
+        return JSONResponse({"success": False, "msg": "Duplicate transaction detected. This checkout was already processed."})
+
     user = await db.store_customers.find_one({"email": email})
     if not user:
+        await set_transaction_status(tx_id, "failed", {"reason": "user_not_found"})
         return JSONResponse({"success": False, "msg": "Account not found!", "force_logout": True})
     if user.get("is_banned", False):
+        await set_transaction_status(tx_id, "failed", {"reason": "banned"})
         return JSONResponse({"success": False, "msg": "Your account is suspended.", "force_logout": True})
     if user.get("balance_frozen", False):
+        await set_transaction_status(tx_id, "failed", {"reason": "frozen"})
         return JSONResponse({"success": False, "msg": "Your balance is currently frozen. Please contact support."})
 
     results = []
 
     for item in payload.cart:
-        currency  = item.currency.upper()
+        if item.quantity <= 0 or int(item.quantity) != item.quantity:
+            results.append({"stock_key": item.stock_key, "status": "Failed", "msg": "Invalid quantity"})
+            continue
+        if item.price <= 0:
+            results.append({"stock_key": item.stock_key, "status": "Failed", "msg": "Invalid amount"})
+            continue
+
+        currency  = item.currency.upper().strip()
+        if not currency.isalpha() or len(currency) < 3:
+            results.append({"stock_key": item.stock_key, "status": "Failed", "msg": "Invalid currency"})
+            continue
+
         bal_field = f"balance_{currency.lower()}"
 
-        for _ in range(item.quantity):
-            # إعادة جلب المستخدم في كل حلقة لضمان دقة الرصيد المتبقي
-            user = await db.store_customers.find_one({"email": email})
-
-            if user.get(bal_field, 0) < item.price:
-                results.append({
-                    "stock_key": item.stock_key,
-                    "status":    "Failed",
-                    "msg":       f"Insufficient {currency} balance!",
-                })
-                # توقف عن محاولة شراء هذا المنتج بالكمية المتبقية
-                break
-
+        for _ in range(int(item.quantity)):
             code_doc = await db.stock.find_one_and_delete({"category": item.stock_key})
             if not code_doc:
-                results.append({
-                    "stock_key": item.stock_key,
-                    "status":    "Failed",
-                    "msg":       "Out of stock",
-                })
+                results.append({"stock_key": item.stock_key, "status": "Failed", "msg": "Out of stock"})
                 break
 
-            code_str    = str(code_doc.get("code") or code_doc["_id"])
-            seq         = await get_next_order_id()
-            order_id    = f"{seq}S"
-            now_str     = datetime.now().strftime("%Y-%m-%d %H:%M")
+            bal_res = await db.store_customers.update_one(
+                {"email": email, bal_field: {"$gte": item.price}},
+                {"$inc": {bal_field: -item.price}}
+            )
+            if bal_res.modified_count == 0:
+                await db.stock.insert_one({
+                    "code": code_doc.get("code") or code_doc.get("_id"),
+                    "category": item.stock_key,
+                    "added_at": datetime.now(),
+                })
+                results.append({"stock_key": item.stock_key, "status": "Failed", "msg": f"Insufficient {currency} balance!"})
+                break
 
-            await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: -item.price}})
+            code_str = str(code_doc.get("code") or code_doc["_id"])
+            seq      = await get_next_order_id()
+            order_id = f"{seq}S"
+            now_str  = datetime.now().strftime("%Y-%m-%d %H:%M")
 
             await db.store_orders.insert_one({
                 "_id":      order_id,
@@ -394,6 +494,7 @@ async def checkout_cart(request: Request, payload: CheckoutRequest):
                 "time":     now_str,
                 "source":   "Web Store",
             })
+            await log_wallet_txn(email, -item.price, currency, f"Order #{order_id}", ref=order_id)
 
             results.append({
                 "stock_key": item.stock_key,
@@ -404,9 +505,9 @@ async def checkout_cart(request: Request, payload: CheckoutRequest):
                 "order_id":  order_id,
             })
 
-    # إعادة جلب أرصدة المستخدم المحدّثة بعد انتهاء كل العمليات
     user = await db.store_customers.find_one({"email": email})
-    new_balances = {k: v for k, v in user.items() if k.startswith("balance_")}
+    new_balances = {k: v for k, v in (user or {}).items() if k.startswith("balance_")}
+    await set_transaction_status(tx_id, "success", {"results_count": len(results)})
 
     return JSONResponse({
         "success":      True,
@@ -457,19 +558,39 @@ async def store_admin_page(request: Request):
     })
 
 @router.post("/api/store/manage_balance")
-async def store_manage_balance(request: Request, email: str = Form(...), amount: float = Form(...), action: str = Form(...), currency: str = Form(...)):
+async def store_manage_balance(request: Request, email: str = Form(...), amount: int = Form(...), action: str = Form(...), currency: str = Form(...), transaction_id: str = Form("")):
     if not check_auth(request):
         return JSONResponse({"success": False, "msg": "Unauthorized"})
 
-    # ده بيسمح بإنشاء أي عملة جديدة تلقائياً بمجرد كتابة اسمها!
+    if amount <= 0:
+        return JSONResponse({"success": False, "msg": "Amount must be a positive integer"})
+
+    currency = currency.upper().strip()
+    if not currency.isalpha() or len(currency) < 3:
+        return JSONResponse({"success": False, "msg": "Invalid currency"})
+
+    tx_id = (transaction_id or "").strip() or f"ADMIN-BAL-{email}-{uuid.uuid4().hex}"
+    await ensure_store_security_indexes()
+    if not await acquire_transaction_lock(tx_id, email, "manage_balance"):
+        return JSONResponse({"success": False, "msg": "Duplicate transaction detected."})
+
     bal_field = f"balance_{currency.lower()}"
-    
+
     if action == "add":
         await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: amount}})
+        await log_wallet_txn(email, amount, currency, "Top-up (Admin)")
     elif action == "sub":
-        await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: -amount}})
+        res = await db.store_customers.update_one({"email": email, bal_field: {"$gte": amount}}, {"$inc": {bal_field: -amount}})
+        if res.modified_count == 0:
+            await set_transaction_status(tx_id, "failed", {"reason": "insufficient_balance"})
+            return JSONResponse({"success": False, "msg": f"Insufficient {currency} balance"})
+        await log_wallet_txn(email, -amount, currency, "Manual deduction (Admin)")
+    else:
+        await set_transaction_status(tx_id, "failed", {"reason": "invalid_action"})
+        return JSONResponse({"success": False, "msg": "Invalid action"})
 
-    return JSONResponse({"success": True, "msg": f"{currency.upper()} balance updated successfully!"})
+    await set_transaction_status(tx_id, "success")
+    return JSONResponse({"success": True, "msg": f"{currency} balance updated successfully!", "transaction_id": tx_id})
 
 # Endpoint تجميد الرصيد أو حظر الحساب
 @router.post("/api/store/admin/toggle-status")
