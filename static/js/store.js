@@ -326,6 +326,8 @@ function updateUIDynamic(name, balances) {
         const profEl = $(`prof-bal-${curr.toLowerCase()}`);
         if (profEl) profEl.innerText = val;
     }
+} // <--- تم إصلاح الكارثة وإضافة قوس الإغلاق هنا!
+
 function openProfileModal() {
     if($('prof-name')) $('prof-name').innerText = localStorage.getItem('store_name');
     if($('prof-email')) $('prof-email').innerText = localStorage.getItem('store_email');
@@ -342,7 +344,8 @@ function openProfileModal() {
     }
     openModal('profile-modal');
 }
-    function previewAvatar(input) {
+
+function previewAvatar(input) {
     if (input.files && input.files[0]) {
         const reader = new FileReader();
         reader.onload = function(e) {
@@ -372,6 +375,7 @@ async function doChangePassword(e) {
     } catch { Core.showToast('Network Error!', 'error'); }
     btn.innerHTML = orig; btn.disabled = false;
 }
+
 async function doUpdateProfile(e) {
     e.preventDefault();
     const name = $('edit-name').value;
