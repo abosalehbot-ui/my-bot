@@ -6,6 +6,8 @@ import random
 import httpx
 import traceback
 from datetime import datetime
+from pydantic import BaseModel
+from typing import List
 
 # ─── Shared imports (no duplicate connections) ──────────────────────────
 from database import db, get_next_order_id
@@ -15,6 +17,17 @@ router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 
 GOOGLE_CLIENT_ID = "671995925834-4bf0od4fm0pkkhvkfrvqh41h6rpb574v.apps.googleusercontent.com"
+
+
+# ── Pydantic models لـ Checkout Cart ──────────────────────────────────────
+class CartItem(BaseModel):
+    stock_key: str
+    price:     float
+    currency:  str
+    quantity:  int
+
+class CheckoutRequest(BaseModel):
+    cart: List[CartItem]
 
 
 def hash_password(password: str) -> str:
@@ -53,6 +66,17 @@ async def public_storefront(request: Request):
                 sk = p.get("stock_key")
                 if sk and sk not in stock_details:
                     stock_details[sk] = await db.stock.count_documents({"category": sk})
+                # 4. توحيد prices لدعم المنتجات القديمة والجديدة
+                if "prices" not in p:
+                    p["prices"] = {
+                        "EGP": p.get("price_egp", 0),
+                        "USD": p.get("price_usd", 0),
+                    }
+
+        # 5. جلب العملات المتاحة من قاعدة البيانات
+        currencies = await db.store_currencies.find().to_list(100)
+        if not currencies:
+            currencies = [{"_id": "EGP", "symbol": "EGP"}, {"_id": "USD", "symbol": "USD"}]
 
         return templates.TemplateResponse("storefront.html", {
             "request":     request,
@@ -60,9 +84,10 @@ async def public_storefront(request: Request):
             "stock":       stock_details,
             "client_id":   GOOGLE_CLIENT_ID,
             "maintenance": maintenance,
+            "currencies":  currencies,
         })
     except Exception as e:
-        # 4. طباعة الخطأ بالكامل على الشاشة بدل الإيرور 500 المزعج
+        # 6. طباعة الخطأ بالكامل على الشاشة بدل الإيرور 500 المزعج
         error_details = traceback.format_exc()
         print(error_details)
         return HTMLResponse(
@@ -301,6 +326,94 @@ async def get_my_orders(request: Request):
     for o in orders:
         o["order_id"] = str(o.get("_id", ""))
     return JSONResponse({"success": True, "orders": orders})
+
+@router.post("/api/store/checkout-cart")
+async def checkout_cart(request: Request, payload: CheckoutRequest):
+    """شراء أكثر من منتج في عملية واحدة (Checkout Cart)."""
+    email = request.cookies.get("store_session")
+    if not email:
+        return JSONResponse({"success": False, "msg": "Unauthorized! Please login again.", "force_logout": True})
+
+    user = await db.store_customers.find_one({"email": email})
+    if not user:
+        return JSONResponse({"success": False, "msg": "Account not found!", "force_logout": True})
+    if user.get("is_banned", False):
+        return JSONResponse({"success": False, "msg": "Your account is suspended.", "force_logout": True})
+    if user.get("balance_frozen", False):
+        return JSONResponse({"success": False, "msg": "Your balance is currently frozen. Please contact support."})
+
+    results = []
+
+    for item in payload.cart:
+        currency  = item.currency.upper()
+        bal_field = f"balance_{currency.lower()}"
+
+        for _ in range(item.quantity):
+            # إعادة جلب المستخدم في كل حلقة لضمان دقة الرصيد المتبقي
+            user = await db.store_customers.find_one({"email": email})
+
+            if user.get(bal_field, 0) < item.price:
+                results.append({
+                    "stock_key": item.stock_key,
+                    "status":    "Failed",
+                    "msg":       f"Insufficient {currency} balance!",
+                })
+                # توقف عن محاولة شراء هذا المنتج بالكمية المتبقية
+                break
+
+            code_doc = await db.stock.find_one_and_delete({"category": item.stock_key})
+            if not code_doc:
+                results.append({
+                    "stock_key": item.stock_key,
+                    "status":    "Failed",
+                    "msg":       "Out of stock",
+                })
+                break
+
+            code_str    = str(code_doc.get("code") or code_doc["_id"])
+            seq         = await get_next_order_id()
+            order_id    = f"{seq}S"
+            now_str     = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+            await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: -item.price}})
+
+            await db.store_orders.insert_one({
+                "_id":      order_id,
+                "email":    email,
+                "name":     user["name"],
+                "category": item.stock_key,
+                "code":     code_str,
+                "price":    item.price,
+                "currency": currency,
+                "date":     now_str,
+            })
+            await db.codes_map.insert_one({
+                "code":     code_str,
+                "order_id": order_id,
+                "name":     f"{user['name']} (Web)",
+                "time":     now_str,
+                "source":   "Web Store",
+            })
+
+            results.append({
+                "stock_key": item.stock_key,
+                "status":    "Success",
+                "code":      code_str,
+                "price":     item.price,
+                "currency":  currency,
+                "order_id":  order_id,
+            })
+
+    # إعادة جلب أرصدة المستخدم المحدّثة بعد انتهاء كل العمليات
+    user = await db.store_customers.find_one({"email": email})
+    new_balances = {k: v for k, v in user.items() if k.startswith("balance_")}
+
+    return JSONResponse({
+        "success":      True,
+        "results":      results,
+        "new_balances": new_balances,
+        "msg":          "Checkout completed!",
+    })
 
 # ==========================================
 # 5. لوحة أدمن المتجر

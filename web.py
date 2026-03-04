@@ -1,6 +1,7 @@
 import os
 import re
-from fastapi import FastAPI, Request, Form, Response, status
+import uuid
+from fastapi import FastAPI, Request, Form, Response, status, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -44,6 +45,34 @@ def clean_and_extract_tokens(raw_text):
         if len(token) > 15 and re.match(r'^[A-Za-z0-9\-_]+$', token):
             valid_tokens.append(token)
     return valid_tokens
+
+
+async def save_upload(file: UploadFile) -> str:
+    """حفظ الملف المرفوع وإرجاع المسار العام."""
+    if not file or not file.filename:
+        return ""
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "png"
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    filepath = os.path.join("static", "uploads", filename)
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    content = await file.read()
+    with open(filepath, "wb") as f:
+        f.write(content)
+    return f"/static/uploads/{filename}"
+
+
+def convert_objectids(document):
+    """تحويل ObjectId لـ string لتجنب أخطاء JSON."""
+    if isinstance(document, list):
+        for item in document:
+            convert_objectids(item)
+    elif isinstance(document, dict):
+        for key, value in list(document.items()):
+            if key == "_id" and not isinstance(value, (str, int, float)):
+                document[key] = str(value)
+            else:
+                convert_objectids(value)
+    return document
 
 
 # ==========================================
@@ -130,38 +159,104 @@ async def dashboard(request: Request):
             dynamic_stock_keys.append(p["stock_key"])
             stock_details[p["stock_key"]] = await db.stock.count_documents({"category": p["stock_key"]})
 
+    # ── جلب العملات للـ Dashboard ──────────────────────────────────────────
+    currencies = await db.store_currencies.find().to_list(None)
+    if not currencies:
+        default_curs = [{"_id": "EGP", "symbol": "EGP"}, {"_id": "USD", "symbol": "USD"}]
+        await db.store_currencies.insert_many(default_curs)
+        currencies = default_curs
+
+    # ── حماية المنتجات القديمة من أخطاء prices ────────────────────────────
+    for cat in categories:
+        for p in cat.get("products", []):
+            if "prices" not in p:
+                p["prices"] = {
+                    "EGP": p.get("price_egp", 0),
+                    "USD": p.get("price_usd", 0),
+                }
+
     settings    = await db.settings.find_one({"_id": "config"})
     maintenance = settings.get("maintenance", False) if settings else False
 
     cache_config  = await db.settings.find_one({"_id": "cache_config"})
     tracked_users = cache_config.get("tracked_users", []) if cache_config else []
 
+    all_users  = convert_objectids(all_users)
+    categories = convert_objectids(categories)
+    logs       = convert_objectids(logs)
+
     return templates.TemplateResponse("index.html", {
         "request": request, "users_count": users_count, "stock_count": stock_count,
         "cached_count": cached_count, "logs": logs, "all_users": all_users,
         "stock_details": stock_details, "dynamic_stock_keys": dynamic_stock_keys,
-        "categories": categories, "maintenance": maintenance,
+        "categories": categories, "currencies": currencies, "maintenance": maintenance,
         "shared_tokens_count": shared_tokens_count, "total_system_tokens": total_system_tokens,
         "global_stats": global_stats, "store_stats": store_stats, "tracked_users": tracked_users,
     })
 
 
 # ==========================================
-# Catalog APIs
+# Currencies APIs (إدارة العملات)
+# ==========================================
+@app.post("/api/catalog/currency/add")
+async def api_add_currency(request: Request, code: str = Form(...), symbol: str = Form(...)):
+    if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauthorized"})
+    code = code.upper().strip()
+    if await db.store_currencies.find_one({"_id": code}):
+        return JSONResponse({"success": False, "msg": "Currency already exists!"})
+    await db.store_currencies.insert_one({"_id": code, "symbol": symbol.strip()})
+    await web_log("إضافة عملة", f"{code} ({symbol})")
+    return JSONResponse({"success": True, "msg": f"Currency {code} added successfully!"})
+
+@app.post("/api/catalog/currency/delete")
+async def api_delete_currency(request: Request, code: str = Form(...)):
+    if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauthorized"})
+    await db.store_currencies.delete_one({"_id": code})
+    await web_log("حذف عملة", code)
+    return JSONResponse({"success": True, "msg": f"Currency {code} deleted!"})
+
+
+# ==========================================
+# Catalog APIs (الكتالوج والصور والأسعار)
 # ==========================================
 @app.post("/api/catalog/category/add")
-async def api_add_category(request: Request, cat_id: str = Form(...), name: str = Form(...), icon: str = Form("fa-gamepad")):
+async def api_add_category(
+    request: Request,
+    cat_id: str = Form(...),
+    name: str = Form(...),
+    icon: str = Form("fa-gamepad"),
+    image: UploadFile = File(None),
+    logo: UploadFile = File(None),
+):
     if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauth"})
     cat_id = cat_id.lower().replace(" ", "_")
-    if await db.store_categories.find_one({"_id": cat_id}): return JSONResponse({"success": False, "msg": "ID exists!"})
-    await db.store_categories.insert_one({"_id": cat_id, "name": name, "icon": icon, "products": []})
+    if await db.store_categories.find_one({"_id": cat_id}):
+        return JSONResponse({"success": False, "msg": "ID exists!"})
+    image_url = await save_upload(image) if image and image.filename else ""
+    logo_url  = await save_upload(logo)  if logo  and logo.filename  else ""
+    await db.store_categories.insert_one({
+        "_id": cat_id, "name": name, "icon": icon,
+        "image": image_url, "logo": logo_url, "products": []
+    })
     await web_log("إنشاء فئة جديدة", f"الفئة: {name}")
     return JSONResponse({"success": True, "msg": "Category Added!"})
 
 @app.post("/api/catalog/category/edit")
-async def api_edit_category(request: Request, cat_id: str = Form(...), name: str = Form(...), icon: str = Form(...)):
+async def api_edit_category(
+    request: Request,
+    cat_id: str = Form(...),
+    name: str = Form(...),
+    icon: str = Form(...),
+    image: UploadFile = File(None),
+    logo: UploadFile = File(None),
+):
     if not check_auth(request): return JSONResponse({"success": False})
-    await db.store_categories.update_one({"_id": cat_id}, {"$set": {"name": name, "icon": icon}})
+    update_data = {"name": name, "icon": icon}
+    if image and image.filename:
+        update_data["image"] = await save_upload(image)
+    if logo and logo.filename:
+        update_data["logo"] = await save_upload(logo)
+    await db.store_categories.update_one({"_id": cat_id}, {"$set": update_data})
     await web_log("تعديل فئة", f"{cat_id} → {name}")
     return JSONResponse({"success": True, "msg": "Category Updated!"})
 
@@ -172,19 +267,67 @@ async def api_delete_category(request: Request, cat_id: str = Form(...)):
     return JSONResponse({"success": True, "msg": "Category Deleted!"})
 
 @app.post("/api/catalog/product/add")
-async def api_add_product(request: Request, cat_id: str = Form(...), stock_key: str = Form(...), name: str = Form(...), price_egp: float = Form(...), price_usd: float = Form(...)):
+async def api_add_product(request: Request, image: UploadFile = File(None)):
     if not check_auth(request): return JSONResponse({"success": False})
-    product = {"stock_key": stock_key, "name": name, "price_egp": price_egp, "price_usd": price_usd}
+    form      = await request.form()
+    cat_id    = form.get("cat_id")
+    stock_key = form.get("stock_key")
+    name      = form.get("name")
+
+    image_url = await save_upload(image) if image and image.filename else form.get("image", "")
+
+    # بناء كائن الأسعار ديناميكياً لدعم أي عملة
+    prices = {}
+    for key, val in form.items():
+        if key.startswith("price_"):
+            curr_code = key.replace("price_", "").upper()
+            try:
+                prices[curr_code] = float(val) if val else 0.0
+            except ValueError:
+                prices[curr_code] = 0.0
+
+    product = {
+        "stock_key": stock_key,
+        "name":      name,
+        "image":     image_url,
+        "prices":    prices,
+        "price_egp": prices.get("EGP", 0),
+        "price_usd": prices.get("USD", 0),
+    }
     await db.store_categories.update_one({"_id": cat_id}, {"$push": {"products": product}})
     await web_log("إضافة منتج", f"{name} في {cat_id}")
     return JSONResponse({"success": True, "msg": "Product Added!"})
 
 @app.post("/api/catalog/product/edit")
-async def api_edit_product(request: Request, cat_id: str = Form(...), stock_key: str = Form(...), name: str = Form(...), price_egp: float = Form(...), price_usd: float = Form(...)):
+async def api_edit_product(request: Request, image: UploadFile = File(None)):
     if not check_auth(request): return JSONResponse({"success": False})
+    form      = await request.form()
+    cat_id    = form.get("cat_id")
+    stock_key = form.get("stock_key")
+    name      = form.get("name")
+
+    update_fields = {"products.$.name": name}
+    if image and image.filename:
+        update_fields["products.$.image"] = await save_upload(image)
+    elif form.get("image"):
+        update_fields["products.$.image"] = form.get("image")
+
+    prices = {}
+    for key, val in form.items():
+        if key.startswith("price_"):
+            curr_code = key.replace("price_", "").upper()
+            try:
+                prices[curr_code] = float(val) if val else 0.0
+            except ValueError:
+                prices[curr_code] = 0.0
+
+    update_fields["products.$.prices"]    = prices
+    update_fields["products.$.price_egp"] = prices.get("EGP", 0)
+    update_fields["products.$.price_usd"] = prices.get("USD", 0)
+
     await db.store_categories.update_one(
         {"_id": cat_id, "products.stock_key": stock_key},
-        {"$set": {"products.$.name": name, "products.$.price_egp": price_egp, "products.$.price_usd": price_usd}}
+        {"$set": update_fields}
     )
     return JSONResponse({"success": True, "msg": "Product Updated!"})
 
