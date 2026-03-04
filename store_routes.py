@@ -46,7 +46,6 @@ async def public_storefront(request: Request):
     settings = await db.settings.find_one({"_id": "config"})
     maintenance = settings.get("maintenance", False) if settings else False
 
-    # --- جلب بيانات العميل لتجنب خطأ 500 ---
     email = request.cookies.get("store_session")
     customer_data = {"name": ""} 
     if email:
@@ -82,7 +81,7 @@ async def public_storefront(request: Request):
         "stock": stock_details, 
         "client_id": GOOGLE_CLIENT_ID, 
         "maintenance": maintenance,
-        "customer": customer_data # تمرير البيانات هنا
+        "customer": customer_data
     })
 
 # ==========================================
@@ -238,6 +237,7 @@ async def customer_buy_uc(request: Request, stock_key: str = Form(...), price: f
     })
     
     return JSONResponse({"success": True, "code": code_str, "new_balance": new_bal, "currency": currency.upper(), "msg": "Purchase successful!"})
+
 @router.post("/api/store/checkout-cart")
 async def checkout_cart(request: Request, payload: CheckoutRequest):
     email = request.cookies.get("store_session")
@@ -295,6 +295,7 @@ async def checkout_cart(request: Request, payload: CheckoutRequest):
     }
 
     return JSONResponse({"success": True, "results": results, "new_balances": new_balances, "msg": "Checkout completed!"})
+
 @router.get("/api/store/my-orders")
 async def get_my_orders(request: Request):
     email = request.cookies.get("store_session")
@@ -367,6 +368,7 @@ async def change_email_verify(request: Request, new_email: str = Form(...), code
     res = JSONResponse({"success": True, "msg": "Email updated successfully!"})
     res.set_cookie(key="store_session", value=new_email, httponly=True, max_age=86400 * 30)
     return res
+
 @router.post("/api/store/change-password")
 async def change_password(request: Request, old_password: str = Form(...), new_password: str = Form(...)):
     email = request.cookies.get("store_session")
@@ -381,6 +383,7 @@ async def change_password(request: Request, old_password: str = Form(...), new_p
         
     await db.store_customers.update_one({"email": email}, {"$set": {"password": hash_password(new_password)}})
     return JSONResponse({"success": True, "msg": "Password updated successfully!"})
+
 # ==========================================
 # 6. لوحة أدمن الاستور
 # ==========================================
@@ -422,26 +425,18 @@ async def admin_set_avatar(request: Request, email: str = Form(...), avatar: Upl
 async def store_manage_balance(request: Request, email: str = Form(...), amount: float = Form(...), action: str = Form(...), currency: str = Form(...)):
     if not check_auth(request): return JSONResponse({"success": False})
     
-    # حل جذري للمستخدمين القدامى: البحث بالإيميل أو اليوزر نيم أو الـ ID
     query = [{"email": email}, {"username": email}]
-    try:
-        query.append({"user_id": int(email)})
-    except:
-        pass
+    try: query.append({"user_id": int(email)})
+    except: pass
         
     user = await db.store_customers.find_one({"$or": query})
-    if not user:
-        return JSONResponse({"success": False, "msg": "User not found (Old user record might be corrupted)."})
+    if not user: return JSONResponse({"success": False, "msg": "User not found."})
         
     bal_field = f"balance_{currency.lower()}"
-    # نستخدم الـ _id الحقيقي للمستخدم لضمان تحديث بياناته حتى لو كان حسابه قديماً
     if action == "add": await db.store_customers.update_one({"_id": user["_id"]}, {"$inc": {bal_field: amount}})
     elif action == "set": await db.store_customers.update_one({"_id": user["_id"]}, {"$set": {bal_field: amount}})
     
     return JSONResponse({"success": True, "msg": f"{currency.upper()} Balance updated successfully!"})
-# ==========================================
-# 7. مسارات التحكم الشاملة للعملاء (Admin Controls)
-# ==========================================
 
 @router.post("/api/store/admin/delete-customer")
 async def admin_delete_customer(request: Request, email: str = Form(...)):
@@ -468,12 +463,11 @@ async def admin_change_email_req(request: Request, email: str = Form(...), new_e
     if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauthorized"})
     
     existing = await db.store_customers.find_one({"email": new_email})
-    if existing:
-        return JSONResponse({"success": False, "msg": "New email is already registered to another user!"})
+    if existing: return JSONResponse({"success": False, "msg": "New email is already registered!"})
     
     code = str(random.randint(100000, 999999))
     await db.otps.update_one({"email": new_email}, {"$set": {"code": code, "old_email": email, "type": "admin_change_email", "created_at": datetime.now()}}, upsert=True)
-    return JSONResponse({"success": True, "msg": "Verification OTP generated. Check database or logs."})
+    return JSONResponse({"success": True, "msg": "Verification OTP generated."})
 
 @router.post("/api/store/admin/email-verify")
 async def admin_change_email_ver(request: Request, email: str = Form(...), code: str = Form(...)):
@@ -488,11 +482,6 @@ async def admin_change_email_ver(request: Request, email: str = Form(...), code:
     await db.otps.delete_one({"_id": otp_doc["_id"]})
     
     return JSONResponse({"success": True, "msg": "Email changed successfully!", "new_email": new_email})
-
-
-# -------------------------------------------------------------------
-# 👇 الأكواد المضافة حديثاً لتشغيل (Account Controls) وسجل الطلبات 👇
-# -------------------------------------------------------------------
 
 @router.post("/api/store/admin/toggle-status")
 async def admin_toggle_status(request: Request, email: str = Form(...), action: str = Form(...)):
@@ -528,10 +517,10 @@ async def admin_customer_orders(request: Request, email: str):
             o['order_id'] = str(o['_id'])
             o['_id'] = str(o['_id'])
     return JSONResponse({"success": True, "orders": orders})
-    # -------------------------------------------------------------------
-# 👇 دوال إرجاع الطلبات الجديدة (تعمل بصمت بدون Redirect) 👇
-# -------------------------------------------------------------------
 
+# ==========================================
+# 8. إرجاع الطلبات والأموال (المشكلة التي تم حلها!)
+# ==========================================
 @router.post("/api/store/admin/return-order")
 async def admin_return_single_order(request: Request, order_id: str = Form(...)):
     if not check_auth(request): return JSONResponse({"success": False, "msg": "Unauthorized"})
@@ -539,14 +528,23 @@ async def admin_return_single_order(request: Request, order_id: str = Form(...))
     order = await db.store_orders.find_one({"_id": order_id})
     if not order: return JSONResponse({"success": False, "msg": "Order not found!"})
     
-    # 1. إرجاع الكود للمخزن
+    # 1. إرجاع الرصيد للمستخدم (المشكلة السابقة)
+    email = order.get("email")
+    price = float(order.get("price", 0))
+    currency = order.get("currency", "EGP").lower()
+    bal_field = f"balance_{currency}"
+    
+    if email and price > 0:
+        await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: price}})
+    
+    # 2. إرجاع الكود للمخزن
     await db.stock.insert_one({"code": order["code"], "category": order["category"], "added_at": datetime.now()})
     
-    # 2. حذف الطلب من خريطة الأكواد ومن سجل الطلبات
+    # 3. مسح الطلب من السجلات
     await db.codes_map.delete_many({"order_id": order_id})
     await db.store_orders.delete_one({"_id": order_id})
     
-    return JSONResponse({"success": True, "msg": f"Order #{order_id} returned to stock successfully!"})
+    return JSONResponse({"success": True, "msg": f"Order #{order_id} returned and {price} {currency.upper()} refunded!"})
 
 @router.post("/api/store/admin/return-all-orders")
 async def admin_return_all_orders(request: Request, email: str = Form(...)):
@@ -555,13 +553,30 @@ async def admin_return_all_orders(request: Request, email: str = Form(...)):
     orders = await db.store_orders.find({"email": email}).to_list(None)
     if not orders: return JSONResponse({"success": False, "msg": "No orders found for this user."})
     
-    # تجهيز الأكواد لإرجاعها للمخزن دفعة واحدة
-    codes_to_return = [{"code": o["code"], "category": o["category"], "added_at": datetime.now()} for o in orders]
-    await db.stock.insert_many(codes_to_return, ordered=False)
+    refund_egp = 0.0
+    refund_usd = 0.0
+    codes_to_return = []
+    order_ids = []
     
-    # حذف جميع الطلبات الخاصة بهذا المستخدم من السجلات
-    order_ids = [o["_id"] for o in orders]
+    # حساب الفلوس وتجهيز الأكواد
+    for o in orders:
+        codes_to_return.append({"code": o["code"], "category": o["category"], "added_at": datetime.now()})
+        order_ids.append(o["_id"])
+        
+        curr = o.get("currency", "").upper()
+        if curr == "EGP": refund_egp += float(o.get("price", 0))
+        elif curr == "USD": refund_usd += float(o.get("price", 0))
+        
+    # إرجاع المال للمستخدم
+    if refund_egp > 0 or refund_usd > 0:
+        await db.store_customers.update_one(
+            {"email": email},
+            {"$inc": {"balance_egp": refund_egp, "balance_usd": refund_usd}}
+        )
+        
+    # إرجاع الأكواد وحذف السجلات
+    await db.stock.insert_many(codes_to_return, ordered=False)
     await db.codes_map.delete_many({"order_id": {"$in": order_ids}})
     await db.store_orders.delete_many({"email": email})
     
-    return JSONResponse({"success": True, "msg": f"Success! {len(orders)} orders returned to stock."})
+    return JSONResponse({"success": True, "msg": f"Success! {len(orders)} orders returned and money refunded."})
