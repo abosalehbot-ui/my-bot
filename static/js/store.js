@@ -563,13 +563,6 @@ async function confirmCartPurchase() {
 }
 
 // ─── Profile Modal ───────────────────────────────────────────────────────
-
-function showTab(tabName) {
-    if (tabName === 'profile') {
-        openProfileModal();
-    }
-}
-
 function _isStoreLoggedIn() {
     return !!localStorage.getItem('store_email');
 }
@@ -578,26 +571,14 @@ function _applyProfileAuthGuard() {
     const authContent = $('profile-auth-content');
     const required    = $('profile-login-required');
     const loggedIn    = _isStoreLoggedIn();
-
-    // If template renders both blocks, keep old behavior.
-    if (required) {
-        if (authContent) authContent.classList.toggle('hidden', !loggedIn);
-        required.classList.toggle('hidden', loggedIn);
-        return;
-    }
-
-    // Jinja guest-mode card is rendered inside profile-auth-content.
-    if (authContent) authContent.classList.remove('hidden');
+    if (authContent) authContent.classList.toggle('hidden', !loggedIn);
+    if (required) required.classList.toggle('hidden', loggedIn);
 }
 
 function openProfileModal() {
     openModal('profile-modal');
     _applyProfileAuthGuard();
-
-    if (!_isStoreLoggedIn()) {
-        openAuthModal('signin');
-        return;
-    }
+    if (!_isStoreLoggedIn()) return;
 
     const remembered = localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview';
     switchProfileTab(remembered);
@@ -606,7 +587,7 @@ function openProfileModal() {
 }
 
 function switchProfileTab(tab) {
-    if (!_isStoreLoggedIn()) { openAuthModal('signin'); return; }
+    if (!_isStoreLoggedIn()) return;
     ['overview', 'edit', 'security', 'history', 'support'].forEach(t => {
         $('ptab-' + t)?.classList.add('hidden');
         const btn = $('ptab-btn-' + t);
