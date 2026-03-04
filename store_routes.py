@@ -42,6 +42,17 @@ async def generate_unique_id():
         if not await db.store_customers.find_one({"user_id": new_id}):
             return new_id
 
+async def log_wallet_txn(email: str, amount: float, currency: str, note: str, ref: str = ""):
+    await db.store_wallet_ledger.insert_one({
+        "email": email,
+        "amount": float(amount),
+        "currency": currency.upper(),
+        "note": note,
+        "ref": ref,
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "ts": datetime.now(),
+    })
+
 # ==========================================
 # 1. الواجهة الرئيسية للمتجر
 # ==========================================
@@ -312,6 +323,7 @@ async def customer_buy(request: Request, stock_key: str = Form(...), price: floa
         "time":     now_str,
         "source":   "Web Store",
     })
+    await log_wallet_txn(email, -price, currency, f"Order #{order_id}", ref=order_id)
 
     return JSONResponse({"success": True, "code": code_str, "new_balance": new_bal,
                          "currency": currency.upper(), "msg": "Purchase successful!"})
@@ -326,6 +338,20 @@ async def get_my_orders(request: Request):
     for o in orders:
         o["order_id"] = str(o.get("_id", ""))
     return JSONResponse({"success": True, "orders": orders})
+
+@router.get("/api/store/wallet-history")
+async def wallet_history(request: Request):
+    email = request.cookies.get("store_session")
+    if not email:
+        return JSONResponse({"success": False, "txns": []})
+
+    txns = await db.store_wallet_ledger.find({"email": email}).sort("ts", -1).to_list(200)
+    for t in txns:
+        t["id"] = str(t.get("_id", ""))
+        if "_id" in t:
+            del t["_id"]
+        t.pop("ts", None)
+    return JSONResponse({"success": True, "txns": txns})
 
 @router.post("/api/store/checkout-cart")
 async def checkout_cart(request: Request, payload: CheckoutRequest):
@@ -394,6 +420,7 @@ async def checkout_cart(request: Request, payload: CheckoutRequest):
                 "time":     now_str,
                 "source":   "Web Store",
             })
+            await log_wallet_txn(email, -item.price, currency, f"Order #{order_id}", ref=order_id)
 
             results.append({
                 "stock_key": item.stock_key,
@@ -466,8 +493,10 @@ async def store_manage_balance(request: Request, email: str = Form(...), amount:
     
     if action == "add":
         await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: amount}})
+        await log_wallet_txn(email, amount, currency, "Top-up (Admin)")
     elif action == "sub":
         await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: -amount}})
+        await log_wallet_txn(email, -amount, currency, "Manual deduction (Admin)")
 
     return JSONResponse({"success": True, "msg": f"{currency.upper()} balance updated successfully!"})
 
