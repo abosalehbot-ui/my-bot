@@ -1,5 +1,5 @@
 // ============================================================
-// Saleh Zone Store Engine v3.0 — Clean Single Source of Truth
+// Saleh Zone Store Engine v3.1 — Catalog View + Persistent Cart
 // ============================================================
 
 // ─── State ───────────────────────────────────────────────────────────────
@@ -8,6 +8,17 @@ let pendingPurchase  = null;
 let ordersLoaded     = false;
 let _forgotEmail     = '';
 let _profileLoaded   = false;
+
+// ─── Cart State — persisted in localStorage under 'sz_cart' ──────────────
+let cart = [];
+
+function _saveCart() {
+    try { localStorage.setItem('sz_cart', JSON.stringify(cart)); } catch {}
+}
+
+function _loadCart() {
+    try { cart = JSON.parse(localStorage.getItem('sz_cart') || '[]'); } catch { cart = []; }
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -217,34 +228,90 @@ async function onTelegramAuth(user) {
     } catch { setStatus('Error!', true); }
 }
 
+// ─── Catalog / Products View Switcher ────────────────────────────────────
+
+/**
+ * showCategory(catId)
+ * Hides the catalog grid and reveals the products for the chosen category.
+ */
+function showCategory(catId) {
+    // Hide all per-category product sections
+    document.querySelectorAll('[id^="cat-products-"]').forEach(el => el.classList.add('hidden'));
+
+    // Reveal the selected one
+    const target = $('cat-products-' + catId);
+    if (target) target.classList.remove('hidden');
+
+    // Swap views
+    $('catalog-view')?.classList.add('hidden');
+    $('products-view')?.classList.remove('hidden');
+
+    // Scroll to top of content area
+    $('main-scroll')?.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/**
+ * backToCatalog()
+ * Returns to the category cards grid.
+ */
+function backToCatalog() {
+    $('products-view')?.classList.add('hidden');
+    $('catalog-view')?.classList.remove('hidden');
+    $('main-scroll')?.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 // ─── Purchase Flow (Buy Now) ─────────────────────────────────────────────
+
+/**
+ * buyProduct(stock_key, pricesObj, name, iconClass)
+ * Opens the Buy Now confirmation modal with correct product details.
+ */
 function buyProduct(stock_key, pricesObj, name, iconClass) {
-    if (!localStorage.getItem('store_email')) { openAuthModal('signin'); toggleSidebarMobile(); return; }
-    const finalPrice = (pricesObj && pricesObj[currentCurrency]) ? pricesObj[currentCurrency] : (pricesObj && pricesObj['EGP']) ? pricesObj['EGP'] : 0;
-    pendingPurchase  = { stock_key, price: finalPrice, currency: currentCurrency };
-    const priceText  = finalPrice + ' ' + currentCurrency;
-    const pColor     = currentCurrency === 'EGP' ? 'text-yellow-500' : currentCurrency === 'USD' ? 'text-szcyan' : 'text-szgreen';
+    if (!localStorage.getItem('store_email')) { openAuthModal('signin'); return; }
+
+    const finalPrice = (pricesObj && pricesObj[currentCurrency] != null)
+        ? pricesObj[currentCurrency]
+        : (pricesObj && pricesObj['EGP'] != null ? pricesObj['EGP'] : 0);
+
+    pendingPurchase = { stock_key, price: finalPrice, currency: currentCurrency };
+
+    const priceText = finalPrice + ' ' + currentCurrency;
+    const pColor    = currentCurrency === 'EGP' ? 'text-yellow-500'
+                    : currentCurrency === 'USD' ? 'text-szcyan'
+                    : 'text-szgreen';
 
     setText('checkout-user-name',  localStorage.getItem('store_name'));
     setText('checkout-user-email', localStorage.getItem('store_email'));
     setText('checkout-item-name',  name);
-    const icon = $('checkout-item-icon'); if (icon && iconClass) icon.className = `fas ${iconClass}`;
+
+    const icon = $('checkout-item-icon');
+    if (icon && iconClass) icon.className = `fas ${iconClass}`;
+
     const pe = $('checkout-item-price');
     if (pe) { pe.innerText = priceText; pe.className = `p-4 text-right font-black text-lg ${pColor}`; }
+
     const te = $('checkout-total-price');
     if (te) { te.innerText = priceText; te.className = `text-2xl font-black ${pColor}`; }
+
     openModal('checkout-modal');
 }
 
+/**
+ * confirmPurchase()
+ * Submits the single-item Buy Now order to the server.
+ */
 async function confirmPurchase() {
     if (!pendingPurchase) return;
     if (!$('terms-checkbox').checked) return Core.showToast('Please agree to the Terms of Service.', 'error');
+
     const btn = $('btn-confirm-pay'), orig = btn.innerHTML;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...'; btn.disabled = true;
+
     const fd = new FormData();
     fd.append('stock_key', pendingPurchase.stock_key);
     fd.append('price',     pendingPurchase.price);
     fd.append('currency',  pendingPurchase.currency);
+
     try {
         const d = await (await fetch('/api/store/buy', { method: 'POST', body: fd })).json();
         if (d.success) {
@@ -253,7 +320,8 @@ async function confirmPurchase() {
             updateUI(localStorage.getItem('store_name'), newEgp, newUsd);
             ordersLoaded = false;
             closeModal('checkout-modal');
-            const ce = $('purchased-code'); if (ce) ce.innerText = d.code;
+            const ce = $('purchased-code');
+            if (ce) { ce.innerText = d.code; ce.classList.remove('text-left'); }
             openModal('success-modal');
         } else {
             Core.showToast(d.msg, 'error');
@@ -261,6 +329,7 @@ async function confirmPurchase() {
             else if (d.msg.includes('balance') || d.msg.includes('stock')) location.reload();
         }
     } catch { Core.showToast('An error occurred!', 'error'); }
+
     btn.innerHTML = orig; btn.disabled = false;
 }
 
@@ -269,30 +338,37 @@ function copyPurchasedCode() {
     if (code) Core.copy(code);
 }
 
-// ─── Cart System (Add/Remove/Qty) ─────────────────────────────────────────
-let cart = [];
+// ─── Cart System ─────────────────────────────────────────────────────────
 
+/**
+ * addToCart(stock_key, pricesObj, name, iconClass)
+ * Adds an item (or increments qty) and persists the cart to localStorage.
+ */
 function addToCart(stock_key, pricesObj, name, iconClass) {
-    if (!localStorage.getItem('store_email')) { openAuthModal('signin'); toggleSidebarMobile(); return; }
+    if (!localStorage.getItem('store_email')) { openAuthModal('signin'); return; }
+
     const existing = cart.find(i => i.stock_key === stock_key);
     if (existing) {
         existing.qty += 1;
     } else {
         cart.push({ stock_key, prices: pricesObj, name, iconClass, qty: 1 });
     }
+    _saveCart();
     updateCartUI();
-    Core.showToast('Added to cart!', 'success');
+    Core.showToast(`${name} added to cart!`, 'success');
 }
 
 function removeFromCart(stock_key) {
     cart = cart.filter(i => i.stock_key !== stock_key);
+    _saveCart();
     updateCartUI();
-    if (!$('cart-modal').classList.contains('hidden')) openCartModal();
+    // Refresh the open cart modal if it's visible
+    if (!$('cart-modal')?.classList.contains('hidden')) openCartModal();
 }
 
 function increaseCartQty(stock_key) {
     const item = cart.find(i => i.stock_key === stock_key);
-    if (item) { item.qty++; updateCartUI(); openCartModal(); }
+    if (item) { item.qty++; _saveCart(); updateCartUI(); openCartModal(); }
 }
 
 function decreaseCartQty(stock_key) {
@@ -300,8 +376,14 @@ function decreaseCartQty(stock_key) {
     if (item) {
         item.qty--;
         if (item.qty <= 0) removeFromCart(stock_key);
-        else { updateCartUI(); openCartModal(); }
+        else { _saveCart(); updateCartUI(); openCartModal(); }
     }
+}
+
+// Also exposed via window for HTML inline references
+function changeCartQty(stock_key, delta) {
+    if (delta > 0) increaseCartQty(stock_key);
+    else decreaseCartQty(stock_key);
 }
 
 function updateCartUI() {
@@ -312,60 +394,107 @@ function updateCartUI() {
     if (cd) cd.innerText = count;
 }
 
+/**
+ * openCartModal()
+ * Renders current cart items and opens the modal.
+ */
 window.openCartModal = function() {
     if (!localStorage.getItem('store_email')) { openAuthModal('signin'); return; }
+
     const container = $('cart-items-container');
     if (!container) return;
-    
+
     if (cart.length === 0) {
-        container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-500 py-16"><i class="fas fa-shopping-cart text-6xl mb-4 opacity-30"></i><p class="font-bold">Your cart is empty</p></div>';
+        container.innerHTML = `
+            <div class="flex flex-col items-center justify-center h-full text-gray-500 py-16">
+                <i class="fas fa-shopping-cart text-6xl mb-4 opacity-30"></i>
+                <p class="font-bold">Your cart is empty</p>
+                <p class="text-xs mt-1 text-gray-700">Browse the store and add items</p>
+            </div>`;
         const tp = $('cart-total-price');
         if (tp) { tp.innerText = '0.00 ' + currentCurrency; tp.className = 'text-2xl font-black text-szcyan'; }
         openModal('cart-modal');
         return;
     }
 
-    let html = '';
+    let html  = '';
     let total = 0;
+
     cart.forEach(item => {
-        const price = (item.prices && item.prices[currentCurrency]) ? item.prices[currentCurrency] : (item.prices && item.prices['EGP']) ? item.prices['EGP'] : 0;
+        const price     = (item.prices && item.prices[currentCurrency] != null)
+                        ? item.prices[currentCurrency]
+                        : (item.prices && item.prices['EGP'] != null ? item.prices['EGP'] : 0);
         const itemTotal = price * item.qty;
         total += itemTotal;
-        const pColor = currentCurrency === 'EGP' ? 'text-yellow-500' : currentCurrency === 'USD' ? 'text-szcyan' : 'text-szgreen';
+        const pColor    = currentCurrency === 'EGP' ? 'text-yellow-500'
+                        : currentCurrency === 'USD' ? 'text-szcyan'
+                        : 'text-szgreen';
+
         html += `
         <div class="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-black border border-gray-800 rounded-xl mb-3 hover:border-szcyan/50 transition gap-4">
-            <div class="flex-1 min-w-0">
-                <h4 class="text-white font-bold text-sm truncate">${item.name}</h4>
-                <div class="${pColor} font-black text-sm mt-1">${price} ${currentCurrency} <span class="text-gray-500 text-[10px] font-bold uppercase ml-1">each</span></div>
+            <div class="flex items-center gap-3 flex-1 min-w-0">
+                <div class="w-10 h-10 rounded-lg bg-szcyan/10 border border-szcyan/20 flex items-center justify-center text-szcyan shrink-0">
+                    <i class="fas ${item.iconClass || 'fa-box'} text-sm"></i>
+                </div>
+                <div class="min-w-0">
+                    <h4 class="text-white font-bold text-sm truncate">${item.name}</h4>
+                    <div class="${pColor} font-black text-sm">${price} ${currentCurrency}
+                        <span class="text-gray-500 text-[10px] font-bold uppercase ml-1">each</span>
+                    </div>
+                </div>
             </div>
             <div class="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
                 <div class="flex items-center bg-[#050505] border border-gray-700 rounded-lg overflow-hidden h-9">
-                    <button onclick="decreaseCartQty('${item.stock_key}')" class="w-9 h-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-800 transition"><i class="fas fa-minus text-xs"></i></button>
+                    <button onclick="decreaseCartQty('${item.stock_key}')"
+                        class="w-9 h-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-800 transition">
+                        <i class="fas fa-minus text-xs"></i>
+                    </button>
                     <span class="w-10 text-center text-white font-bold text-sm">${item.qty}</span>
-                    <button onclick="increaseCartQty('${item.stock_key}')" class="w-9 h-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-800 transition"><i class="fas fa-plus text-xs"></i></button>
+                    <button onclick="increaseCartQty('${item.stock_key}')"
+                        class="w-9 h-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-800 transition">
+                        <i class="fas fa-plus text-xs"></i>
+                    </button>
                 </div>
-                <button onclick="removeFromCart('${item.stock_key}')" class="text-red-500 hover:text-white hover:bg-red-600 bg-red-900/20 w-9 h-9 rounded-lg flex items-center justify-center transition shrink-0"><i class="fas fa-trash-alt"></i></button>
+                <div class="${pColor} font-black text-sm w-20 text-right">${itemTotal.toFixed(2)}</div>
+                <button onclick="removeFromCart('${item.stock_key}')"
+                    class="text-red-500 hover:text-white hover:bg-red-600 bg-red-900/20 w-9 h-9 rounded-lg flex items-center justify-center transition shrink-0">
+                    <i class="fas fa-trash-alt text-xs"></i>
+                </button>
             </div>
         </div>`;
     });
+
     container.innerHTML = html;
-    const tColor = currentCurrency === 'EGP' ? 'text-yellow-500' : currentCurrency === 'USD' ? 'text-szcyan' : 'text-szgreen';
+
+    const tColor  = currentCurrency === 'EGP' ? 'text-yellow-500'
+                  : currentCurrency === 'USD' ? 'text-szcyan'
+                  : 'text-szgreen';
     const totalEl = $('cart-total-price');
-    if (totalEl) { totalEl.innerText = total.toFixed(2) + ' ' + currentCurrency; totalEl.className = `text-2xl font-black ${tColor}`; }
+    if (totalEl) {
+        totalEl.innerText  = total.toFixed(2) + ' ' + currentCurrency;
+        totalEl.className  = `text-2xl font-black ${tColor}`;
+    }
+
     openModal('cart-modal');
 };
 
+/**
+ * confirmCartPurchase()
+ * Sends all cart items to the backend checkout endpoint in one request.
+ */
 async function confirmCartPurchase() {
-    if (cart.length === 0) return;
+    if (cart.length === 0) return Core.showToast('Your cart is empty.', 'error');
     if (!$('cart-terms-checkbox').checked) return Core.showToast('Please agree to the Terms of Service.', 'error');
-    
+
     const btn = $('btn-confirm-cart'), orig = btn.innerHTML;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...'; btn.disabled = true;
-    
+
     const cartItems = cart.map(item => ({
         stock_key: item.stock_key,
         quantity:  item.qty,
-        price:     (item.prices && item.prices[currentCurrency]) ? item.prices[currentCurrency] : (item.prices && item.prices['EGP']) ? item.prices['EGP'] : 0,
+        price:     (item.prices && item.prices[currentCurrency] != null)
+                    ? item.prices[currentCurrency]
+                    : (item.prices && item.prices['EGP'] != null ? item.prices['EGP'] : 0),
         currency:  currentCurrency,
     }));
 
@@ -376,6 +505,7 @@ async function confirmCartPurchase() {
             body:    JSON.stringify({ cart: cartItems }),
         });
         const d = await res.json();
+
         if (d.success) {
             const newEgp = d.new_balances?.balance_egp ?? localStorage.getItem('bal_egp');
             const newUsd = d.new_balances?.balance_usd ?? localStorage.getItem('bal_usd');
@@ -383,7 +513,9 @@ async function confirmCartPurchase() {
             localStorage.setItem('bal_egp', newEgp ?? '0');
             localStorage.setItem('bal_usd', newUsd ?? '0');
 
+            // Clear cart
             cart = [];
+            _saveCart();
             updateCartUI();
             ordersLoaded = false;
             closeModal('cart-modal');
@@ -413,6 +545,7 @@ async function confirmCartPurchase() {
             if (d.force_logout) logout();
         }
     } catch { Core.showToast('An error occurred!', 'error'); }
+
     btn.innerHTML = orig; btn.disabled = false;
 }
 
@@ -426,12 +559,12 @@ function openProfileModal() {
 
 function switchProfileTab(tab) {
     ['overview', 'edit', 'security', 'history', 'support'].forEach(t => {
-        $('ptab-'+t)?.classList.add('hidden');
-        const btn = $('ptab-btn-'+t);
+        $('ptab-' + t)?.classList.add('hidden');
+        const btn = $('ptab-btn-' + t);
         if (btn) { btn.classList.remove('active'); btn.classList.add('inactive'); }
     });
-    $('ptab-'+tab)?.classList.remove('hidden');
-    const ab = $('ptab-btn-'+tab);
+    $('ptab-' + tab)?.classList.remove('hidden');
+    const ab = $('ptab-btn-' + tab);
     if (ab) { ab.classList.add('active'); ab.classList.remove('inactive'); }
     if (tab === 'history' && !ordersLoaded) fetchMyOrders();
     if (tab === 'support' && !_ticketsLoaded) loadMyTickets();
@@ -601,7 +734,7 @@ async function fetchMyOrders() {
 }
 
 // ============================================================
-// Support Tickets — Customer Side
+// Support Tickets — Customer Side (unchanged from v3.0)
 // ============================================================
 let _activeConvoTicketId = '';
 let _ticketsLoaded       = false;
@@ -718,7 +851,7 @@ async function openTicketConvo(ticketId) {
         const replySection = $('convo-reply-section');
         if (replySection) replySection.style.display = ticket.status === 'closed' ? 'none' : '';
 
-        const msgs      = ticket.messages || [];
+        const msgs         = ticket.messages || [];
         const msgContainer = $('convo-messages');
         if (!msgs.length) {
             msgContainer.innerHTML = '<p class="text-center text-gray-600 text-xs py-6">No messages yet.</p>';
@@ -780,17 +913,24 @@ async function sendCustomerReply() {
 
 // ─── DOMContentLoaded ────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+    // Apply saved theme
     const theme = localStorage.getItem('sz_theme') || 'default';
     document.documentElement.setAttribute('data-theme', theme);
 
+    // Restore cart from localStorage — must happen before updateCartUI()
+    _loadCart();
+    updateCartUI();
+
+    // Restore user session from localStorage
     const email = localStorage.getItem('store_email');
     const name  = localStorage.getItem('store_name');
     if (email && name) {
         updateUI(name, localStorage.getItem('bal_egp') || '0', localStorage.getItem('bal_usd') || '0');
         _applyAvatar(localStorage.getItem('store_avatar') || '');
-        fetchAndApplyProfile(); 
+        fetchAndApplyProfile();
     }
 
+    // Scroll-to-top button
     const ms = $('main-scroll'), sb = $('scrollToTopBtn');
     if (ms && sb) {
         ms.addEventListener('scroll', () => {
