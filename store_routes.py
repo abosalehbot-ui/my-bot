@@ -424,11 +424,12 @@ async def checkout_cart(request: Request, payload: CheckoutRequest):
             if user.get(bal_field, 0) < trusted_price:
                 results.append({
                     "stock_key": item.stock_key,
-                    "status":    "Failed",
-                    "msg":       f"Insufficient {currency} balance!",
+                    "status": "Success",
+                    "code": unit["code"],
+                    "price": unit["price"],
+                    "currency": unit["currency"],
+                    "order_id": unit["order_id"],
                 })
-                # توقف عن محاولة شراء هذا المنتج بالكمية المتبقية
-                break
 
                 results.append({
                     "stock_key": item.stock_key,
