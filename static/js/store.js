@@ -218,12 +218,12 @@ async function onTelegramAuth(user) {
 }
 
 // ─── Purchase Flow (Buy Now) ─────────────────────────────────────────────
-function buyProduct(stock_key, pEgp, pUsd, name, iconClass) {
+function buyProduct(stock_key, pricesObj, name, iconClass) {
     if (!localStorage.getItem('store_email')) { openAuthModal('signin'); toggleSidebarMobile(); return; }
-    const finalPrice = currentCurrency === 'EGP' ? pEgp : pUsd;
+    const finalPrice = (pricesObj && pricesObj[currentCurrency]) ? pricesObj[currentCurrency] : (pricesObj && pricesObj['EGP']) ? pricesObj['EGP'] : 0;
     pendingPurchase  = { stock_key, price: finalPrice, currency: currentCurrency };
     const priceText  = finalPrice + ' ' + currentCurrency;
-    const pColor     = currentCurrency === 'EGP' ? 'text-yellow-500' : 'text-szcyan';
+    const pColor     = currentCurrency === 'EGP' ? 'text-yellow-500' : currentCurrency === 'USD' ? 'text-szcyan' : 'text-szgreen';
 
     setText('checkout-user-name',  localStorage.getItem('store_name'));
     setText('checkout-user-email', localStorage.getItem('store_email'));
@@ -272,13 +272,13 @@ function copyPurchasedCode() {
 // ─── Cart System (Add/Remove/Qty) ─────────────────────────────────────────
 let cart = [];
 
-function addToCart(stock_key, pEgp, pUsd, name, iconClass) {
+function addToCart(stock_key, pricesObj, name, iconClass) {
     if (!localStorage.getItem('store_email')) { openAuthModal('signin'); toggleSidebarMobile(); return; }
     const existing = cart.find(i => i.stock_key === stock_key);
     if (existing) {
         existing.qty += 1;
     } else {
-        cart.push({ stock_key, pEgp, pUsd, name, iconClass, qty: 1 });
+        cart.push({ stock_key, prices: pricesObj, name, iconClass, qty: 1 });
     }
     updateCartUI();
     Core.showToast('Added to cart!', 'success');
@@ -327,14 +327,15 @@ window.openCartModal = function() {
     let html = '';
     let total = 0;
     cart.forEach(item => {
-        const price = currentCurrency === 'EGP' ? item.pEgp : item.pUsd;
+        const price = (item.prices && item.prices[currentCurrency]) ? item.prices[currentCurrency] : (item.prices && item.prices['EGP']) ? item.prices['EGP'] : 0;
         const itemTotal = price * item.qty;
         total += itemTotal;
+        const pColor = currentCurrency === 'EGP' ? 'text-yellow-500' : currentCurrency === 'USD' ? 'text-szcyan' : 'text-szgreen';
         html += `
         <div class="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-black border border-gray-800 rounded-xl mb-3 hover:border-szcyan/50 transition gap-4">
             <div class="flex-1 min-w-0">
                 <h4 class="text-white font-bold text-sm truncate">${item.name}</h4>
-                <div class="text-szcyan font-black text-sm mt-1">${price} ${currentCurrency} <span class="text-gray-500 text-[10px] font-bold uppercase ml-1">each</span></div>
+                <div class="${pColor} font-black text-sm mt-1">${price} ${currentCurrency} <span class="text-gray-500 text-[10px] font-bold uppercase ml-1">each</span></div>
             </div>
             <div class="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
                 <div class="flex items-center bg-[#050505] border border-gray-700 rounded-lg overflow-hidden h-9">
@@ -347,7 +348,9 @@ window.openCartModal = function() {
         </div>`;
     });
     container.innerHTML = html;
-    $('cart-total-price').innerText = total.toFixed(2) + ' ' + currentCurrency;
+    const tColor = currentCurrency === 'EGP' ? 'text-yellow-500' : currentCurrency === 'USD' ? 'text-szcyan' : 'text-szgreen';
+    const totalEl = $('cart-total-price');
+    if (totalEl) { totalEl.innerText = total.toFixed(2) + ' ' + currentCurrency; totalEl.className = `text-2xl font-black ${tColor}`; }
     openModal('cart-modal');
 };
 
@@ -358,31 +361,54 @@ async function confirmCartPurchase() {
     const btn = $('btn-confirm-cart'), orig = btn.innerHTML;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...'; btn.disabled = true;
     
-    const cartData = cart.map(i => ({
-        stock_key: i.stock_key,
-        qty: i.qty,
-        price: currentCurrency === 'EGP' ? i.pEgp : i.pUsd,
-        name: i.name
+    // بناء طلب الـ Cart بالصيغة الجديدة (JSON → /api/store/checkout-cart)
+    const cartItems = cart.map(item => ({
+        stock_key: item.stock_key,
+        quantity:  item.qty,
+        price:     (item.prices && item.prices[currentCurrency]) ? item.prices[currentCurrency] : (item.prices && item.prices['EGP']) ? item.prices['EGP'] : 0,
+        currency:  currentCurrency,
     }));
 
-    const fd = new FormData();
-    fd.append('cart_data', JSON.stringify(cartData));
-    fd.append('currency', currentCurrency);
-
     try {
-        const d = await (await fetch('/api/store/buy-cart', { method: 'POST', body: fd })).json();
+        const res = await fetch('/api/store/checkout-cart', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ cart: cartItems }),
+        });
+        const d = await res.json();
         if (d.success) {
-            const newEgp = d.currency === 'EGP' ? d.new_balance : localStorage.getItem('bal_egp');
-            const newUsd = d.currency === 'USD' ? d.new_balance : localStorage.getItem('bal_usd');
+            // تحديث الأرصدة ديناميكياً من الـ response
+            const newEgp = d.new_balances?.balance_egp ?? localStorage.getItem('bal_egp');
+            const newUsd = d.new_balances?.balance_usd ?? localStorage.getItem('bal_usd');
             updateUI(localStorage.getItem('store_name'), newEgp, newUsd);
-            
+            localStorage.setItem('bal_egp', newEgp ?? '0');
+            localStorage.setItem('bal_usd', newUsd ?? '0');
+
             cart = [];
             updateCartUI();
             ordersLoaded = false;
             closeModal('cart-modal');
-            
+
+            // عرض نتائج كل منتج في نافذة النجاح
+            const successItems = d.results.filter(r => r.status === 'Success');
+            const failedItems  = d.results.filter(r => r.status === 'Failed');
+
+            let codesHtml = successItems.map(r =>
+                `<div class="bg-black border border-szgreen/30 rounded-lg p-3 mb-2">
+                    <div class="text-[10px] text-gray-500 mb-1">${r.stock_key} · ${r.price} ${r.currency}</div>
+                    <div class="text-szgreen font-mono font-bold select-all">${r.code}</div>
+                 </div>`
+            ).join('');
+
+            if (failedItems.length > 0) {
+                codesHtml += `<div class="mt-3 border-t border-gray-800 pt-3">
+                    <p class="text-xs text-red-400 font-bold mb-2"><i class="fas fa-exclamation-triangle mr-1"></i>Failed items (${failedItems.length}):</p>
+                    ${failedItems.map(r => `<div class="text-xs text-gray-500">${r.stock_key}: ${r.msg}</div>`).join('')}
+                </div>`;
+            }
+
             const ce = $('purchased-code');
-            if (ce) ce.innerHTML = d.codes.join('<br><br>');
+            if (ce) { ce.innerHTML = codesHtml || 'No successful items.'; ce.classList.add('text-left'); }
             openModal('success-modal');
         } else {
             alert(d.msg);
