@@ -76,6 +76,17 @@
             z-index: 1;
         }
 
+        /* Category cards — slower, larger spin for a folder-like feel */
+        .cat-card::before {
+            animation-duration: 7s;
+            width: 220px;
+            height: 300%;
+            top: -100%;
+            left: calc(50% - 110px);
+        }
+        .cat-card:hover::before { animation-duration: 1.8s; }
+        .cat-card::after { background: #0c0c0c; }
+
         .social-btn { position: relative; width: 45px; height: 45px; display: flex; justify-content: center; align-items: center; border-radius: 8px; background-color: transparent; cursor: pointer; transition: background-color 0.3s; overflow: hidden; }
         .social-btn:hover { background-color: rgba(255,255,255,0.05); }
         .social-btn svg { width: 22px; height: 22px; fill: #9ca3af; transition: fill 0.3s, transform 0.3s; position: absolute; pointer-events: none; z-index: 1; }
@@ -158,7 +169,8 @@
                 <li><hr class="border-gray-800"></li>
                 
                 <li>
-                    <a href="#" onclick="document.getElementById('main-scroll').scrollTo({top:0, behavior:'smooth'}); toggleSidebarMobile();" class="flex items-center p-3 text-base font-bold text-white rounded-lg bg-gray-900 group shadow-[0_0_10px_rgba(125,252,137,0.1)]">
+                    <!-- Store Home now calls backToCatalog() instead of scrolling -->
+                    <a href="#" onclick="backToCatalog(); toggleSidebarMobile();" class="flex items-center p-3 text-base font-bold text-white rounded-lg bg-gray-900 group shadow-[0_0_10px_rgba(125,252,137,0.1)]">
                         <i class="fas fa-store w-6 text-szgreen"></i><span class="ml-3">Store Home</span>
                     </a>
                 </li>
@@ -178,7 +190,8 @@
                     </button>
                     <ul id="dropdown-cats" class="py-2 space-y-1">
                         {% for cat in categories %}
-                        <li><a href="#cat-{{ cat._id }}" onclick="toggleSidebarMobile()" class="flex items-center p-2 pl-11 w-full text-sm font-bold text-gray-500 rounded-lg hover:bg-gray-900 hover:text-white transition"><i class="fas {{ cat.icon }} w-5 text-szcyan"></i> {{ cat.name }}</a></li>
+                        <!-- Updated: now calls showCategory() instead of anchor scroll -->
+                        <li><a href="#" onclick="showCategory('{{ cat._id }}'); toggleSidebarMobile();" class="flex items-center p-2 pl-11 w-full text-sm font-bold text-gray-500 rounded-lg hover:bg-gray-900 hover:text-white transition"><i class="fas {{ cat.icon }} w-5 text-szcyan"></i> {{ cat.name }}</a></li>
                         {% endfor %}
                     </ul>
                 </li>
@@ -227,90 +240,194 @@
         </div>
 
         <div class="p-6 md:p-10 max-w-6xl mx-auto w-full flex-1">
-            <div class="text-center md:text-left mb-12 fade-in">
-                <h1 class="text-3xl md:text-5xl font-black mb-3 text-white uppercase tracking-widest">Instant <span class="text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">Delivery</span></h1>
-                <p class="text-gray-400 max-w-xl text-sm">Select your package. Codes are delivered instantly after payment.</p>
-            </div>
 
-            {% if not categories %}
-            <div class="text-center text-gray-500 mt-20"><i class="fas fa-box-open text-6xl mb-4 opacity-50"></i><p>Store is currently empty. Please wait for the admin to add items.</p></div>
-            {% endif %}
-
-            {% for cat in categories %}
-            <div id="cat-{{ cat._id }}" class="mb-16 scroll-mt-20 fade-in">
-                <div class="flex items-center gap-4 mb-6 border-b border-gray-800 pb-4">
-                    {% if cat.image %}
-                    <img src="{{ cat.image }}" alt="{{ cat.name }}" class="w-12 h-12 rounded-xl object-cover border border-szcyan/30 shadow-[0_0_10px_rgba(var(--theme-secondary),0.2)]">
-                    {% else %}
-                    <div class="w-12 h-12 bg-szcyan/10 border border-szcyan/20 rounded-xl flex items-center justify-center text-szcyan text-xl">
-                        <i class="fas {{ cat.icon }}"></i>
-                    </div>
-                    {% endif %}
-                    <h2 class="text-2xl font-black text-white">{{ cat.name }}</h2>
+            <!-- ═══════════════════════════════════════════════════════════════ -->
+            <!-- CATALOG VIEW  (shown by default)                               -->
+            <!-- ═══════════════════════════════════════════════════════════════ -->
+            <div id="catalog-view">
+                <div class="text-center md:text-left mb-10 fade-in">
+                    <h1 class="text-3xl md:text-5xl font-black mb-3 text-white uppercase tracking-widest">Instant <span class="text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">Delivery</span></h1>
+                    <p class="text-gray-400 max-w-xl text-sm">Pick a category below. Codes delivered instantly after payment.</p>
                 </div>
-                
+
+                {% if not categories %}
+                <div class="text-center text-gray-500 mt-20"><i class="fas fa-box-open text-6xl mb-4 opacity-50"></i><p>Store is currently empty. Please wait for the admin to add items.</p></div>
+                {% endif %}
+
+                <!-- Category Cards Grid -->
                 <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                    {% for p in cat.products %}
-                    
-                    <div class="uc-card animated-card bg-panelbg rounded-2xl p-5 md:p-6 flex flex-col items-center text-center relative">
-                        
-                        {% if stock.get(p.stock_key, 0) > 0 %}
-                        <div class="absolute top-3 right-3 bg-szgreen/20 text-szgreen text-[10px] font-bold px-2 py-1 rounded border border-szgreen/30"><i class="fas fa-bolt mr-1"></i> INSTANT</div>
+                    {% for cat in categories %}
+                    {% set ns = namespace(avail=0) %}
+                    {% for p in cat.products %}{% set ns.avail = ns.avail + stock.get(p.stock_key, 0) %}{% endfor %}
+
+                    <div onclick="showCategory('{{ cat._id }}')"
+                         class="uc-card animated-card cat-card rounded-2xl p-6 flex flex-col items-center text-center cursor-pointer group relative fade-in">
+
+                        <!-- Stock badge — top left -->
+                        {% if ns.avail > 0 %}
+                        <div class="absolute top-3 left-3 bg-szgreen/20 text-szgreen text-[9px] font-bold px-2 py-0.5 rounded-full border border-szgreen/30">
+                            <i class="fas fa-bolt mr-0.5"></i>{{ ns.avail }} in stock
+                        </div>
                         {% else %}
-                        <div class="absolute top-3 right-3 bg-red-900/50 text-red-400 text-[10px] font-bold px-2 py-1 rounded border border-red-900/50">OUT OF STOCK</div>
+                        <div class="absolute top-3 left-3 bg-red-900/40 text-red-400 text-[9px] font-bold px-2 py-0.5 rounded-full border border-red-900/30">
+                            EMPTY
+                        </div>
                         {% endif %}
 
-                        {% if p.image %}
-                        <div class="w-20 h-20 md:w-24 md:h-24 mt-4 md:mt-0 mb-4 rounded-full overflow-hidden border-2 border-szcyan/30 shadow-[0_0_20px_rgba(var(--theme-secondary),0.15)] floating">
-                            <img src="{{ p.image }}" alt="{{ p.name }}" class="w-full h-full object-cover">
+                        <!-- Arrow — top right -->
+                        <div class="absolute top-3 right-3 text-gray-700 group-hover:text-szcyan transition-colors duration-300">
+                            <i class="fas fa-chevron-right text-xs"></i>
+                        </div>
+
+                        <!-- Icon / Image -->
+                        {% if cat.image %}
+                        <div class="w-20 h-20 md:w-24 md:h-24 mt-5 mb-5 rounded-2xl overflow-hidden border-2 border-szcyan/30 shadow-[0_0_25px_rgba(94,234,212,0.15)] floating">
+                            <img src="{{ cat.image }}" alt="{{ cat.name }}" class="w-full h-full object-cover">
                         </div>
                         {% elif cat.logo %}
-                        <div class="w-20 h-20 md:w-24 md:h-24 mt-4 md:mt-0 mb-4 rounded-full overflow-hidden border-2 border-szcyan/30 shadow-[0_0_20px_rgba(var(--theme-secondary),0.15)] floating">
+                        <div class="w-20 h-20 md:w-24 md:h-24 mt-5 mb-5 rounded-2xl overflow-hidden border-2 border-szcyan/30 shadow-[0_0_25px_rgba(94,234,212,0.15)] floating">
                             <img src="{{ cat.logo }}" alt="{{ cat.name }}" class="w-full h-full object-cover">
                         </div>
                         {% else %}
-                        <div class="w-20 h-20 md:w-24 md:h-24 mt-4 md:mt-0 mb-4 rounded-full bg-gradient-to-br from-szcyan/10 to-transparent border border-szcyan/20 flex items-center justify-center shadow-[0_0_20px_rgba(var(--theme-secondary),0.1)] floating text-szcyan text-3xl">
+                        <div class="w-20 h-20 md:w-24 md:h-24 mt-5 mb-5 rounded-2xl bg-gradient-to-br from-szcyan/20 to-szgreen/5 border border-szcyan/20 flex items-center justify-center text-szcyan text-4xl shadow-[0_0_25px_rgba(94,234,212,0.1)] floating">
                             <i class="fas {{ cat.icon }}"></i>
                         </div>
                         {% endif %}
-                        
-                        <h3 class="text-xl md:text-2xl font-black text-white mb-1">{{ p.name }}</h3>
-                        
-                        <div class="mt-2 mb-4 bg-black w-full py-2 rounded-lg border border-gray-800">
-                            {% for cur in currencies %}
-                            <div class="price-display {{ cur._id.lower() }}-price {% if not loop.first %}hidden{% endif %}">
-                                <span class="text-xl md:text-2xl font-black {% if cur._id == 'EGP' %}text-yellow-500{% elif cur._id == 'USD' %}text-szcyan{% else %}text-szgreen{% endif %}">
-                                    {{ p.prices.get(cur._id, p.prices.get(cur._id.lower(), 0)) if p.prices is defined else (p.price_egp if cur._id == 'EGP' else p.price_usd) }}
-                                </span>
-                                <span class="text-[10px] text-gray-500 font-bold uppercase ml-1">{{ cur.symbol }}</span>
-                            </div>
-                            {% endfor %}
-                        </div>
 
-                        <div class="text-xs text-gray-400 mb-4 flex justify-between items-center w-full bg-gray-900/50 p-2.5 rounded-lg border border-gray-800">
-                            <span><i class="fas fa-box text-szcyan mr-1"></i> Available:</span>
-                            <span class="font-bold {% if stock.get(p.stock_key, 0) > 0 %}text-szgreen{% else %}text-red-500{% endif %}">
-                                {{ stock.get(p.stock_key, 0) }} items
-                            </span>
-                        </div>
+                        <!-- Name -->
+                        <h3 class="text-base md:text-lg font-black text-white mb-2 group-hover:text-szcyan transition-colors duration-300 leading-tight">
+                            {{ cat.name }}
+                        </h3>
 
-                        {% if stock.get(p.stock_key, 0) > 0 %}
-                        <div class="flex gap-2 w-full">
-                            <button onclick="buyProduct('{{ p.stock_key }}', {{ p.prices | tojson | safe if p.prices is defined else '{}' }}, '{{ p.name }}', '{{ cat.icon }}')" class="flex-1 bg-gradient-to-r from-szgreen to-szcyan text-black font-bold py-2.5 md:py-3 rounded-xl hover:opacity-90 transition text-sm md:text-base btn-glow">
-                                Buy Now
-                            </button>
-                            <button onclick="addToCart('{{ p.stock_key }}', {{ p.prices | tojson | safe if p.prices is defined else '{}' }}, '{{ p.name }}', '{{ cat.icon }}')" class="bg-gray-800 text-szcyan border border-gray-700 font-bold py-2.5 px-4 md:py-3 md:px-5 rounded-xl hover:bg-szcyan hover:text-white transition flex items-center justify-center">
-                                <i class="fas fa-cart-plus"></i>
-                            </button>
+                        <!-- Product count -->
+                        <p class="text-[10px] text-gray-600 mb-4">
+                            <i class="fas fa-cubes mr-1 text-gray-700"></i>{{ cat.products | length }} product{{ 's' if (cat.products | length) != 1 else '' }}
+                        </p>
+
+                        <!-- Browse CTA -->
+                        <div class="w-full bg-szcyan/5 border border-szcyan/20 group-hover:bg-szcyan/15 group-hover:border-szcyan/50 rounded-xl py-2 text-xs font-black text-szcyan transition-all duration-300 flex items-center justify-center gap-2">
+                            Browse <i class="fas fa-arrow-right text-[10px] group-hover:translate-x-1 transition-transform duration-300"></i>
                         </div>
-                        {% else %}
-                        <button disabled class="w-full bg-gray-900 text-gray-600 font-bold py-2.5 md:py-3 rounded-xl cursor-not-allowed border border-gray-800 text-sm md:text-base">UNAVAILABLE</button>
-                        {% endif %}
                     </div>
                     {% endfor %}
                 </div>
             </div>
-            {% endfor %}
+            <!-- END CATALOG VIEW -->
+
+
+            <!-- ═══════════════════════════════════════════════════════════════ -->
+            <!-- PRODUCTS VIEW  (hidden until a category card is clicked)       -->
+            <!-- ═══════════════════════════════════════════════════════════════ -->
+            <div id="products-view" class="hidden">
+
+                <!-- Back button -->
+                <button onclick="backToCatalog()"
+                    class="flex items-center gap-2 text-gray-500 hover:text-szcyan transition-colors duration-200 mb-8 group">
+                    <div class="w-8 h-8 rounded-lg bg-gray-900 border border-gray-800 group-hover:border-szcyan/50 flex items-center justify-center transition-colors duration-200">
+                        <i class="fas fa-arrow-left text-xs"></i>
+                    </div>
+                    <span class="text-sm font-bold">Back to Categories</span>
+                </button>
+
+                <!-- One hidden section per category — JS reveals the selected one -->
+                {% for cat in categories %}
+                <div id="cat-products-{{ cat._id }}" class="hidden fade-in">
+
+                    <!-- Category header -->
+                    <div class="flex items-center gap-4 mb-8 pb-5 border-b border-gray-800">
+                        {% if cat.image %}
+                        <img src="{{ cat.image }}" alt="{{ cat.name }}" class="w-12 h-12 rounded-xl object-cover border border-szcyan/30 shadow-[0_0_10px_rgba(94,234,212,0.2)]">
+                        {% elif cat.logo %}
+                        <img src="{{ cat.logo }}" alt="{{ cat.name }}" class="w-12 h-12 rounded-xl object-cover border border-szcyan/30 shadow-[0_0_10px_rgba(94,234,212,0.2)]">
+                        {% else %}
+                        <div class="w-12 h-12 bg-szcyan/10 border border-szcyan/20 rounded-xl flex items-center justify-center text-szcyan text-xl">
+                            <i class="fas {{ cat.icon }}"></i>
+                        </div>
+                        {% endif %}
+                        <div>
+                            <h2 class="text-2xl font-black text-white">{{ cat.name }}</h2>
+                            <p class="text-xs text-gray-500 mt-0.5">{{ cat.products | length }} product{{ 's' if (cat.products | length) != 1 else '' }}</p>
+                        </div>
+                    </div>
+
+                    <!-- Products grid -->
+                    {% if cat.products %}
+                    <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                        {% for p in cat.products %}
+
+                        <div class="uc-card animated-card bg-panelbg rounded-2xl p-5 md:p-6 flex flex-col items-center text-center relative">
+
+                            {% if stock.get(p.stock_key, 0) > 0 %}
+                            <div class="absolute top-3 right-3 bg-szgreen/20 text-szgreen text-[10px] font-bold px-2 py-1 rounded border border-szgreen/30"><i class="fas fa-bolt mr-1"></i> INSTANT</div>
+                            {% else %}
+                            <div class="absolute top-3 right-3 bg-red-900/50 text-red-400 text-[10px] font-bold px-2 py-1 rounded border border-red-900/50">OUT OF STOCK</div>
+                            {% endif %}
+
+                            {% if p.image %}
+                            <div class="w-20 h-20 md:w-24 md:h-24 mt-4 md:mt-0 mb-4 rounded-full overflow-hidden border-2 border-szcyan/30 shadow-[0_0_20px_rgba(94,234,212,0.15)] floating">
+                                <img src="{{ p.image }}" alt="{{ p.name }}" class="w-full h-full object-cover">
+                            </div>
+                            {% elif cat.logo %}
+                            <div class="w-20 h-20 md:w-24 md:h-24 mt-4 md:mt-0 mb-4 rounded-full overflow-hidden border-2 border-szcyan/30 shadow-[0_0_20px_rgba(94,234,212,0.15)] floating">
+                                <img src="{{ cat.logo }}" alt="{{ cat.name }}" class="w-full h-full object-cover">
+                            </div>
+                            {% else %}
+                            <div class="w-20 h-20 md:w-24 md:h-24 mt-4 md:mt-0 mb-4 rounded-full bg-gradient-to-br from-szcyan/10 to-transparent border border-szcyan/20 flex items-center justify-center shadow-[0_0_20px_rgba(94,234,212,0.1)] floating text-szcyan text-3xl">
+                                <i class="fas {{ cat.icon }}"></i>
+                            </div>
+                            {% endif %}
+
+                            <h3 class="text-xl md:text-2xl font-black text-white mb-1">{{ p.name }}</h3>
+
+                            <div class="mt-2 mb-4 bg-black w-full py-2 rounded-lg border border-gray-800">
+                                {% for cur in currencies %}
+                                <div class="price-display {{ cur._id.lower() }}-price {% if not loop.first %}hidden{% endif %}">
+                                    <span class="text-xl md:text-2xl font-black {% if cur._id == 'EGP' %}text-yellow-500{% elif cur._id == 'USD' %}text-szcyan{% else %}text-szgreen{% endif %}">
+                                        {{ p.prices.get(cur._id, p.prices.get(cur._id.lower(), 0)) if p.prices is defined else (p.price_egp if cur._id == 'EGP' else p.price_usd) }}
+                                    </span>
+                                    <span class="text-[10px] text-gray-500 font-bold uppercase ml-1">{{ cur.symbol }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="text-xs text-gray-400 mb-4 flex justify-between items-center w-full bg-gray-900/50 p-2.5 rounded-lg border border-gray-800">
+                                <span><i class="fas fa-box text-szcyan mr-1"></i> Available:</span>
+                                <span class="font-bold {% if stock.get(p.stock_key, 0) > 0 %}text-szgreen{% else %}text-red-500{% endif %}">
+                                    {{ stock.get(p.stock_key, 0) }} items
+                                </span>
+                            </div>
+
+                            {% if stock.get(p.stock_key, 0) > 0 %}
+                            <div class="flex gap-2 w-full">
+                                <button onclick="buyProduct('{{ p.stock_key }}', {{ p.prices | tojson | safe if p.prices is defined else '{}' }}, '{{ p.name }}', '{{ cat.icon }}')"
+                                    class="flex-1 bg-gradient-to-r from-szgreen to-szcyan text-black font-bold py-2.5 md:py-3 rounded-xl hover:opacity-90 transition text-sm md:text-base btn-glow">
+                                    Buy Now
+                                </button>
+                                <button onclick="addToCart('{{ p.stock_key }}', {{ p.prices | tojson | safe if p.prices is defined else '{}' }}, '{{ p.name }}', '{{ cat.icon }}')"
+                                    class="bg-gray-800 text-szcyan border border-gray-700 font-bold py-2.5 px-4 md:py-3 md:px-5 rounded-xl hover:bg-szcyan hover:text-white transition flex items-center justify-center">
+                                    <i class="fas fa-cart-plus"></i>
+                                </button>
+                            </div>
+                            {% else %}
+                            <button disabled class="w-full bg-gray-900 text-gray-600 font-bold py-2.5 md:py-3 rounded-xl cursor-not-allowed border border-gray-800 text-sm md:text-base">UNAVAILABLE</button>
+                            {% endif %}
+                        </div>
+
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center text-gray-500 py-20">
+                        <i class="fas fa-box-open text-5xl mb-4 opacity-40"></i>
+                        <p class="font-bold">No products in this category yet.</p>
+                    </div>
+                    {% endif %}
+
+                </div>
+                {% endfor %}
+
+            </div>
+            <!-- END PRODUCTS VIEW -->
+
         </div>
 
         <footer class="border-t border-gray-800 bg-[#0a0a0a] mt-auto w-full">
