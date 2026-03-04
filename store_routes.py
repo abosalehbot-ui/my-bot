@@ -290,8 +290,13 @@ async def customer_buy(request: Request, stock_key: str = Form(...), price: floa
     if user.get("balance_frozen", False):
         return JSONResponse({"success": False, "msg": "Your balance is currently frozen. Please contact support."})
 
+    currency = currency.upper()
+    trusted_price = await get_server_price(stock_key, currency)
+    if trusted_price is None:
+        return JSONResponse({"success": False, "msg": "Invalid product or currency."})
+
     bal_field = f"balance_{currency.lower()}"
-    if user.get(bal_field, 0) < price:
+    if user.get(bal_field, 0) < trusted_price:
         return JSONResponse({"success": False, "msg": f"Insufficient {currency.upper()} balance! Please recharge."})
 
     code_doc = await db.stock.find_one_and_delete({"category": stock_key})
@@ -303,8 +308,8 @@ async def customer_buy(request: Request, stock_key: str = Form(...), price: floa
     order_id    = f"{seq}S"
     now_str     = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: -price}})
-    new_bal = user.get(bal_field, 0) - price
+    await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: -trusted_price}})
+    new_bal = user.get(bal_field, 0) - trusted_price
 
     await db.store_orders.insert_one({
         "_id":      order_id,
@@ -312,8 +317,8 @@ async def customer_buy(request: Request, stock_key: str = Form(...), price: floa
         "name":     user["name"],
         "category": stock_key,
         "code":     code_str,
-        "price":    price,
-        "currency": currency.upper(),
+        "price":    trusted_price,
+        "currency": currency,
         "date":     now_str,
     })
     await db.codes_map.insert_one({
@@ -326,7 +331,7 @@ async def customer_buy(request: Request, stock_key: str = Form(...), price: floa
     await log_wallet_txn(email, -price, currency, f"Order #{order_id}", ref=order_id)
 
     return JSONResponse({"success": True, "code": code_str, "new_balance": new_bal,
-                         "currency": currency.upper(), "msg": "Purchase successful!"})
+                         "currency": currency, "msg": "Purchase successful!"})
 
 @router.get("/api/store/my-orders")
 async def get_my_orders(request: Request):
@@ -373,12 +378,36 @@ async def checkout_cart(request: Request, payload: CheckoutRequest):
     for item in payload.cart:
         currency  = item.currency.upper()
         bal_field = f"balance_{currency.lower()}"
+        trusted_price = await get_server_price(item.stock_key, currency)
+
+        if item.quantity <= 0:
+            results.append({
+                "stock_key": item.stock_key,
+                "status":    "Failed",
+                "msg":       "Invalid quantity",
+            })
+            continue
+
+        if trusted_price is None:
+            results.append({
+                "stock_key": item.stock_key,
+                "status":    "Failed",
+                "msg":       "Invalid product or currency",
+            })
+            continue
 
         for _ in range(item.quantity):
             # إعادة جلب المستخدم في كل حلقة لضمان دقة الرصيد المتبقي
             user = await db.store_customers.find_one({"email": email})
+            if not user:
+                results.append({
+                    "stock_key": item.stock_key,
+                    "status":    "Failed",
+                    "msg":       "Account not found",
+                })
+                break
 
-            if user.get(bal_field, 0) < item.price:
+            if user.get(bal_field, 0) < trusted_price:
                 results.append({
                     "stock_key": item.stock_key,
                     "status":    "Failed",
@@ -401,7 +430,7 @@ async def checkout_cart(request: Request, payload: CheckoutRequest):
             order_id    = f"{seq}S"
             now_str     = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-            await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: -item.price}})
+            await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: -trusted_price}})
 
             await db.store_orders.insert_one({
                 "_id":      order_id,
@@ -409,7 +438,7 @@ async def checkout_cart(request: Request, payload: CheckoutRequest):
                 "name":     user["name"],
                 "category": item.stock_key,
                 "code":     code_str,
-                "price":    item.price,
+                "price":    trusted_price,
                 "currency": currency,
                 "date":     now_str,
             })
@@ -426,7 +455,7 @@ async def checkout_cart(request: Request, payload: CheckoutRequest):
                 "stock_key": item.stock_key,
                 "status":    "Success",
                 "code":      code_str,
-                "price":     item.price,
+                "price":     trusted_price,
                 "currency":  currency,
                 "order_id":  order_id,
             })
