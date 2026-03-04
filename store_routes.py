@@ -507,9 +507,17 @@ async def checkout_cart(request: Request, payload: CheckoutRequest):
 
     user = await db.store_customers.find_one({"email": email})
     if not user:
-        return JSONResponse({"success": False, "msg": "Account not found!", "force_logout": True})
+        return JSONResponse(
+            {"success": False, "msg": "Account not found!", "force_logout": True}
+        )
     if user.get("is_banned", False):
-        return JSONResponse({"success": False, "msg": "Your account is suspended.", "force_logout": True})
+        return JSONResponse(
+            {
+                "success": False,
+                "msg": "Your account is suspended.",
+                "force_logout": True,
+            }
+        )
     if user.get("balance_frozen", False):
         return JSONResponse({"success": False, "msg": "Your balance is currently frozen. Please contact support."})
 
