@@ -5,9 +5,11 @@ import hashlib
 import random
 import httpx
 import traceback
+import uuid
 from datetime import datetime
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
+from pymongo.errors import DuplicateKeyError, OperationFailure
 
 # ─── Shared imports (no duplicate connections) ──────────────────────────
 from database import db, get_next_order_id
@@ -28,6 +30,7 @@ class CartItem(BaseModel):
 
 class CheckoutRequest(BaseModel):
     cart: List[CartItem]
+    transaction_id: Optional[str] = ""
 
 
 def hash_password(password: str) -> str:
@@ -275,7 +278,13 @@ async def reset_password(request: Request, email: str = Form(...), code: str = F
 # 4. الشراء وسجل الطلبات
 # ==========================================
 @router.post("/api/store/buy")
-async def customer_buy(request: Request, stock_key: str = Form(...), price: float = Form(...), currency: str = Form(...)):
+async def customer_buy(
+    request: Request,
+    stock_key: str = Form(...),
+    currency: str = Form(...),
+    transaction_id: str = Form(""),
+    price: float = Form(0),
+):
     email = request.cookies.get("store_session")
     if not email:
         return JSONResponse({"success": False, "msg": "Unauthorized! Please login again.", "force_logout": True})
@@ -283,10 +292,8 @@ async def customer_buy(request: Request, stock_key: str = Form(...), price: floa
     user = await db.store_customers.find_one({"email": email})
     if not user:
         return JSONResponse({"success": False, "msg": "Account not found!", "force_logout": True})
-    
     if user.get("is_banned", False):
         return JSONResponse({"success": False, "msg": "Your account is suspended.", "force_logout": True})
-        
     if user.get("balance_frozen", False):
         return JSONResponse({"success": False, "msg": "Your balance is currently frozen. Please contact support."})
 
@@ -360,7 +367,7 @@ async def wallet_history(request: Request):
 
 @router.post("/api/store/checkout-cart")
 async def checkout_cart(request: Request, payload: CheckoutRequest):
-    """شراء أكثر من منتج في عملية واحدة (Checkout Cart)."""
+    """Secure checkout with atomic wallet deduction + atomic stock reservation per unit."""
     email = request.cookies.get("store_session")
     if not email:
         return JSONResponse({"success": False, "msg": "Unauthorized! Please login again.", "force_logout": True})
@@ -416,12 +423,13 @@ async def checkout_cart(request: Request, payload: CheckoutRequest):
                 # توقف عن محاولة شراء هذا المنتج بالكمية المتبقية
                 break
 
-            code_doc = await db.stock.find_one_and_delete({"category": item.stock_key})
-            if not code_doc:
                 results.append({
                     "stock_key": item.stock_key,
-                    "status":    "Failed",
-                    "msg":       "Out of stock",
+                    "status": "Success",
+                    "code": unit["code"],
+                    "price": unit["price"],
+                    "currency": unit["currency"],
+                    "order_id": unit["order_id"],
                 })
                 break
 
@@ -464,12 +472,22 @@ async def checkout_cart(request: Request, payload: CheckoutRequest):
     user = await db.store_customers.find_one({"email": email})
     new_balances = {k: v for k, v in user.items() if k.startswith("balance_")}
 
-    return JSONResponse({
-        "success":      True,
-        "results":      results,
-        "new_balances": new_balances,
-        "msg":          "Checkout completed!",
-    })
+        fresh_user = await db.store_customers.find_one({"email": email})
+        new_balances = {k: v for k, v in (fresh_user or {}).items() if k.startswith("balance_")}
+        await _finish_txn_lock(txid, "done", "ok")
+        return JSONResponse({
+            "success": True,
+            "results": results,
+            "new_balances": new_balances,
+            "msg": "Checkout completed!",
+            "transaction_id": txid,
+        })
+    except ValueError as e:
+        await _finish_txn_lock(txid, "failed", str(e))
+        return JSONResponse({"success": False, "msg": str(e)})
+    except Exception:
+        await _finish_txn_lock(txid, "failed", "internal_error")
+        return JSONResponse({"success": False, "msg": "Checkout failed due to server error."})
 
 # ==========================================
 # 5. لوحة أدمن المتجر
@@ -513,13 +531,29 @@ async def store_admin_page(request: Request):
     })
 
 @router.post("/api/store/manage_balance")
-async def store_manage_balance(request: Request, email: str = Form(...), amount: float = Form(...), action: str = Form(...), currency: str = Form(...)):
+async def store_manage_balance(
+    request: Request,
+    email: str = Form(...),
+    amount: float = Form(...),
+    action: str = Form(...),
+    currency: str = Form(...),
+    transaction_id: str = Form(""),
+):
     if not check_auth(request):
         return JSONResponse({"success": False, "msg": "Unauthorized"})
 
-    # ده بيسمح بإنشاء أي عملة جديدة تلقائياً بمجرد كتابة اسمها!
+    try:
+        amount_int = _sanitize_positive_int(amount, "amount", max_value=1_000_000)
+        currency = _normalize_currency(currency)
+    except ValueError as e:
+        return JSONResponse({"success": False, "msg": str(e)})
+
+    txid = await _acquire_txn_lock(transaction_id, email, f"admin_balance_{action}")
+    if not txid:
+        return JSONResponse({"success": False, "msg": "Duplicate transaction detected."})
+
     bal_field = f"balance_{currency.lower()}"
-    
+
     if action == "add":
         await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: amount}})
         await log_wallet_txn(email, amount, currency, "Top-up (Admin)")
@@ -527,7 +561,8 @@ async def store_manage_balance(request: Request, email: str = Form(...), amount:
         await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: -amount}})
         await log_wallet_txn(email, -amount, currency, "Manual deduction (Admin)")
 
-    return JSONResponse({"success": True, "msg": f"{currency.upper()} balance updated successfully!"})
+    await _finish_txn_lock(txid, "done", "ok")
+    return JSONResponse({"success": True, "msg": f"{currency} balance updated successfully!", "transaction_id": txid})
 
 # Endpoint تجميد الرصيد أو حظر الحساب
 @router.post("/api/store/admin/toggle-status")
