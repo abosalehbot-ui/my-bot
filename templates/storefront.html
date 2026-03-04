@@ -645,8 +645,7 @@
                             {% if stock.get(p.stock_key, 0) > 0 %}
                             <div
                                 class="absolute top-3 right-3 bg-szgreen/20 text-szgreen text-[10px] font-bold px-2 py-1 rounded border border-szgreen/30">
-                                <i class="fas fa-bolt mr-1"></i> INSTANT
-                            </div>
+                                <i class="fas fa-bolt mr-1"></i> INSTANT</div>
                             {% else %}
                             <div
                                 class="absolute top-3 right-3 bg-red-900/50 text-red-400 text-[10px] font-bold px-2 py-1 rounded border border-red-900/50">
@@ -825,8 +824,7 @@
                     <dl class="bg-[#050505] border border-gray-800 p-4 rounded-xl flex items-center gap-3">
                         <div
                             class="w-10 h-10 bg-gray-900 rounded-full flex items-center justify-center text-szgreen border border-gray-700">
-                            <i class="fas fa-user"></i>
-                        </div>
+                            <i class="fas fa-user"></i></div>
                         <div>
                             <dt class="text-sm font-bold text-white" id="checkout-user-name">Loading...</dt>
                             <dd class="text-xs text-szcyan font-mono" id="checkout-user-email">Loading...</dd>
@@ -1020,7 +1018,7 @@
                     <div class="text-sm"><input type="text" id="verify-otp" required maxlength="6"
                             class="w-full rounded-md border border-gray-700 bg-[#0a0a0a] px-4 py-3 text-szgreen text-center text-2xl tracking-[0.5em] font-black outline-none focus:border-szgreen">
                     </div>
-                <button type="submit" id="btn-verify"
+                    <button type="submit" id="btn-verify"
                         class="w-full bg-gradient-to-r from-szgreen to-szcyan text-black py-3 rounded-md font-bold uppercase tracking-wide btn-glow">Verify
                         & Login</button>
                     <button type="button" onclick="switchAuthView('signup')"
@@ -1111,8 +1109,7 @@
                                 </div>
                                 <div
                                     class="absolute inset-0 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-white text-xs">
-                                    <i class="fas fa-camera"></i>
-                                </div>
+                                    <i class="fas fa-camera"></i></div>
                             </div>
                             <div class="flex-1 min-w-0">
                                 <div class="font-black text-white text-base truncate" id="prof-name">...</div>
@@ -1167,8 +1164,7 @@
                                 </div>
                                 <div
                                     class="absolute inset-0 rounded-full bg-black/70 flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-white">
-                                    <i class="fas fa-camera"></i>
-                                </div>
+                                    <i class="fas fa-camera"></i></div>
                             </div>
                             <button onclick="triggerAvatarUpload()"
                                 class="mt-2 text-xs text-szcyan font-bold hover:underline"><i
@@ -1367,6 +1363,8 @@
 
     <script src="/static/js/core.js"></script>
     <script src="/static/js/store.js"></script>
+    {% endif %}
+
 </body>
 
 </html>
