@@ -1,6 +1,7 @@
 import os
 import re
 import uuid
+import base64
 from fastapi import FastAPI, Request, Form, Response, status, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -48,17 +49,34 @@ def clean_and_extract_tokens(raw_text):
 
 
 async def save_upload(file: UploadFile) -> str:
-    """حفظ الملف المرفوع وإرجاع المسار العام."""
+    """حفظ الملف المرفوع داخل Mongo كـ data URI لتفادي ضياع الصور مع إعادة التشغيل."""
     if not file or not file.filename:
         return ""
-    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "png"
-    filename = f"{uuid.uuid4().hex}.{ext}"
-    filepath = os.path.join("static", "uploads", filename)
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
     content = await file.read()
-    with open(filepath, "wb") as f:
-        f.write(content)
-    return f"/static/uploads/{filename}"
+    if not content:
+        return ""
+    if len(content) > 2_000_000:
+        raise ValueError("Image too large (max 2MB)")
+
+    content_type = (file.content_type or "").lower()
+    allowed_types = {"image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"}
+    if content_type not in allowed_types:
+        ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+        guessed = {
+            "png": "image/png",
+            "jpg": "image/jpeg",
+            "jpeg": "image/jpeg",
+            "webp": "image/webp",
+            "gif": "image/gif",
+        }.get(ext)
+        if guessed:
+            content_type = guessed
+        else:
+            raise ValueError("Invalid image type")
+
+    b64 = base64.b64encode(content).decode("utf-8")
+    return f"data:{content_type};base64,{b64}"
 
 
 def convert_objectids(document):
@@ -232,8 +250,11 @@ async def api_add_category(
     cat_id = cat_id.lower().replace(" ", "_")
     if await db.store_categories.find_one({"_id": cat_id}):
         return JSONResponse({"success": False, "msg": "ID exists!"})
-    image_url = await save_upload(image) if image and image.filename else ""
-    logo_url  = await save_upload(logo)  if logo  and logo.filename  else ""
+    try:
+        image_url = await save_upload(image) if image and image.filename else ""
+        logo_url  = await save_upload(logo)  if logo  and logo.filename  else ""
+    except ValueError as e:
+        return JSONResponse({"success": False, "msg": str(e)})
     await db.store_categories.insert_one({
         "_id": cat_id, "name": name, "icon": icon,
         "image": image_url, "logo": logo_url, "products": []
@@ -252,10 +273,13 @@ async def api_edit_category(
 ):
     if not check_auth(request): return JSONResponse({"success": False})
     update_data = {"name": name, "icon": icon}
-    if image and image.filename:
-        update_data["image"] = await save_upload(image)
-    if logo and logo.filename:
-        update_data["logo"] = await save_upload(logo)
+    try:
+        if image and image.filename:
+            update_data["image"] = await save_upload(image)
+        if logo and logo.filename:
+            update_data["logo"] = await save_upload(logo)
+    except ValueError as e:
+        return JSONResponse({"success": False, "msg": str(e)})
     await db.store_categories.update_one({"_id": cat_id}, {"$set": update_data})
     await web_log("تعديل فئة", f"{cat_id} → {name}")
     return JSONResponse({"success": True, "msg": "Category Updated!"})
@@ -274,7 +298,10 @@ async def api_add_product(request: Request, image: UploadFile = File(None)):
     stock_key = form.get("stock_key")
     name      = form.get("name")
 
-    image_url = await save_upload(image) if image and image.filename else form.get("image", "")
+    try:
+        image_url = await save_upload(image) if image and image.filename else form.get("image", "")
+    except ValueError as e:
+        return JSONResponse({"success": False, "msg": str(e)})
 
     # بناء كائن الأسعار ديناميكياً لدعم أي عملة
     prices = {}
@@ -307,10 +334,13 @@ async def api_edit_product(request: Request, image: UploadFile = File(None)):
     name      = form.get("name")
 
     update_fields = {"products.$.name": name}
-    if image and image.filename:
-        update_fields["products.$.image"] = await save_upload(image)
-    elif form.get("image"):
-        update_fields["products.$.image"] = form.get("image")
+    try:
+        if image and image.filename:
+            update_fields["products.$.image"] = await save_upload(image)
+        elif form.get("image"):
+            update_fields["products.$.image"] = form.get("image")
+    except ValueError as e:
+        return JSONResponse({"success": False, "msg": str(e)})
 
     prices = {}
     for key, val in form.items():

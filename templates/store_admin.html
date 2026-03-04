@@ -145,7 +145,7 @@
                         <td class="px-4 py-3"><span class="badge-egp px-2 py-1 rounded text-xs font-black">{{ c.balance_egp or 0 }}</span></td>
                         <td class="px-4 py-3"><span class="badge-usd px-2 py-1 rounded text-xs font-black">{{ c.balance_usd or 0 }}</span></td>
                         <td class="px-4 py-3">
-                            <button onclick='openCustomerModal({{ c | tojson }})'
+                            <button onclick='openCustomerModal({{ c | tojson | forceescape }})'
                                 class="bg-szgreen/10 text-szgreen border border-szgreen/20 px-3 py-1 rounded text-xs font-bold hover:bg-szgreen hover:text-black transition">
                                 <i class="fas fa-pen mr-1"></i>Manage
                             </button>
@@ -193,7 +193,7 @@
                         </td>
                         <td class="px-4 py-3 text-xs text-gray-500">{{ o.date }}</td>
                         <td class="px-4 py-3">
-                            <button onclick="copyText('{{ o.code }}')"
+                            <button onclick='copyText({{ o.code | tojson | forceescape }})'
                                 class="bg-gray-900 text-szgreen border border-gray-700 px-3 py-1 rounded text-xs font-mono hover:bg-szgreen hover:text-black transition">
                                 <i class="fas fa-copy mr-1"></i>Copy
                             </button>

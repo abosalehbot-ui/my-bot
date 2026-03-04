@@ -263,17 +263,17 @@ function backToCatalog() {
 // ─── Purchase Flow (Buy Now) ─────────────────────────────────────────────
 
 /**
- * buyProduct(stock_key, pricesObj, name, iconClass)
+ * buyProduct(stock_key, pricesObj, name, imageUrl, iconClass)
  * Opens the Buy Now confirmation modal with correct product details.
  */
-function buyProduct(stock_key, pricesObj, name, iconClass) {
+function buyProduct(stock_key, pricesObj, name, imageUrl, iconClass) {
     if (!localStorage.getItem('store_email')) { openAuthModal('signin'); return; }
 
     const finalPrice = (pricesObj && pricesObj[currentCurrency] != null)
         ? pricesObj[currentCurrency]
         : (pricesObj && pricesObj['EGP'] != null ? pricesObj['EGP'] : 0);
 
-    pendingPurchase = { stock_key, price: finalPrice, currency: currentCurrency };
+    pendingPurchase = { stock_key, price: finalPrice, currency: currentCurrency, imageUrl, iconClass };
 
     const priceText = finalPrice + ' ' + currentCurrency;
     const pColor    = currentCurrency === 'EGP' ? 'text-yellow-500'
@@ -285,7 +285,17 @@ function buyProduct(stock_key, pricesObj, name, iconClass) {
     setText('checkout-item-name',  name);
 
     const icon = $('checkout-item-icon');
-    if (icon && iconClass) icon.className = `fas ${iconClass}`;
+    const img  = $('checkout-item-image');
+    if (imageUrl) {
+        if (img) { img.src = imageUrl; img.classList.remove('hidden'); }
+        if (icon) icon.classList.add('hidden');
+    } else {
+        if (img) { img.src = ''; img.classList.add('hidden'); }
+        if (icon) {
+            icon.className = `fas ${iconClass || 'fa-box'}`;
+            icon.classList.remove('hidden');
+        }
+    }
 
     const pe = $('checkout-item-price');
     if (pe) { pe.innerText = priceText; pe.className = `p-4 text-right font-black text-lg ${pColor}`; }
@@ -341,17 +351,17 @@ function copyPurchasedCode() {
 // ─── Cart System ─────────────────────────────────────────────────────────
 
 /**
- * addToCart(stock_key, pricesObj, name, iconClass)
+ * addToCart(stock_key, pricesObj, name, imageUrl, iconClass)
  * Adds an item (or increments qty) and persists the cart to localStorage.
  */
-function addToCart(stock_key, pricesObj, name, iconClass) {
+function addToCart(stock_key, pricesObj, name, imageUrl, iconClass) {
     if (!localStorage.getItem('store_email')) { openAuthModal('signin'); return; }
 
     const existing = cart.find(i => i.stock_key === stock_key);
     if (existing) {
         existing.qty += 1;
     } else {
-        cart.push({ stock_key, prices: pricesObj, name, iconClass, qty: 1 });
+        cart.push({ stock_key, prices: pricesObj, name, image: imageUrl || '', iconClass, qty: 1 });
     }
     _saveCart();
     updateCartUI();
@@ -433,8 +443,10 @@ window.openCartModal = function() {
         html += `
         <div class="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-black border border-gray-800 rounded-xl mb-3 hover:border-szcyan/50 transition gap-4">
             <div class="flex items-center gap-3 flex-1 min-w-0">
-                <div class="w-10 h-10 rounded-lg bg-szcyan/10 border border-szcyan/20 flex items-center justify-center text-szcyan shrink-0">
-                    <i class="fas ${item.iconClass || 'fa-box'} text-sm"></i>
+                <div class="w-10 h-10 rounded-lg bg-szcyan/10 border border-szcyan/20 flex items-center justify-center text-szcyan shrink-0 overflow-hidden">
+                    ${item.image
+                        ? `<img src="${item.image}" alt="${item.name}" class="w-full h-full object-cover">`
+                        : `<i class="fas ${item.iconClass || 'fa-box'} text-sm"></i>`}
                 </div>
                 <div class="min-w-0">
                     <h4 class="text-white font-bold text-sm truncate">${item.name}</h4>
