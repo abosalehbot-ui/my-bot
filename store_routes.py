@@ -433,15 +433,19 @@ async def store_admin_page(request: Request):
         if "_id" in customer:
             customer["_id"] = str(customer["_id"])
 
-    store_orders = await db.store_orders.find().sort("date", -1).to_list(500)
+    store_orders    = await db.store_orders.find().sort("date", -1).to_list(500)
 
     # ── Support Tickets ──────────────────────────────────────────────────
-    open_tickets    = await db.support_tickets.find({"status": {"$ne": "closed"}}).sort("created_at", -1).to_list(200)
-    support_tickets = await db.support_tickets.find().sort("created_at", -1).to_list(500)
-    for t in open_tickets:
-        t["ticket_id"] = str(t["_id"])
-    for t in support_tickets:
-        t["ticket_id"] = str(t["_id"])
+    try:
+        open_tickets    = await db.support_tickets.find({"status": {"$ne": "closed"}}).sort("created_at", -1).to_list(200)
+        support_tickets = await db.support_tickets.find().sort("created_at", -1).to_list(500)
+        for t in open_tickets:
+            t["ticket_id"] = str(t["_id"])
+        for t in support_tickets:
+            t["ticket_id"] = str(t["_id"])
+    except Exception:
+        open_tickets    = []
+        support_tickets = []
 
     return templates.TemplateResponse("store_admin.html", {
         "request":         request,
@@ -470,7 +474,7 @@ async def store_manage_balance(request: Request, email: str = Form(...), amount:
 # Endpoint تجميد الرصيد أو حظر الحساب
 @router.post("/api/store/admin/toggle-status")
 async def admin_toggle_status(request: Request, email: str = Form(...), action: str = Form(...)):
-    if not admin_check(request):
+    if not check_auth(request):
         return JSONResponse({"success": False, "msg": "Unauthorized"})
         
     user = await db.store_customers.find_one({"email": email})
@@ -753,27 +757,26 @@ async def admin_delete_customer(request: Request, email: str = Form(...)):
     await db.otps.delete_many({"email": email})
     return JSONResponse({"success": True, "msg": f"Account {email} deleted."})
 
-
 # ==========================================
 # 8. Support Tickets System
 # ==========================================
 
 @router.post("/api/store/tickets/create")
 async def create_ticket(
-    request: Request,
-    subject: str = Form(...),
-    message: str = Form(...),
+    request:  Request,
+    subject:  str = Form(...),
+    message:  str = Form(...),
 ):
     email = request.cookies.get("store_session")
     if not email:
-        return JSONResponse({"success": False, "msg": "You must be logged in to submit a ticket."})
+        return JSONResponse({"success": False, "msg": "Please login first."})
 
     user = await db.store_customers.find_one({"email": email})
     if not user:
-        return JSONResponse({"success": False, "msg": "Account not found.", "force_logout": True})
+        return JSONResponse({"success": False, "msg": "Account not found."})
 
     if not subject.strip() or not message.strip():
-        return JSONResponse({"success": False, "msg": "Subject and message cannot be empty."})
+        return JSONResponse({"success": False, "msg": "Subject and message are required."})
 
     # Generate unique ticket ID
     ticket_id = f"TKT-{random.randint(10000, 99999)}"
@@ -783,21 +786,19 @@ async def create_ticket(
     await db.support_tickets.insert_one({
         "_id":        ticket_id,
         "email":      email,
-        "name":       user["name"],
+        "name":       user.get("name", "Customer"),
         "subject":    subject.strip(),
         "status":     "open",
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "messages": [
-            {
-                "sender":  "customer",
-                "name":    user["name"],
-                "message": message.strip(),
-                "time":    datetime.now().strftime("%Y-%m-%d %H:%M"),
-            }
-        ],
+        "messages": [{
+            "sender":  "customer",
+            "name":    user.get("name", "Customer"),
+            "message": message.strip(),
+            "time":    datetime.now().strftime("%Y-%m-%d %H:%M"),
+        }],
     })
 
-    return JSONResponse({"success": True, "msg": f"Ticket {ticket_id} submitted successfully!", "ticket_id": ticket_id})
+    return JSONResponse({"success": True, "msg": f"Ticket {ticket_id} submitted!", "ticket_id": ticket_id})
 
 
 @router.get("/api/store/tickets/my")
@@ -820,22 +821,20 @@ async def customer_reply_ticket(
 ):
     email = request.cookies.get("store_session")
     if not email:
-        return JSONResponse({"success": False, "msg": "Not logged in."})
+        return JSONResponse({"success": False, "msg": "Please login first."})
 
     ticket = await db.support_tickets.find_one({"_id": ticket_id, "email": email})
     if not ticket:
         return JSONResponse({"success": False, "msg": "Ticket not found."})
-    if ticket["status"] == "closed":
-        return JSONResponse({"success": False, "msg": "This ticket is closed and cannot receive new replies."})
-    if not message.strip():
-        return JSONResponse({"success": False, "msg": "Reply cannot be empty."})
+    if ticket.get("status") == "closed":
+        return JSONResponse({"success": False, "msg": "This ticket is closed."})
 
     user = await db.store_customers.find_one({"email": email})
     await db.support_tickets.update_one(
         {"_id": ticket_id},
         {"$push": {"messages": {
             "sender":  "customer",
-            "name":    user["name"] if user else email,
+            "name":    user.get("name", "Customer") if user else "Customer",
             "message": message.strip(),
             "time":    datetime.now().strftime("%Y-%m-%d %H:%M"),
         }}}
@@ -855,17 +854,18 @@ async def admin_reply_ticket(
     ticket = await db.support_tickets.find_one({"_id": ticket_id})
     if not ticket:
         return JSONResponse({"success": False, "msg": "Ticket not found."})
-    if not message.strip():
-        return JSONResponse({"success": False, "msg": "Reply cannot be empty."})
 
     await db.support_tickets.update_one(
         {"_id": ticket_id},
-        {"$push": {"messages": {
-            "sender":  "admin",
-            "name":    "Support Team",
-            "message": message.strip(),
-            "time":    datetime.now().strftime("%Y-%m-%d %H:%M"),
-        }}}
+        {
+            "$push": {"messages": {
+                "sender":  "admin",
+                "name":    "Support Team",
+                "message": message.strip(),
+                "time":    datetime.now().strftime("%Y-%m-%d %H:%M"),
+            }},
+            "$set": {"status": "in_progress"},
+        }
     )
     return JSONResponse({"success": True, "msg": "Reply sent!"})
 
@@ -879,15 +879,13 @@ async def admin_change_ticket_status(
     if not admin_check(request):
         return JSONResponse({"success": False, "msg": "Unauthorized"})
 
-    allowed = {"open", "in_progress", "closed"}
-    if status not in allowed:
+    if status not in ("open", "in_progress", "closed"):
         return JSONResponse({"success": False, "msg": "Invalid status."})
 
     result = await db.support_tickets.update_one({"_id": ticket_id}, {"$set": {"status": status}})
     if result.matched_count == 0:
         return JSONResponse({"success": False, "msg": "Ticket not found."})
-
-    return JSONResponse({"success": True, "msg": f"Status updated to '{status}'.", "status": status})
+    return JSONResponse({"success": True, "msg": f"Status updated to {status}."})
 
 
 @router.get("/api/store/admin/tickets/view")
@@ -897,6 +895,8 @@ async def admin_view_ticket(request: Request, ticket_id: str):
 
     ticket = await db.support_tickets.find_one({"_id": ticket_id})
     if not ticket:
-        return JSONResponse({"success": False, "msg": "Not found"})
+        return JSONResponse({"success": False, "msg": "Ticket not found."})
+
     ticket["ticket_id"] = str(ticket["_id"])
+    del ticket["_id"]
     return JSONResponse({"success": True, "ticket": ticket})
