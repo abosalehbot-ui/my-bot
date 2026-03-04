@@ -191,7 +191,9 @@
         
         <div class="absolute bottom-0 left-0 flex items-center justify-between p-4 w-full bg-[#0a0a0a] z-20 border-t border-r border-gray-800">
             <select id="currency-toggle" onchange="toggleCurrency()" class="bg-gray-900 border border-gray-700 text-white text-xs font-bold py-2 px-3 rounded outline-none cursor-pointer focus:border-szgreen transition">
-                <option value="EGP">🇪🇬 EGP</option><option value="USD">🇺🇸 USD</option>
+                {% for cur in currencies %}
+                <option value="{{ cur._id }}">{{ cur.symbol }}</option>
+                {% endfor %}
             </select>
             
             <div class="flex items-center gap-2 relative">
@@ -240,7 +242,16 @@
 
             {% for cat in categories %}
             <div id="cat-{{ cat._id }}" class="mb-16 scroll-mt-20 fade-in">
-                <h2 class="text-2xl font-black text-white mb-6 flex items-center gap-3 border-b border-gray-800 pb-2"><i class="fas {{ cat.icon }} text-szcyan"></i> {{ cat.name }}</h2>
+                <div class="flex items-center gap-4 mb-6 border-b border-gray-800 pb-4">
+                    {% if cat.image %}
+                    <img src="{{ cat.image }}" alt="{{ cat.name }}" class="w-12 h-12 rounded-xl object-cover border border-szcyan/30 shadow-[0_0_10px_rgba(var(--theme-secondary),0.2)]">
+                    {% else %}
+                    <div class="w-12 h-12 bg-szcyan/10 border border-szcyan/20 rounded-xl flex items-center justify-center text-szcyan text-xl">
+                        <i class="fas {{ cat.icon }}"></i>
+                    </div>
+                    {% endif %}
+                    <h2 class="text-2xl font-black text-white">{{ cat.name }}</h2>
+                </div>
                 
                 <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                     {% for p in cat.products %}
@@ -253,19 +264,31 @@
                         <div class="absolute top-3 right-3 bg-red-900/50 text-red-400 text-[10px] font-bold px-2 py-1 rounded border border-red-900/50">OUT OF STOCK</div>
                         {% endif %}
 
+                        {% if p.image %}
+                        <div class="w-20 h-20 md:w-24 md:h-24 mt-4 md:mt-0 mb-4 rounded-full overflow-hidden border-2 border-szcyan/30 shadow-[0_0_20px_rgba(var(--theme-secondary),0.15)] floating">
+                            <img src="{{ p.image }}" alt="{{ p.name }}" class="w-full h-full object-cover">
+                        </div>
+                        {% elif cat.logo %}
+                        <div class="w-20 h-20 md:w-24 md:h-24 mt-4 md:mt-0 mb-4 rounded-full overflow-hidden border-2 border-szcyan/30 shadow-[0_0_20px_rgba(var(--theme-secondary),0.15)] floating">
+                            <img src="{{ cat.logo }}" alt="{{ cat.name }}" class="w-full h-full object-cover">
+                        </div>
+                        {% else %}
                         <div class="w-20 h-20 md:w-24 md:h-24 mt-4 md:mt-0 mb-4 rounded-full bg-gradient-to-br from-szcyan/10 to-transparent border border-szcyan/20 flex items-center justify-center shadow-[0_0_20px_rgba(var(--theme-secondary),0.1)] floating text-szcyan text-3xl">
                             <i class="fas {{ cat.icon }}"></i>
                         </div>
+                        {% endif %}
                         
                         <h3 class="text-xl md:text-2xl font-black text-white mb-1">{{ p.name }}</h3>
                         
                         <div class="mt-2 mb-4 bg-black w-full py-2 rounded-lg border border-gray-800">
-                            <div class="price-display egp-price">
-                                <span class="text-xl md:text-2xl font-black text-yellow-500">{{ p.price_egp }}</span> <span class="text-[10px] text-gray-500 font-bold uppercase">EGP</span>
+                            {% for cur in currencies %}
+                            <div class="price-display {{ cur._id.lower() }}-price {% if not loop.first %}hidden{% endif %}">
+                                <span class="text-xl md:text-2xl font-black {% if cur._id == 'EGP' %}text-yellow-500{% elif cur._id == 'USD' %}text-szcyan{% else %}text-szgreen{% endif %}">
+                                    {{ p.prices.get(cur._id, p.prices.get(cur._id.lower(), 0)) if p.prices is defined else (p.price_egp if cur._id == 'EGP' else p.price_usd) }}
+                                </span>
+                                <span class="text-[10px] text-gray-500 font-bold uppercase ml-1">{{ cur.symbol }}</span>
                             </div>
-                            <div class="price-display usd-price hidden">
-                                <span class="text-xl md:text-2xl font-black text-szcyan">{{ p.price_usd }}</span> <span class="text-[10px] text-gray-500 font-bold uppercase">USD</span>
-                            </div>
+                            {% endfor %}
                         </div>
 
                         <div class="text-xs text-gray-400 mb-4 flex justify-between items-center w-full bg-gray-900/50 p-2.5 rounded-lg border border-gray-800">
@@ -277,10 +300,10 @@
 
                         {% if stock.get(p.stock_key, 0) > 0 %}
                         <div class="flex gap-2 w-full">
-                            <button onclick="buyProduct('{{ p.stock_key }}', {{ p.price_egp }}, {{ p.price_usd }}, '{{ p.name }}', '{{ cat.icon }}')" class="flex-1 bg-gradient-to-r from-szgreen to-szcyan text-black font-bold py-2.5 md:py-3 rounded-xl hover:opacity-90 transition text-sm md:text-base btn-glow">
+                            <button onclick="buyProduct('{{ p.stock_key }}', {{ p.prices | tojson | safe if p.prices is defined else '{}' }}, '{{ p.name }}', '{{ cat.icon }}')" class="flex-1 bg-gradient-to-r from-szgreen to-szcyan text-black font-bold py-2.5 md:py-3 rounded-xl hover:opacity-90 transition text-sm md:text-base btn-glow">
                                 Buy Now
                             </button>
-                            <button onclick="addToCart('{{ p.stock_key }}', {{ p.price_egp }}, {{ p.price_usd }}, '{{ p.name }}', '{{ cat.icon }}')" class="bg-gray-800 text-szcyan border border-gray-700 font-bold py-2.5 px-4 md:py-3 md:px-5 rounded-xl hover:bg-szcyan hover:text-white transition flex items-center justify-center">
+                            <button onclick="addToCart('{{ p.stock_key }}', {{ p.prices | tojson | safe if p.prices is defined else '{}' }}, '{{ p.name }}', '{{ cat.icon }}')" class="bg-gray-800 text-szcyan border border-gray-700 font-bold py-2.5 px-4 md:py-3 md:px-5 rounded-xl hover:bg-szcyan hover:text-white transition flex items-center justify-center">
                                 <i class="fas fa-cart-plus"></i>
                             </button>
                         </div>
