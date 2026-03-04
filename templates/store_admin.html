@@ -276,7 +276,7 @@
                     </thead>
                     <tbody class="divide-y divide-gray-800">
                         {% for o in store_orders %}
-                        <tr class="hover:bg-black/30 transition order-row"
+                        <tr id="main-order-row-{{ o._id }}" class="hover:bg-black/30 transition order-row"
                             data-search="{{ o.email|lower }} {{ o._id|lower }}">
                             <td class="px-4 py-3 font-mono text-szcyan font-bold">#{{ o._id }}</td>
                             <td class="px-4 py-3 font-bold text-white">{{ o.name }}</td>
@@ -296,7 +296,7 @@
                             <td class="px-4 py-3">
                                 <button onclick="returnOrder('{{ o._id }}')"
                                     class="bg-red-900/20 text-red-400 border border-red-900/30 px-3 py-1 rounded text-xs font-bold hover:bg-red-900/40 transition">
-                                    <i class="fas fa-undo mr-1"></i>Return
+                                    <i class="fas fa-undo mr-1"></i>Refund
                                 </button>
                             </td>
                         </tr>
@@ -545,7 +545,7 @@
             <p id="confirm-msg" class="text-sm text-gray-400 mb-6">This action cannot be undone.</p>
             <div class="flex gap-3">
                 <button onclick="closeConfirmModal()" class="flex-1 bg-gray-900 text-white font-bold py-3 rounded-xl hover:bg-gray-800 transition border border-gray-700">Cancel</button>
-                <button id="confirm-action-btn" class="flex-1 bg-red-500 text-black font-black py-3 rounded-xl hover:bg-red-600 transition shadow-[0_0_15px_rgba(239,68,68,0.4)]">Yes, Do it!</button>
+                <button id="confirm-action-btn" class="flex-1 bg-red-500 text-black font-black py-3 rounded-xl hover:bg-red-600 transition shadow-[0_0_15px_rgba(239,68,68,0.4)]">Yes, Refund!</button>
             </div>
         </div>
     </div>
@@ -846,18 +846,31 @@
             closeConfirmModal();
         });
 
-        // ─── Return Order (Single & All) ─────────────────────────────────────────
+        // ─── Return Order & Refund ─────────────────────────────────────────
         function returnOrder(orderId) {
-            showConfirm('Return Order?', `Are you sure you want to return order #${orderId} to stock?`, async () => {
+            showConfirm('Return & Refund?', `Are you sure you want to return order #${orderId} to stock and refund the customer?`, async () => {
                 const fd = new FormData(); fd.append('order_id', orderId);
                 try {
                     const d = await (await fetch('/api/store/admin/return-order', { method: 'POST', body: fd })).json();
                     if (d.success) { 
                         showToast(d.msg); 
+                        // حذف الصف بصمت بدون ريفرش للصفحة
+                        const mainRow = $('main-order-row-' + orderId);
+                        const modalRow = $('modal-order-row-' + orderId);
+                        if (mainRow) mainRow.remove();
+                        if (modalRow) modalRow.remove();
+
+                        // تحديث بيانات الرصيد للمستخدم المفتوح حالياً
                         if(_cEmail && !$('customer-modal').classList.contains('hidden')) {
-                            loadCustomerOrders(); 
-                        } else {
-                            setTimeout(() => location.reload(), 1000); 
+                            const newVal = await (await fetch('/api/store/customer-info?email=' + encodeURIComponent(_cEmail))).json();
+                            if (newVal.success) renderBalances(newVal);
+                            
+                            // تحديث عدد الطلبات في الواجهة
+                            const countEl = $('cm-orders-count');
+                            if(countEl) {
+                                const currentCount = parseInt(countEl.innerText);
+                                if(!isNaN(currentCount)) countEl.innerText = (currentCount - 1) + ' orders';
+                            }
                         }
                     } else showToast(d.msg, 'error');
                 } catch { showToast('Error returning order!', 'error'); }
@@ -865,12 +878,23 @@
         }
 
         function returnAllCustomerOrders() {
-            showConfirm('Return ALL Orders?', `WARNING: This will return all purchased codes for ${_cEmail} back to stock!`, async () => {
+            showConfirm('Return ALL Orders?', `WARNING: This will return all purchased codes for ${_cEmail} back to stock AND refund the total balance!`, async () => {
                 const fd = new FormData(); fd.append('email', _cEmail);
                 try {
                     const d = await (await fetch('/api/store/admin/return-all-orders', { method: 'POST', body: fd })).json();
-                    if (d.success) { showToast(d.msg); loadCustomerOrders(); } 
-                    else showToast(d.msg, 'error');
+                    if (d.success) { 
+                        showToast(d.msg); 
+                        
+                        // مسح كل صفوف هذا المستخدم من الجدول الرئيسي
+                        document.querySelectorAll(`.order-row[data-search*="${_cEmail.toLowerCase()}"]`).forEach(r => r.remove());
+                        
+                        // تحديث البيانات في النافذة الجانبية المفتوحة
+                        loadCustomerOrders();
+                        const newVal = await (await fetch('/api/store/customer-info?email=' + encodeURIComponent(_cEmail))).json();
+                        if (newVal.success) renderBalances(newVal);
+                        setText('cm-orders-count', '0 orders');
+
+                    } else showToast(d.msg, 'error');
                 } catch { showToast('Error returning orders!', 'error'); }
             });
         }
@@ -893,7 +917,7 @@
                     tbody.innerHTML = d.orders.map(o => {
                         const pc = o.currency === 'USD' ? 'text-szcyan' : 'text-yellow-500';
                         const safeCode = String(o.code).replace(/'/g, "\\'");
-                        return `<tr class="hover:bg-[#111] transition">
+                        return `<tr id="modal-order-row-${o.order_id}" class="hover:bg-[#111] transition">
                             <td class="px-3 py-3 font-mono text-szcyan">#${o.order_id}</td>
                             <td class="px-3 py-3 font-bold text-white">${o.category}</td>
                             <td class="px-3 py-3 font-black ${pc}">${o.price} <span class="text-[10px] text-gray-500">${o.currency}</span></td>
@@ -903,7 +927,7 @@
                             </td>
                             <td class="px-3 py-3 flex items-center gap-2">
                                 <button onclick="copyText('${safeCode}')" class="bg-gray-900 text-szcyan border border-gray-700 px-2 py-1 rounded text-[10px] font-bold hover:bg-szcyan hover:text-black transition">Copy</button>
-                                <button onclick="returnOrder('${o.order_id}')" class="bg-red-900/20 text-red-400 border border-red-900/30 px-2 py-1 rounded text-[10px] font-bold hover:bg-red-500 hover:text-black transition">Return</button>
+                                <button onclick="returnOrder('${o.order_id}')" class="bg-red-900/20 text-red-400 border border-red-900/30 px-2 py-1 rounded text-[10px] font-bold hover:bg-red-500 hover:text-black transition">Refund</button>
                             </td>
                         </tr>`;
                     }).join('');
