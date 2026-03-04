@@ -119,12 +119,56 @@
                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     <div class="bg-panelbg border border-gray-800 p-6 rounded-xl h-fit sticky top-4">
                         <h3 class="font-bold text-white uppercase text-sm mb-4 border-b border-gray-800 pb-3"><i class="fas fa-folder-plus text-szcyan mr-2"></i> Add Main Category</h3>
-                        <form onsubmit="submitAjax(event, '/api/catalog/category/add', 'catalog')" class="space-y-4">
+                        <form onsubmit="submitAjaxMultipart(event, '/api/catalog/category/add', 'catalog')" class="space-y-4" enctype="multipart/form-data">
                             <div><label class="text-xs text-gray-500 mb-1 block">Category ID (e.g. pubg)</label><input type="text" name="cat_id" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-szcyan font-mono text-sm"></div>
                             <div><label class="text-xs text-gray-500 mb-1 block">Display Name</label><input type="text" name="name" required placeholder="PUBG Mobile" class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-szcyan"></div>
                             <div><label class="text-xs text-gray-500 mb-1 block">Icon (FontAwesome)</label><input type="text" name="icon" value="fa-gamepad" class="w-full bg-[#050505] border border-gray-800 text-gray-400 p-3 rounded-lg outline-none focus:border-szcyan font-mono text-sm"></div>
+                            <div>
+                                <label class="text-xs text-gray-500 mb-1 block"><i class="fas fa-image text-szcyan mr-1"></i>Category Banner (optional)</label>
+                                <label class="w-full flex items-center gap-3 bg-[#050505] border border-dashed border-gray-700 hover:border-szcyan p-3 rounded-lg cursor-pointer transition group">
+                                    <i class="fas fa-cloud-upload-alt text-gray-600 group-hover:text-szcyan transition text-lg"></i>
+                                    <span class="text-xs text-gray-500 group-hover:text-szcyan transition" id="img-label-new-cat">Click to upload image</span>
+                                    <input type="file" name="image" accept="image/*" class="hidden" onchange="previewFile(this, 'img-label-new-cat')">
+                                </label>
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-500 mb-1 block"><i class="fas fa-stamp text-szgreen mr-1"></i>Category Logo (optional)</label>
+                                <label class="w-full flex items-center gap-3 bg-[#050505] border border-dashed border-gray-700 hover:border-szgreen p-3 rounded-lg cursor-pointer transition group">
+                                    <i class="fas fa-image text-gray-600 group-hover:text-szgreen transition text-lg"></i>
+                                    <span class="text-xs text-gray-500 group-hover:text-szgreen transition" id="logo-label-new-cat">Click to upload logo</span>
+                                    <input type="file" name="logo" accept="image/*" class="hidden" onchange="previewFile(this, 'logo-label-new-cat')">
+                                </label>
+                            </div>
                             <button type="submit" class="w-full bg-szcyan text-black font-bold py-3 rounded-lg btn-glow">Create Category</button>
                         </form>
+
+                        <!-- ── Currencies Manager ───────────────────────── -->
+                        <div class="mt-8 pt-6 border-t border-gray-800">
+                            <h3 class="font-bold text-white uppercase text-sm mb-4 flex items-center gap-2"><i class="fas fa-coins text-yellow-500"></i> Currencies</h3>
+                            <div class="space-y-2 mb-4 max-h-36 overflow-y-auto pr-1" id="currencies-list">
+                                {% for cur in currencies %}
+                                <div class="flex items-center justify-between bg-black border border-gray-800 rounded-lg px-3 py-2">
+                                    <div>
+                                        <span class="text-white font-black text-sm">{{ cur._id }}</span>
+                                        <span class="text-gray-500 text-xs ml-2">{{ cur.symbol }}</span>
+                                    </div>
+                                    {% if cur._id not in ['EGP', 'USD'] %}
+                                    <form onsubmit="submitAjax(event, '/api/catalog/currency/delete', 'catalog')">
+                                        <input type="hidden" name="code" value="{{ cur._id }}">
+                                        <button class="text-red-500 hover:text-red-400 text-xs p-1 transition"><i class="fas fa-trash"></i></button>
+                                    </form>
+                                    {% else %}
+                                    <span class="text-gray-700 text-[10px]">default</span>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <form onsubmit="submitAjax(event, '/api/catalog/currency/add', 'catalog')" class="flex gap-2">
+                                <input type="text" name="code" placeholder="SAR" maxlength="5" class="w-1/3 bg-[#050505] border border-gray-800 text-white px-2 py-2 rounded-lg text-xs outline-none focus:border-yellow-500 font-mono uppercase" style="text-transform:uppercase">
+                                <input type="text" name="symbol" placeholder="🇸🇦 SAR" class="flex-1 bg-[#050505] border border-gray-800 text-white px-2 py-2 rounded-lg text-xs outline-none focus:border-yellow-500">
+                                <button class="bg-yellow-500 text-black font-bold px-3 rounded-lg text-xs hover:opacity-90 transition"><i class="fas fa-plus"></i></button>
+                            </form>
+                        </div>
                     </div>
                     
                     <div class="lg:col-span-3 space-y-6">
@@ -146,29 +190,42 @@
                                 {% for p in cat.products %}
                                 <div class="bg-black border border-gray-800 p-4 rounded-lg relative group">
                                     <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition flex gap-1">
-                                        <button onclick="editProduct('{{ cat._id }}', '{{ p.stock_key }}', '{{ p.name }}', '{{ p.price_egp }}', '{{ p.price_usd }}')" class="text-yellow-500 hover:text-yellow-400 p-1"><i class="fas fa-edit"></i></button>
+                                        <button onclick="editProduct('{{ cat._id }}', '{{ p.stock_key }}', '{{ p.name }}', {{ p.prices | tojson | safe if p.prices is defined else '{}' }})" class="text-yellow-500 hover:text-yellow-400 p-1"><i class="fas fa-edit"></i></button>
                                         <form onsubmit="if(confirm('Delete product?')) submitAjax(event, '/api/catalog/product/delete', 'catalog'); else event.preventDefault();">
                                             <input type="hidden" name="cat_id" value="{{ cat._id }}"><input type="hidden" name="stock_key" value="{{ p.stock_key }}"><button class="text-red-500 hover:text-red-400 p-1"><i class="fas fa-trash"></i></button>
                                         </form>
                                     </div>
+                                    {% if p.image %}
+                                    <img src="{{ p.image }}" class="w-10 h-10 rounded-lg object-cover border border-gray-700 mb-2" alt="{{ p.name }}">
+                                    {% endif %}
                                     <div class="font-bold text-white mb-1">{{ p.name }}</div>
                                     <div class="text-[10px] font-mono text-gray-500 mb-2">Key: <span class="text-szgreen">{{ p.stock_key }}</span></div>
-                                    <div class="flex justify-between items-center bg-gray-900 p-2 rounded border border-gray-800">
-                                        <div class="text-center w-1/2 border-r border-gray-800"><div class="font-black text-yellow-500">{{ p.price_egp }}</div><div class="text-[9px] text-gray-500 uppercase">EGP</div></div>
-                                        <div class="text-center w-1/2"><div class="font-black text-szcyan">{{ p.price_usd }}</div><div class="text-[9px] text-gray-500 uppercase">USD</div></div>
+                                    <div class="flex flex-wrap gap-1">
+                                        {% if p.prices is defined %}
+                                            {% for code, val in p.prices.items() %}
+                                            <span class="bg-gray-900 border border-gray-800 rounded px-2 py-1 text-[10px] font-black text-szgreen">{{ val }} <span class="text-gray-600">{{ code }}</span></span>
+                                            {% endfor %}
+                                        {% else %}
+                                        <span class="bg-gray-900 border border-gray-800 rounded px-2 py-1 text-[10px] font-black text-yellow-500">{{ p.price_egp }} <span class="text-gray-600">EGP</span></span>
+                                        <span class="bg-gray-900 border border-gray-800 rounded px-2 py-1 text-[10px] font-black text-szcyan">{{ p.price_usd }} <span class="text-gray-600">USD</span></span>
+                                        {% endif %}
                                     </div>
                                 </div>
                                 {% endfor %}
                                 
                                 <div class="border border-dashed border-gray-700 p-4 rounded-lg bg-white/5 flex flex-col justify-center">
-                                    <form onsubmit="submitAjax(event, '/api/catalog/product/add', 'catalog')" class="space-y-2">
+                                    <form onsubmit="submitAjaxMultipart(event, '/api/catalog/product/add', 'catalog')" class="space-y-2" enctype="multipart/form-data">
                                         <input type="hidden" name="cat_id" value="{{ cat._id }}">
                                         <input type="text" name="stock_key" required placeholder="Key (e.g. 60_uc)" class="w-full bg-black border border-gray-800 text-white px-2 py-1.5 rounded text-xs outline-none focus:border-szgreen font-mono">
                                         <input type="text" name="name" required placeholder="Name (e.g. 60 UC)" class="w-full bg-black border border-gray-800 text-white px-2 py-1.5 rounded text-xs outline-none focus:border-szgreen">
-                                        <div class="flex gap-2">
-                                            <input type="number" step="0.01" name="price_egp" required placeholder="EGP" class="w-1/2 bg-black border border-gray-800 text-yellow-500 px-2 py-1.5 rounded text-xs outline-none focus:border-yellow-500">
-                                            <input type="number" step="0.01" name="price_usd" required placeholder="USD" class="w-1/2 bg-black border border-gray-800 text-szcyan px-2 py-1.5 rounded text-xs outline-none focus:border-szcyan">
-                                        </div>
+                                        {% for cur in currencies %}
+                                        <input type="number" step="0.01" name="price_{{ cur._id }}" placeholder="{{ cur.symbol }} Price" class="w-full bg-black border border-gray-800 {% if cur._id == 'EGP' %}text-yellow-500{% elif cur._id == 'USD' %}text-szcyan{% else %}text-szgreen{% endif %} px-2 py-1.5 rounded text-xs outline-none">
+                                        {% endfor %}
+                                        <label class="w-full flex items-center gap-2 bg-black border border-dashed border-gray-700 hover:border-szcyan px-2 py-1.5 rounded cursor-pointer transition group">
+                                            <i class="fas fa-image text-gray-600 group-hover:text-szcyan transition text-xs"></i>
+                                            <span class="text-[10px] text-gray-500 group-hover:text-szcyan transition" id="prod-img-{{ cat._id }}">Product image (opt.)</span>
+                                            <input type="file" name="image" accept="image/*" class="hidden" onchange="previewFile(this, 'prod-img-{{ cat._id }}')">
+                                        </label>
                                         <button class="w-full bg-gray-800 hover:bg-szgreen hover:text-black text-white text-xs font-bold py-2 rounded transition mt-1">Add Product</button>
                                     </form>
                                 </div>
@@ -338,28 +395,49 @@
         <div class="bg-panelbg border border-gray-800 w-full max-w-md rounded-xl shadow-2xl p-6 relative fade-in">
             <button onclick="closeModal('edit-cat-modal')" class="absolute top-4 right-4 text-gray-500 hover:text-red-500"><i class="fas fa-times text-xl"></i></button>
             <h3 class="text-xl font-bold text-white mb-4 border-b border-gray-800 pb-2">Edit Category</h3>
-            <form onsubmit="submitAjax(event, '/api/catalog/category/edit', 'catalog')" class="space-y-4">
+            <form onsubmit="submitAjaxMultipart(event, '/api/catalog/category/edit', 'catalog')" class="space-y-4" enctype="multipart/form-data">
                 <input type="hidden" id="edit-cat-id" name="cat_id">
                 <div><label class="text-xs text-gray-500 mb-1 block">Display Name</label><input type="text" id="edit-cat-name" name="name" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500"></div>
                 <div><label class="text-xs text-gray-500 mb-1 block">Icon (FontAwesome)</label><input type="text" id="edit-cat-icon" name="icon" class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500 font-mono text-sm"></div>
+                <div>
+                    <label class="text-xs text-gray-500 mb-1 block"><i class="fas fa-image text-szcyan mr-1"></i>New Banner Image (leave blank to keep)</label>
+                    <label class="w-full flex items-center gap-3 bg-[#050505] border border-dashed border-gray-700 hover:border-szcyan p-3 rounded-lg cursor-pointer transition group">
+                        <i class="fas fa-cloud-upload-alt text-gray-600 group-hover:text-szcyan transition"></i>
+                        <span class="text-xs text-gray-500 group-hover:text-szcyan transition" id="edit-cat-img-label">Click to replace image</span>
+                        <input type="file" name="image" accept="image/*" class="hidden" onchange="previewFile(this, 'edit-cat-img-label')">
+                    </label>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500 mb-1 block"><i class="fas fa-stamp text-szgreen mr-1"></i>New Logo (leave blank to keep)</label>
+                    <label class="w-full flex items-center gap-3 bg-[#050505] border border-dashed border-gray-700 hover:border-szgreen p-3 rounded-lg cursor-pointer transition group">
+                        <i class="fas fa-image text-gray-600 group-hover:text-szgreen transition"></i>
+                        <span class="text-xs text-gray-500 group-hover:text-szgreen transition" id="edit-cat-logo-label">Click to replace logo</span>
+                        <input type="file" name="logo" accept="image/*" class="hidden" onchange="previewFile(this, 'edit-cat-logo-label')">
+                    </label>
+                </div>
                 <button type="submit" class="w-full bg-yellow-500 text-black font-bold py-3 rounded-lg mt-2 btn-glow">Save Changes</button>
             </form>
         </div>
     </div>
 
     <div id="edit-prod-modal" class="fixed inset-0 bg-black/90 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-panelbg border border-gray-800 w-full max-w-md rounded-xl shadow-2xl p-6 relative fade-in">
+        <div class="bg-panelbg border border-gray-800 w-full max-w-md rounded-xl shadow-2xl p-6 relative fade-in max-h-[90vh] overflow-y-auto">
             <button onclick="closeModal('edit-prod-modal')" class="absolute top-4 right-4 text-gray-500 hover:text-red-500"><i class="fas fa-times text-xl"></i></button>
-            <h3 class="text-xl font-bold text-white mb-4 border-b border-gray-800 pb-2">Edit Product Pricing</h3>
-            <form onsubmit="submitAjax(event, '/api/catalog/product/edit', 'catalog')" class="space-y-4">
+            <h3 class="text-xl font-bold text-white mb-4 border-b border-gray-800 pb-2">Edit Product</h3>
+            <form onsubmit="submitAjaxMultipart(event, '/api/catalog/product/edit', 'catalog')" class="space-y-4" enctype="multipart/form-data" id="edit-prod-form">
                 <input type="hidden" id="edit-prod-cat-id" name="cat_id">
                 <input type="hidden" id="edit-prod-key" name="stock_key">
                 <div><label class="text-xs text-gray-500 mb-1 block">Product Name</label><input type="text" id="edit-prod-name" name="name" required class="w-full bg-[#050505] border border-gray-800 text-white p-3 rounded-lg outline-none focus:border-yellow-500"></div>
-                <div class="flex gap-4">
-                    <div class="w-1/2"><label class="text-xs text-yellow-500 mb-1 block">Price (EGP)</label><input type="number" step="0.01" id="edit-prod-egp" name="price_egp" required class="w-full bg-[#050505] border border-gray-800 text-yellow-500 font-bold p-3 rounded-lg outline-none focus:border-yellow-500"></div>
-                    <div class="w-1/2"><label class="text-xs text-szcyan mb-1 block">Price (USD)</label><input type="number" step="0.01" id="edit-prod-usd" name="price_usd" required class="w-full bg-[#050505] border border-gray-800 text-szcyan font-bold p-3 rounded-lg outline-none focus:border-szcyan"></div>
+                <div id="edit-prod-prices-container" class="space-y-3"></div>
+                <div>
+                    <label class="text-xs text-gray-500 mb-1 block"><i class="fas fa-image text-szcyan mr-1"></i>New Product Image (leave blank to keep)</label>
+                    <label class="w-full flex items-center gap-3 bg-[#050505] border border-dashed border-gray-700 hover:border-szcyan p-3 rounded-lg cursor-pointer transition group">
+                        <i class="fas fa-cloud-upload-alt text-gray-600 group-hover:text-szcyan transition"></i>
+                        <span class="text-xs text-gray-500 group-hover:text-szcyan transition" id="edit-prod-img-label">Click to replace image</span>
+                        <input type="file" name="image" accept="image/*" class="hidden" onchange="previewFile(this, 'edit-prod-img-label')">
+                    </label>
                 </div>
-                <button type="submit" class="w-full bg-yellow-500 text-black font-bold py-3 rounded-lg mt-2 btn-glow">Save Pricing</button>
+                <button type="submit" class="w-full bg-yellow-500 text-black font-bold py-3 rounded-lg mt-2 btn-glow">Save Product</button>
             </form>
         </div>
     </div>
@@ -444,13 +522,60 @@
 
         function editCategory(id, name, icon) {
             document.getElementById('edit-cat-id').value = id; document.getElementById('edit-cat-name').value = name;
-            document.getElementById('edit-cat-icon').value = icon; document.getElementById('edit-cat-modal').classList.remove('hidden');
+            document.getElementById('edit-cat-icon').value = icon;
+            document.getElementById('edit-cat-img-label').innerText = 'Click to replace image';
+            document.getElementById('edit-cat-logo-label').innerText = 'Click to replace logo';
+            document.getElementById('edit-cat-modal').classList.remove('hidden');
         }
 
-        function editProduct(catId, stockKey, name, egp, usd) {
-            document.getElementById('edit-prod-cat-id').value = catId; document.getElementById('edit-prod-key').value = stockKey;
-            document.getElementById('edit-prod-name').value = name; document.getElementById('edit-prod-egp').value = egp;
-            document.getElementById('edit-prod-usd').value = usd; document.getElementById('edit-prod-modal').classList.remove('hidden');
+        function editProduct(catId, stockKey, name, pricesObj) {
+            document.getElementById('edit-prod-cat-id').value = catId;
+            document.getElementById('edit-prod-key').value = stockKey;
+            document.getElementById('edit-prod-name').value = name;
+            document.getElementById('edit-prod-img-label').innerText = 'Click to replace image';
+
+            // توليد حقول الأسعار ديناميكياً
+            const container = document.getElementById('edit-prod-prices-container');
+            container.innerHTML = '';
+            const currencies = [{% for cur in currencies %}{code:'{{ cur._id }}', symbol:'{{ cur.symbol }}'},{% endfor %}];
+            currencies.forEach(cur => {
+                const colorClass = cur.code === 'EGP' ? 'text-yellow-500' : cur.code === 'USD' ? 'text-szcyan' : 'text-szgreen';
+                const borderFocus = cur.code === 'EGP' ? 'focus:border-yellow-500' : cur.code === 'USD' ? 'focus:border-szcyan' : 'focus:border-szgreen';
+                const val = (pricesObj && pricesObj[cur.code]) ? pricesObj[cur.code] : 0;
+                container.innerHTML += `
+                    <div><label class="text-xs ${colorClass} mb-1 block">Price (${cur.symbol})</label>
+                    <input type="number" step="0.01" name="price_${cur.code}" value="${val}"
+                        class="w-full bg-[#050505] border border-gray-800 ${colorClass} font-bold p-3 rounded-lg outline-none ${borderFocus}"></div>`;
+            });
+
+            document.getElementById('edit-prod-modal').classList.remove('hidden');
+        }
+
+        // ── submitAjaxMultipart: نفس submitAjax بس لـ FormData مع ملفات ──
+        async function submitAjaxMultipart(e, url, tabReturn='overview') {
+            e.preventDefault();
+            const form = e.target;
+            const btn  = form.querySelector('button[type="submit"]') || form.querySelector('button');
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; btn.disabled = true;
+
+            const fd = new FormData(form);
+            try {
+                const res  = await fetch(url, { method: 'POST', body: fd });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(data.msg, 'success');
+                    setTimeout(() => { window.location.href = '/admin?tab=' + tabReturn; }, 800);
+                } else { showToast(data.msg || 'Error', 'error'); btn.innerHTML = originalHtml; btn.disabled = false; }
+            } catch(err) { showToast('Connection error!', 'error'); btn.innerHTML = originalHtml; btn.disabled = false; }
+        }
+
+        // ── previewFile: يظهر اسم الملف المحدد في label ──────────────────
+        function previewFile(input, labelId) {
+            const label = document.getElementById(labelId);
+            if (label && input.files && input.files[0]) {
+                label.innerText = '✅ ' + input.files[0].name;
+            }
         }
 
         async function submitSmartStock(e) {
