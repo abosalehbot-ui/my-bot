@@ -1012,32 +1012,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     _loadCart();
     updateCartUI();
 
-    // Optimistic UI restore before server confirmation
-    const email = localStorage.getItem('store_email');
-    const name = localStorage.getItem('store_name');
-    if (email && name) {
-        updateUI(name, localStorage.getItem('bal_egp') || '0', localStorage.getItem('bal_usd') || '0');
-        _applyAvatar(localStorage.getItem('store_avatar') || '');
-    }
+   // Optimistic UI restore before server confirmation
+const email = localStorage.getItem('store_email');
+const name  = localStorage.getItem('store_name');
 
-    const isLoggedIn = await fetchAndApplyProfile();
+if (email && name) {
+  updateUI(
+    name,
+    localStorage.getItem('bal_egp') || '0',
+    localStorage.getItem('bal_usd') || '0'
+  );
+  _applyAvatar(localStorage.getItem('store_avatar') || '');
+}
 
-    const hashTab = (location.hash || '').replace('#', '').trim();
-    const allowed = ['overview', 'edit', 'security', 'history', 'support'];
-    const initialTab = allowed.includes(hashTab) ? hashTab : (localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview');
-    if (isLoggedIn && allowed.includes(initialTab)) {
-        openProfileModal();
-        switchProfileTab(initialTab);
-    }
-    _applyProfileAuthGuard();
+const isLoggedIn = await fetchAndApplyProfile();
 
-    const hashTab = (location.hash || '').replace('#', '').trim();
-    const allowed = ['overview', 'edit', 'security', 'history', 'support'];
-    const initialTab = allowed.includes(hashTab) ? hashTab : (localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview');
-    if (allowed.includes(initialTab) && email && name) {
-        openProfileModal();
-        switchProfileTab(initialTab);
-    }
+// Deep-link profile tab via hash
+const allowed = ['overview', 'edit', 'security', 'history', 'support'];
+const hashTab = (location.hash || '').replace('#', '').trim();
+const initialTab = allowed.includes(hashTab)
+  ? hashTab
+  : (localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview');
+
+// افتح المودال لو السيرفر أكد إن المستخدم داخل
+// أو لو عندك optimistic auth من localStorage
+if ((isLoggedIn || (email && name)) && allowed.includes(initialTab)) {
+  openProfileModal();
+  switchProfileTab(initialTab);
+}
+
+// طبّق الجارد بعد ما تظبط الـ state
+_applyProfileAuthGuard();
 
     // Scroll-to-top button
     const ms = $('main-scroll'), sb = $('scrollToTopBtn');
