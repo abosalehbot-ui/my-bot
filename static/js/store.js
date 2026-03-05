@@ -8,10 +8,7 @@ let pendingPurchase  = null;
 let ordersLoaded     = false;
 let _forgotEmail     = '';
 let _profileLoaded   = false;
-let _serverAuthKnown  = false;
-let _serverLoggedIn   = false;
 const STORE_PROFILE_TAB_KEY = 'sz_active_profile_tab';
-const STORE_AUTH_KEYS = ['store_email', 'store_name', 'store_username', 'store_user_id', 'store_avatar', 'bal_egp', 'bal_usd'];
 
 // ─── Cart State — persisted in localStorage under 'sz_cart' ──────────────
 let cart = [];
@@ -570,97 +567,55 @@ async function confirmCartPurchase() {
 }
 
 // ─── Profile Modal ───────────────────────────────────────────────────────
-
-function showTab(tabName) {
-    if (tabName === 'profile') {
-        openProfileModal();
-    }
-}
-
 function _isStoreLoggedIn() {
-    if (_serverAuthKnown) return _serverLoggedIn;
     return !!localStorage.getItem('store_email');
 }
 
 function _applyProfileAuthGuard() {
     const authContent = $('profile-auth-content');
-    const required = $('profile-login-required');
-    const loggedIn = _isStoreLoggedIn();
-
+    const required    = $('profile-login-required');
+    const loggedIn    = _isStoreLoggedIn();
     if (authContent) authContent.classList.toggle('hidden', !loggedIn);
     if (required) required.classList.toggle('hidden', loggedIn);
 }
 
-async function _ensureSessionBootstrap() {
-    if (_serverAuthKnown) return _serverLoggedIn;
-    return await fetchAndApplyProfile();
-}
-
-async function openProfileModal() {
+function openProfileModal() {
     openModal('profile-modal');
-
-    const hasLocalEmail = !!localStorage.getItem('store_email');
-    if (!hasLocalEmail || !_serverAuthKnown) {
-        await _ensureSessionBootstrap();
-    }
     _applyProfileAuthGuard();
-
-    if (!_isStoreLoggedIn()) {
-        return;
-    }
+    if (!_isStoreLoggedIn()) return;
 
     const remembered = localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview';
     switchProfileTab(remembered);
-    if (!_profileLoaded) { _profileLoaded = true; await fetchAndApplyProfile(); }
+    if (!_profileLoaded) { _profileLoaded = true; fetchAndApplyProfile(); }
     else _applyLocalProfile();
 }
 
 function switchProfileTab(tab) {
-    if (!_isStoreLoggedIn()) {
-        _applyProfileAuthGuard();
-        return;
-    }
-
-    const tabs = ['overview', 'edit', 'security', 'history', 'support'];
-    const targetTab = tabs.includes(tab) ? tab : 'overview';
-
-    tabs.forEach(t => {
-        const panel = $('ptab-' + t);
-        if (!panel) {
-            console.warn(`[profile] Missing panel: ptab-${t}`);
-            return;
-        }
-        panel.classList.add('hidden');
-
+    if (!_isStoreLoggedIn()) return;
+    ['overview', 'edit', 'security', 'history', 'support'].forEach(t => {
+        $('ptab-' + t)?.classList.add('hidden');
         const btn = $('ptab-btn-' + t);
-        if (btn) {
+        if (!panel) console.warn(`[profile] Missing panel element: ptab-${t}`);
+        else panel.classList.add('hidden');
+        if (!btn) console.warn(`[profile] Missing tab button element: ptab-btn-${t}`);
+        else {
             btn.classList.remove('active');
             btn.classList.add('inactive');
         }
     });
+    $('ptab-' + tab)?.classList.remove('hidden');
+    const ab = $('ptab-btn-' + tab);
+    if (ab) { ab.classList.add('active'); ab.classList.remove('inactive'); }
 
-    const activePanel = $('ptab-' + targetTab);
-    if (!activePanel) {
-        console.warn(`[profile] Missing active panel target: ptab-${targetTab}`);
-        return;
-    }
-    activePanel.classList.remove('hidden');
+    localStorage.setItem(STORE_PROFILE_TAB_KEY, tab);
+    if (tab === 'overview') history.replaceState(null, '', location.pathname + location.search);
+    else history.replaceState(null, '', `#${tab}`);
 
-    const ab = $('ptab-btn-' + targetTab);
-    if (ab) {
-        ab.classList.add('active');
-        ab.classList.remove('inactive');
-    }
-
-    localStorage.setItem(STORE_PROFILE_TAB_KEY, targetTab);
-    if (targetTab === 'overview') history.replaceState(null, '', location.pathname + location.search);
-    else history.replaceState(null, '', `#${targetTab}`);
-
-    if (targetTab === 'history' && !ordersLoaded) {
+    if (tab === 'history' && !ordersLoaded) {
         fetchMyOrders();
         fetchWalletHistory();
     }
-    if (targetTab === 'support' && !_ticketsLoaded) loadMyTickets();
+    if (tab === 'support' && !_ticketsLoaded) loadMyTickets();
 }
 
 function _applyLocalProfile() {
@@ -1071,6 +1026,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const allowed = ['overview', 'edit', 'security', 'history', 'support'];
     const initialTab = allowed.includes(hashTab) ? hashTab : (localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview');
     if (isLoggedIn && allowed.includes(initialTab)) {
+        openProfileModal();
+        switchProfileTab(initialTab);
+    }
+    _applyProfileAuthGuard();
+
+    const hashTab = (location.hash || '').replace('#', '').trim();
+    const allowed = ['overview', 'edit', 'security', 'history', 'support'];
+    const initialTab = allowed.includes(hashTab) ? hashTab : (localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview');
+    if (allowed.includes(initialTab) && email && name) {
         openProfileModal();
         switchProfileTab(initialTab);
     }

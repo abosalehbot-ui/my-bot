@@ -535,7 +535,7 @@ async def api_return_orders_bulk(request: Request, order_ids: str = Form(...)):
     if not check_auth(request):
         return JSONResponse({"success": False, "msg": "Unauthorized"}, status_code=401)
 
-    ids = [x for x in re.split(r'[\s,]+', order_ids.strip()) if x]
+    ids = [x.strip() for x in order_ids.replace(',', '\\n').splitlines() if x.strip()]
     if not ids:
         return JSONResponse({"success": False, "msg": "No order IDs provided"})
 
