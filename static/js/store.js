@@ -591,7 +591,13 @@ function switchProfileTab(tab) {
     ['overview', 'edit', 'security', 'history', 'support'].forEach(t => {
         $('ptab-' + t)?.classList.add('hidden');
         const btn = $('ptab-btn-' + t);
-        if (btn) { btn.classList.remove('active'); btn.classList.add('inactive'); }
+        if (!panel) console.warn(`[profile] Missing panel element: ptab-${t}`);
+        else panel.classList.add('hidden');
+        if (!btn) console.warn(`[profile] Missing tab button element: ptab-btn-${t}`);
+        else {
+            btn.classList.remove('active');
+            btn.classList.add('inactive');
+        }
     });
     $('ptab-' + tab)?.classList.remove('hidden');
     const ab = $('ptab-btn-' + tab);
