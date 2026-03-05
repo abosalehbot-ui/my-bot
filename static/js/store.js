@@ -114,6 +114,10 @@ function _saveLocals(data) {
     localStorage.setItem('bal_usd',        data.balance_usd ?? 0);
 }
 
+function _clearAuthLocals() {
+    STORE_AUTH_KEYS.forEach(k => localStorage.removeItem(k));
+}
+
 async function saveAndLogin(data) {
     _saveLocals(data);
     updateUI(data.name, data.balance_egp, data.balance_usd);
@@ -125,7 +129,7 @@ async function saveAndLogin(data) {
 
 async function logout() {
     await fetch('/api/store/logout', { method: 'POST' });
-    localStorage.clear();
+    _clearAuthLocals();
     location.reload();
 }
 
@@ -642,12 +646,23 @@ function _fillProfileUI(d) {
 
 async function fetchAndApplyProfile() {
     try {
-        const d = await (await fetch('/api/store/me')).json();
-        if (!d.success) return;
+        const d = await (await fetch('/api/store/me', { cache: 'no-store' })).json();
+        _serverAuthKnown = true;
+        _serverLoggedIn = !!d.success;
+
+        if (!d.success) {
+            _clearAuthLocals();
+            return false;
+        }
         _saveLocals(d);
         updateUI(d.name, d.balance_egp, d.balance_usd);
         _fillProfileUI(d);
-    } catch {}
+        return true;
+    } catch {
+        return _isStoreLoggedIn();
+    } finally {
+        _applyProfileAuthGuard();
+    }
 }
 
 function triggerAvatarUpload() { $('avatar-file-input')?.click(); }
@@ -988,7 +1003,7 @@ async function sendCustomerReply() {
 }
 
 // ─── DOMContentLoaded ────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // Apply saved theme
     const theme = localStorage.getItem('sz_theme') || 'default';
     document.documentElement.setAttribute('data-theme', theme);
@@ -997,13 +1012,22 @@ document.addEventListener('DOMContentLoaded', () => {
     _loadCart();
     updateCartUI();
 
-    // Restore user session from localStorage
+    // Optimistic UI restore before server confirmation
     const email = localStorage.getItem('store_email');
-    const name  = localStorage.getItem('store_name');
+    const name = localStorage.getItem('store_name');
     if (email && name) {
         updateUI(name, localStorage.getItem('bal_egp') || '0', localStorage.getItem('bal_usd') || '0');
         _applyAvatar(localStorage.getItem('store_avatar') || '');
-        fetchAndApplyProfile();
+    }
+
+    const isLoggedIn = await fetchAndApplyProfile();
+
+    const hashTab = (location.hash || '').replace('#', '').trim();
+    const allowed = ['overview', 'edit', 'security', 'history', 'support'];
+    const initialTab = allowed.includes(hashTab) ? hashTab : (localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview');
+    if (isLoggedIn && allowed.includes(initialTab)) {
+        openProfileModal();
+        switchProfileTab(initialTab);
     }
     _applyProfileAuthGuard();
 
@@ -1020,11 +1044,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (ms && sb) {
         ms.addEventListener('scroll', () => {
             const past = ms.scrollTop > 300;
-            sb.classList.toggle('opacity-0',           !past);
+            sb.classList.toggle('opacity-0', !past);
             sb.classList.toggle('pointer-events-none', !past);
-            sb.classList.toggle('translate-y-4',       !past);
-            sb.classList.toggle('opacity-100',          past);
-            sb.classList.toggle('translate-y-0',        past);
+            sb.classList.toggle('translate-y-4', !past);
+            sb.classList.toggle('opacity-100', past);
+            sb.classList.toggle('translate-y-0', past);
         });
         sb.onclick = () => ms.scrollTo({ top: 0, behavior: 'smooth' });
     }

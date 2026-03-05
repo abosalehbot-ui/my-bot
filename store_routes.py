@@ -132,6 +132,35 @@ async def public_storefront(request: Request):
 # ==========================================
 # 2. أنظمة التسجيل والمصادقة
 # ==========================================
+
+
+def _cookie_is_secure(request: Request) -> bool:
+    proto = request.headers.get("x-forwarded-proto", "")
+    if proto:
+        return proto.split(",")[0].strip().lower() == "https"
+    return request.url.scheme == "https"
+
+
+def _set_store_session_cookie(response: JSONResponse, request: Request, email: str):
+    response.set_cookie(
+        key="store_session",
+        value=email,
+        httponly=True,
+        max_age=86400 * 30,
+        path="/",
+        samesite="lax",
+        secure=_cookie_is_secure(request),
+    )
+
+
+def _clear_store_session_cookie(response: JSONResponse, request: Request):
+    response.delete_cookie(
+        key="store_session",
+        path="/",
+        samesite="lax",
+        secure=_cookie_is_secure(request),
+    )
+
 def get_user_data(user):
     return {
         "email": user["email"],
@@ -338,9 +367,9 @@ async def telegram_login(
 
 
 @router.post("/api/store/logout")
-async def store_logout():
+async def store_logout(request: Request):
     response = JSONResponse({"success": True})
-    response.delete_cookie("store_session")
+    _clear_store_session_cookie(response, request)
     return response
 
 
