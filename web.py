@@ -1,6 +1,7 @@
 import os
 import re
 import uuid
+import base64
 from fastapi import FastAPI, Request, Form, Response, status, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -48,17 +49,34 @@ def clean_and_extract_tokens(raw_text):
 
 
 async def save_upload(file: UploadFile) -> str:
-    """حفظ الملف المرفوع وإرجاع المسار العام."""
+    """حفظ الملف المرفوع داخل Mongo كـ data URI لتفادي ضياع الصور مع إعادة التشغيل."""
     if not file or not file.filename:
         return ""
-    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "png"
-    filename = f"{uuid.uuid4().hex}.{ext}"
-    filepath = os.path.join("static", "uploads", filename)
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
     content = await file.read()
-    with open(filepath, "wb") as f:
-        f.write(content)
-    return f"/static/uploads/{filename}"
+    if not content:
+        return ""
+    if len(content) > 2_000_000:
+        raise ValueError("Image too large (max 2MB)")
+
+    content_type = (file.content_type or "").lower()
+    allowed_types = {"image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"}
+    if content_type not in allowed_types:
+        ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+        guessed = {
+            "png": "image/png",
+            "jpg": "image/jpeg",
+            "jpeg": "image/jpeg",
+            "webp": "image/webp",
+            "gif": "image/gif",
+        }.get(ext)
+        if guessed:
+            content_type = guessed
+        else:
+            raise ValueError("Invalid image type")
+
+    b64 = base64.b64encode(content).decode("utf-8")
+    return f"data:{content_type};base64,{b64}"
 
 
 def convert_objectids(document):
@@ -232,8 +250,11 @@ async def api_add_category(
     cat_id = cat_id.lower().replace(" ", "_")
     if await db.store_categories.find_one({"_id": cat_id}):
         return JSONResponse({"success": False, "msg": "ID exists!"})
-    image_url = await save_upload(image) if image and image.filename else ""
-    logo_url  = await save_upload(logo)  if logo  and logo.filename  else ""
+    try:
+        image_url = await save_upload(image) if image and image.filename else ""
+        logo_url  = await save_upload(logo)  if logo  and logo.filename  else ""
+    except ValueError as e:
+        return JSONResponse({"success": False, "msg": str(e)})
     await db.store_categories.insert_one({
         "_id": cat_id, "name": name, "icon": icon,
         "image": image_url, "logo": logo_url, "products": []
@@ -252,10 +273,13 @@ async def api_edit_category(
 ):
     if not check_auth(request): return JSONResponse({"success": False})
     update_data = {"name": name, "icon": icon}
-    if image and image.filename:
-        update_data["image"] = await save_upload(image)
-    if logo and logo.filename:
-        update_data["logo"] = await save_upload(logo)
+    try:
+        if image and image.filename:
+            update_data["image"] = await save_upload(image)
+        if logo and logo.filename:
+            update_data["logo"] = await save_upload(logo)
+    except ValueError as e:
+        return JSONResponse({"success": False, "msg": str(e)})
     await db.store_categories.update_one({"_id": cat_id}, {"$set": update_data})
     await web_log("تعديل فئة", f"{cat_id} → {name}")
     return JSONResponse({"success": True, "msg": "Category Updated!"})
@@ -274,7 +298,10 @@ async def api_add_product(request: Request, image: UploadFile = File(None)):
     stock_key = form.get("stock_key")
     name      = form.get("name")
 
-    image_url = await save_upload(image) if image and image.filename else form.get("image", "")
+    try:
+        image_url = await save_upload(image) if image and image.filename else form.get("image", "")
+    except ValueError as e:
+        return JSONResponse({"success": False, "msg": str(e)})
 
     # بناء كائن الأسعار ديناميكياً لدعم أي عملة
     prices = {}
@@ -307,10 +334,13 @@ async def api_edit_product(request: Request, image: UploadFile = File(None)):
     name      = form.get("name")
 
     update_fields = {"products.$.name": name}
-    if image and image.filename:
-        update_fields["products.$.image"] = await save_upload(image)
-    elif form.get("image"):
-        update_fields["products.$.image"] = form.get("image")
+    try:
+        if image and image.filename:
+            update_fields["products.$.image"] = await save_upload(image)
+        elif form.get("image"):
+            update_fields["products.$.image"] = form.get("image")
+    except ValueError as e:
+        return JSONResponse({"success": False, "msg": str(e)})
 
     prices = {}
     for key, val in form.items():
@@ -451,10 +481,18 @@ async def api_tracked_users(request: Request, user_id: int = Form(...), action: 
         await db.settings.update_one({"_id": "cache_config"}, {"$pull": {"tracked_users": user_id}}, upsert=True)
     return RedirectResponse(url="/admin?tab=tools", status_code=status.HTTP_302_FOUND)
 
-@app.post("/api/return_order")
-async def api_return_order(request: Request, order_id: str = Form(...)):
-    if not check_auth(request): return RedirectResponse("/login")
+async def _log_store_wallet_txn(email: str, amount: float, currency: str, note: str, ref: str = ""):
+    await db.store_wallet_ledger.insert_one({
+        "email": email,
+        "amount": float(amount),
+        "currency": currency.upper(),
+        "note": note,
+        "ref": ref,
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "ts": datetime.now(),
+    })
 
+async def _process_return_order(order_id: str):
     order = await db.orders.find_one({"_id": int(order_id)}) if order_id.isdigit() else None
     if not order:
         order = await db.store_orders.find_one({"_id": order_id})
@@ -466,12 +504,54 @@ async def api_return_order(request: Request, order_id: str = Form(...)):
         await db.codes_map.delete_many({"$or": [{"_id": {"$in": order["items"]}}, {"code": {"$in": order["items"]}}], "order_id": int(order_id)})
         await db.orders.delete_one({"_id": int(order_id)})
         await db.users.update_one({"_id": order["user_id"]}, {"$inc": {"stats.stock": -len(order["items"])}})
+        return True, "Bot order returned"
     elif order and "code" in order:
         await db.stock.insert_one({"code": order["code"], "category": order["category"], "added_at": datetime.now()})
         await db.codes_map.delete_many({"$or": [{"_id": order["code"]}, {"code": order["code"]}], "order_id": order_id})
         await db.store_orders.delete_one({"_id": order_id})
 
-    return RedirectResponse(url="/admin?tab=tools", status_code=status.HTTP_302_FOUND)
+        email = order.get("email")
+        price = float(order.get("price", 0) or 0)
+        currency = (order.get("currency") or "EGP").upper()
+        if email and price > 0:
+            bal_field = f"balance_{currency.lower()}"
+            await db.store_customers.update_one({"email": email}, {"$inc": {bal_field: price}})
+            await _log_store_wallet_txn(email, price, currency, f"Return refund #{order_id}", ref=order_id)
+
+        return True, "Store order returned"
+
+    return False, "Order not found"
+
+@app.post("/api/return_order")
+async def api_return_order(request: Request, order_id: str = Form(...)):
+    if not check_auth(request): return RedirectResponse("/login")
+    ok, _ = await _process_return_order(order_id)
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JSONResponse({"success": ok, "msg": "Order returned to stock!" if ok else "Order not found"})
+    return RedirectResponse(url="/store-admin", status_code=status.HTTP_302_FOUND)
+
+@app.post("/api/return_orders_bulk")
+async def api_return_orders_bulk(request: Request, order_ids: str = Form(...)):
+    if not check_auth(request):
+        return JSONResponse({"success": False, "msg": "Unauthorized"}, status_code=401)
+
+    ids = [x for x in re.split(r'[\s,]+', order_ids.strip()) if x]
+    if not ids:
+        return JSONResponse({"success": False, "msg": "No order IDs provided"})
+
+    done, failed = [], []
+    for oid in ids:
+        ok, msg = await _process_return_order(oid)
+        (done if ok else failed).append(oid if ok else f"{oid} ({msg})")
+
+    return JSONResponse({
+        "success": True,
+        "processed": len(done),
+        "failed": len(failed),
+        "done": done,
+        "errors": failed,
+        "msg": f"Processed {len(done)} returns, {len(failed)} failed.",
+    })
 
 @app.post("/api/search")
 async def api_search(request: Request):
