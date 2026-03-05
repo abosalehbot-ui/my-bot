@@ -563,13 +563,6 @@ async function confirmCartPurchase() {
 }
 
 // ─── Profile Modal ───────────────────────────────────────────────────────
-
-function showTab(tabName) {
-    if (tabName === 'profile') {
-        openProfileModal();
-    }
-}
-
 function _isStoreLoggedIn() {
     return !!localStorage.getItem('store_email');
 }
@@ -578,25 +571,14 @@ function _applyProfileAuthGuard() {
     const authContent = $('profile-auth-content');
     const required    = $('profile-login-required');
     const loggedIn    = _isStoreLoggedIn();
-
-    // If template renders both blocks, keep old behavior.
-    if (required) {
-        if (authContent) authContent.classList.toggle('hidden', !loggedIn);
-        required.classList.toggle('hidden', loggedIn);
-        return;
-    }
-
-    // Jinja guest-mode card is rendered inside profile-auth-content.
-    if (authContent) authContent.classList.remove('hidden');
+    if (authContent) authContent.classList.toggle('hidden', !loggedIn);
+    if (required) required.classList.toggle('hidden', loggedIn);
 }
 
 function openProfileModal() {
     openModal('profile-modal');
     _applyProfileAuthGuard();
-
-    if (!_isStoreLoggedIn()) {
-        return;
-    }
+    if (!_isStoreLoggedIn()) return;
 
     const remembered = localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview';
     switchProfileTab(remembered);
@@ -605,16 +587,9 @@ function openProfileModal() {
 }
 
 function switchProfileTab(tab) {
-    if (!_isStoreLoggedIn()) {
-        _applyProfileAuthGuard();
-        return;
-    }
-
-    const tabs = ['overview', 'edit', 'security', 'history', 'support'];
-    if (!tabs.includes(tab)) tab = 'overview';
-
-    tabs.forEach(t => {
-        const panel = $('ptab-' + t);
+    if (!_isStoreLoggedIn()) return;
+    ['overview', 'edit', 'security', 'history', 'support'].forEach(t => {
+        $('ptab-' + t)?.classList.add('hidden');
         const btn = $('ptab-btn-' + t);
         if (!panel) console.warn(`[profile] Missing panel element: ptab-${t}`);
         else panel.classList.add('hidden');
@@ -624,14 +599,9 @@ function switchProfileTab(tab) {
             btn.classList.add('inactive');
         }
     });
-
-    const activePanel = $('ptab-' + tab);
-    const activeBtn = $('ptab-btn-' + tab);
-    if (activePanel) activePanel.classList.remove('hidden');
-    if (activeBtn) {
-        activeBtn.classList.add('active');
-        activeBtn.classList.remove('inactive');
-    }
+    $('ptab-' + tab)?.classList.remove('hidden');
+    const ab = $('ptab-btn-' + tab);
+    if (ab) { ab.classList.add('active'); ab.classList.remove('inactive'); }
 
     localStorage.setItem(STORE_PROFILE_TAB_KEY, tab);
     if (tab === 'overview') history.replaceState(null, '', location.pathname + location.search);
