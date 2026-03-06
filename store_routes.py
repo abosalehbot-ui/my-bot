@@ -675,7 +675,43 @@ async def store_admin_page(request: Request):
         },
     )
 
+def _sanitize_positive_int(value, field_name: str, max_value: int | None = None) -> int:
+    """
+    Validate that value is a positive integer (supports str/float/int inputs).
+    Raises ValueError with a user-friendly message.
+    """
+    try:
+        v = float(value)
+    except Exception:
+        raise ValueError(f"Invalid {field_name} value.")
 
+    if v <= 0:
+        raise ValueError(f"{field_name} must be greater than 0.")
+
+    if v != int(v):
+        raise ValueError(f"{field_name} must be a whole number (no decimals).")
+
+    v_int = int(v)
+
+    if max_value is not None and v_int > max_value:
+        raise ValueError(f"{field_name} is too large. Max allowed is {max_value}.")
+
+    return v_int
+
+
+def _normalize_currency(currency: str) -> str:
+    """
+    Normalize currency input to 'EGP' or 'USD' (accepts common variants).
+    Raises ValueError if currency is invalid.
+    """
+    c = (currency or "").strip().upper()
+
+    if c in {"EGP", "LE", "L.E", "L.E.", "ج", "ج.م", "جنيه"}:
+        return "EGP"
+    if c in {"USD", "$", "US$", "US DOLLAR"}:
+        return "USD"
+
+    raise ValueError("Invalid currency. Allowed: EGP, USD.")
 @router.post("/api/store/manage_balance")
 async def store_manage_balance(
     request: Request,
@@ -686,10 +722,34 @@ async def store_manage_balance(
     transaction_id: str = Form(""),
 ):
     if not check_auth(request):
-        return JSONResponse({"success": False, "msg": "Unauthorized"})
+        return JSONResponse({"success": False, "msg": "Unauthorized"}, status_code=403)
+
+    sanitizer = globals().get("_sanitize_positive_int")
+    currency_normalizer = globals().get("_normalize_currency")
+    acquire_lock = globals().get("_acquire_txn_lock")
+    finish_lock = globals().get("_finish_txn_lock")
+    if not all(callable(fn) for fn in [sanitizer, currency_normalizer, acquire_lock, finish_lock]):
+        return JSONResponse(
+            {"success": False, "msg": "Server misconfiguration: balance validators unavailable."},
+            status_code=500,
+        )
+
+    try:
+        amount_int = sanitizer(amount, "amount", max_value=1_000_000)
+        currency = currency_normalizer(currency)
+    except ValueError as e:
+        return JSONResponse({"success": False, "msg": str(e)})
+
+    txid = await acquire_lock(transaction_id, email, f"admin_balance_{action}")
+    if not txid:
+        return JSONResponse(
+            {"success": False, "msg": "Duplicate transaction detected."},
+            status_code=409,
+        )
 
     try:
         amount_int = _sanitize_positive_int(amount, "amount", max_value=1_000_000)
+        amount = float(amount_int)
         currency = _normalize_currency(currency)
     except ValueError as e:
         return JSONResponse({"success": False, "msg": str(e)})

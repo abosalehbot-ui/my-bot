@@ -24,6 +24,13 @@ function _loadCart() {
 // ─── Helpers ─────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
 const setText = (id, val) => { const el = $(id); if (el) el.innerText = val ?? ''; };
+const escapeHtml = (val) => String(val ?? '').replace(/[&<>"']/g, (ch) => {
+    if (ch === '&') return '&amp;';
+    if (ch === '<') return '&lt;';
+    if (ch === '>') return '&gt;';
+    if (ch === '"') return '&quot;';
+    return '&#39;';
+});
 
 // ─── Modal ───────────────────────────────────────────────────────────────
 function openModal(id)  { $(id)?.classList.remove('hidden'); }
@@ -33,7 +40,7 @@ function openAuthModal(view) { openModal('auth-modal'); switchAuthView(view); }
 // ─── Toast ───────────────────────────────────────────────────────────────
 function setStatus(msg, isError = false) {
     const el = $('auth-status');
-    if (el) el.innerHTML = isError ? `<span class="text-red-500">${msg}</span>` : `<span class="text-szcyan">${msg}</span>`;
+    if (el) el.innerHTML = isError ? `<span class="text-red-500">${escapeHtml(msg)}</span>` : `<span class="text-szcyan">${escapeHtml(msg)}</span>`;
 }
 
 // ─── Theme ───────────────────────────────────────────────────────────────
@@ -125,6 +132,25 @@ async function saveAndLogin(data) {
     closeModal('auth-modal');
     Core.showToast(`Welcome, ${data.name}!`);
     fetchAndApplyProfile();
+}
+
+function _clearAuthLocalState() {
+    [
+        'store_email',
+        'store_name',
+        'store_username',
+        'store_user_id',
+        'store_avatar',
+        'bal_egp',
+        'bal_usd',
+        STORE_PROFILE_TAB_KEY,
+    ].forEach(k => localStorage.removeItem(k));
+}
+
+function _applyGuestUI() {
+    $('sidebar-guest')?.classList.remove('hidden');
+    $('sidebar-user')?.classList.add('hidden');
+    $('sidebar-logout-btn')?.classList.add('hidden');
 }
 
 async function logout() {
@@ -859,7 +885,7 @@ async function submitTicket() {
             _ticketsLoaded = false;
             await loadMyTickets();
         } else {
-            if (statusEl) statusEl.innerHTML = `<span class="text-red-500">${d.msg}</span>`;
+            if (statusEl) statusEl.innerHTML = `<span class="text-red-500">${escapeHtml(d.msg)}</span>`;
             Core.showToast(d.msg, 'error');
             if (d.force_logout) logout();
         }
@@ -994,7 +1020,7 @@ async function sendCustomerReply() {
             if (statusEl) statusEl.innerHTML = '';
             await openTicketConvo(_activeConvoTicketId); // refresh messages
         } else {
-            if (statusEl) statusEl.innerHTML = `<span class="text-red-500">${d.msg}</span>`;
+            if (statusEl) statusEl.innerHTML = `<span class="text-red-500">${escapeHtml(d.msg)}</span>`;
             Core.showToast(d.msg, 'error');
         }
     } catch {
@@ -1012,32 +1038,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     _loadCart();
     updateCartUI();
 
-    // Optimistic UI restore before server confirmation
-    const email = localStorage.getItem('store_email');
-    const name = localStorage.getItem('store_name');
-    if (email && name) {
-        updateUI(name, localStorage.getItem('bal_egp') || '0', localStorage.getItem('bal_usd') || '0');
-        _applyAvatar(localStorage.getItem('store_avatar') || '');
-    }
+   // Optimistic UI restore before server confirmation
+const email = localStorage.getItem('store_email');
+const name  = localStorage.getItem('store_name');
 
-    const isLoggedIn = await fetchAndApplyProfile();
+if (email && name) {
+  updateUI(
+    name,
+    localStorage.getItem('bal_egp') || '0',
+    localStorage.getItem('bal_usd') || '0'
+  );
+  _applyAvatar(localStorage.getItem('store_avatar') || '');
+}
 
-    const hashTab = (location.hash || '').replace('#', '').trim();
-    const allowed = ['overview', 'edit', 'security', 'history', 'support'];
-    const initialTab = allowed.includes(hashTab) ? hashTab : (localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview');
-    if (isLoggedIn && allowed.includes(initialTab)) {
-        openProfileModal();
-        switchProfileTab(initialTab);
-    }
-    _applyProfileAuthGuard();
+const isLoggedIn = await fetchAndApplyProfile();
 
-    const hashTab = (location.hash || '').replace('#', '').trim();
-    const allowed = ['overview', 'edit', 'security', 'history', 'support'];
-    const initialTab = allowed.includes(hashTab) ? hashTab : (localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview');
-    if (allowed.includes(initialTab) && email && name) {
-        openProfileModal();
-        switchProfileTab(initialTab);
-    }
+// Deep-link profile tab via hash
+const allowed = ['overview', 'edit', 'security', 'history', 'support'];
+const hashTab = (location.hash || '').replace('#', '').trim();
+const initialTab = allowed.includes(hashTab)
+  ? hashTab
+  : (localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview');
+
+// افتح المودال لو السيرفر أكد إن المستخدم داخل
+// أو لو عندك optimistic auth من localStorage
+if ((isLoggedIn || (email && name)) && allowed.includes(initialTab)) {
+  openProfileModal();
+  switchProfileTab(initialTab);
+}
+
+// طبّق الجارد بعد ما تظبط الـ state
+_applyProfileAuthGuard();
 
     // Scroll-to-top button
     const ms = $('main-scroll'), sb = $('scrollToTopBtn');
