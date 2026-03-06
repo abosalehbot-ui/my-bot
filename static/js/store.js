@@ -26,6 +26,13 @@ function _loadCart() {
 // ─── Helpers ─────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
 const setText = (id, val) => { const el = $(id); if (el) el.innerText = val ?? ''; };
+const escapeHtml = (val) => String(val ?? '').replace(/[&<>"']/g, (ch) => {
+    if (ch === '&') return '&amp;';
+    if (ch === '<') return '&lt;';
+    if (ch === '>') return '&gt;';
+    if (ch === '"') return '&quot;';
+    return '&#39;';
+});
 
 // ─── Modal ───────────────────────────────────────────────────────────────
 function openModal(id)  { $(id)?.classList.remove('hidden'); }
@@ -35,7 +42,7 @@ function openAuthModal(view) { openModal('auth-modal'); switchAuthView(view); }
 // ─── Toast ───────────────────────────────────────────────────────────────
 function setStatus(msg, isError = false) {
     const el = $('auth-status');
-    if (el) el.innerHTML = isError ? `<span class="text-red-500">${msg}</span>` : `<span class="text-szcyan">${msg}</span>`;
+    if (el) el.innerHTML = isError ? `<span class="text-red-500">${escapeHtml(msg)}</span>` : `<span class="text-szcyan">${escapeHtml(msg)}</span>`;
 }
 
 // ─── Theme ───────────────────────────────────────────────────────────────
@@ -918,7 +925,7 @@ async function submitTicket() {
             _ticketsLoaded = false;
             await loadMyTickets();
         } else {
-            if (statusEl) statusEl.innerHTML = `<span class="text-red-500">${d.msg}</span>`;
+            if (statusEl) statusEl.innerHTML = `<span class="text-red-500">${escapeHtml(d.msg)}</span>`;
             Core.showToast(d.msg, 'error');
             if (d.force_logout) logout();
         }
@@ -1053,7 +1060,7 @@ async function sendCustomerReply() {
             if (statusEl) statusEl.innerHTML = '';
             await openTicketConvo(_activeConvoTicketId); // refresh messages
         } else {
-            if (statusEl) statusEl.innerHTML = `<span class="text-red-500">${d.msg}</span>`;
+            if (statusEl) statusEl.innerHTML = `<span class="text-red-500">${escapeHtml(d.msg)}</span>`;
             Core.showToast(d.msg, 'error');
         }
     } catch {

@@ -936,7 +936,7 @@ async def store_manage_balance(
     transaction_id: str = Form(""),
 ):
     if not check_auth(request):
-        return JSONResponse({"success": False, "msg": "Unauthorized"})
+        return JSONResponse({"success": False, "msg": "Unauthorized"}, status_code=403)
 
     sanitizer = globals().get("_sanitize_positive_int")
     currency_normalizer = globals().get("_normalize_currency")
@@ -957,47 +957,53 @@ async def store_manage_balance(
     txid = await acquire_lock(transaction_id, email, f"admin_balance_{action}")
     if not txid:
         return JSONResponse(
-            {"success": False, "msg": "Duplicate transaction detected."}
+            {"success": False, "msg": "Duplicate transaction detected."},
+            status_code=409,
         )
 
     bal_field = f"balance_{currency.lower()}"
 
-    if action == "add":
-        res = await db.store_customers.update_one(
-            {"email": email}, {"$inc": {bal_field: amount_int}}
-        )
-        if res.modified_count != 1:
-            await finish_lock(txid, "failed", "user_not_found")
-            return JSONResponse({"success": False, "msg": "User not found"})
-        await log_wallet_txn(email, amount_int, currency, "Top-up (Admin)", ref=txid)
-    elif action == "sub":
-        res = await db.store_customers.update_one(
-            {"email": email, bal_field: {"$gte": amount_int}},
-            {"$inc": {bal_field: -amount_int}},
-        )
-        if res.modified_count != 1:
-            await finish_lock(txid, "failed", "insufficient_or_not_found")
-            return JSONResponse(
-                {
-                    "success": False,
-                    "msg": f"Insufficient {currency} balance or user not found.",
-                }
+    try:
+        if action == "add":
+            res = await db.store_customers.update_one(
+                {"email": email}, {"$inc": {bal_field: amount_int}}
             )
-        await log_wallet_txn(
-            email, -amount_int, currency, "Manual deduction (Admin)", ref=txid
-        )
-    else:
-        await finish_lock(txid, "failed", "invalid_action")
-        return JSONResponse({"success": False, "msg": "Invalid action"})
+            if res.modified_count != 1:
+                await finish_lock(txid, "failed", "user_not_found")
+                return JSONResponse({"success": False, "msg": "User not found"}, status_code=404)
+            await log_wallet_txn(email, amount_int, currency, "Top-up (Admin)", ref=txid)
+        elif action == "sub":
+            res = await db.store_customers.update_one(
+                {"email": email, bal_field: {"$gte": amount_int}},
+                {"$inc": {bal_field: -amount_int}},
+            )
+            if res.modified_count != 1:
+                await finish_lock(txid, "failed", "insufficient_or_not_found")
+                return JSONResponse(
+                    {
+                        "success": False,
+                        "msg": f"Insufficient {currency} balance or user not found.",
+                    },
+                    status_code=400,
+                )
+            await log_wallet_txn(
+                email, -amount_int, currency, "Manual deduction (Admin)", ref=txid
+            )
+        else:
+            await finish_lock(txid, "failed", "invalid_action")
+            return JSONResponse({"success": False, "msg": "Invalid action"}, status_code=400)
 
-    await finish_lock(txid, "done", "ok")
-    return JSONResponse(
-        {
-            "success": True,
-            "msg": f"{currency} balance updated successfully!",
-            "transaction_id": txid,
-        }
-    )
+        await finish_lock(txid, "done", "ok")
+        return JSONResponse(
+            {
+                "success": True,
+                "msg": f"{currency} balance updated successfully!",
+                "transaction_id": txid,
+            }
+        )
+    except Exception:
+        await finish_lock(txid, "failed", "internal_error")
+        return JSONResponse({"success": False, "msg": "Balance update failed"}, status_code=500)
 
 
 # Endpoint تجميد الرصيد أو حظر الحساب

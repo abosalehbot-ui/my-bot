@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from datetime import datetime, timedelta
+from starlette.middleware.base import BaseHTTPMiddleware
 
 # ─── الاتصال الوحيد بقاعدة البيانات للـ web process ────────────────────
 from database import db, get_next_order_id
@@ -14,7 +15,24 @@ from config import SECRET_TOKEN, ADMIN_ID
 
 from store_routes import router as store_router
 
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        response.headers.setdefault("Content-Security-Policy", "default-src 'self' 'unsafe-inline' https: data: blob:")
+        return response
+
+
+def _parse_bulk_order_ids(order_ids: str) -> list[str]:
+    return [x for x in re.split(r"[\s,]+", (order_ids or "").strip()) if x]
+
+
 app = FastAPI(title="Saleh Zone Dashboard")
+app.add_middleware(SecurityHeadersMiddleware)
 app.include_router(store_router)
 
 os.makedirs("static", exist_ok=True)
@@ -535,7 +553,7 @@ async def api_return_orders_bulk(request: Request, order_ids: str = Form(...)):
     if not check_auth(request):
         return JSONResponse({"success": False, "msg": "Unauthorized"}, status_code=401)
 
-    ids = [x for x in re.split(r'[\s,]+', (order_ids or '').strip()) if x]
+    ids = _parse_bulk_order_ids(order_ids)
     if not ids:
         return JSONResponse({"success": False, "msg": "No order IDs provided"})
 
@@ -591,3 +609,8 @@ async def api_search(request: Request):
         res_str += "\n❌ Not found in history."
 
     return JSONResponse({"result": res_str})
+
+
+@app.get("/healthz")
+async def healthz():
+    return {"ok": True}
