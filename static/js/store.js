@@ -627,22 +627,27 @@ function openProfileModal() {
 
 function switchProfileTab(tab) {
     if (!_isStoreLoggedIn()) return;
+
     ['overview', 'edit', 'security', 'history', 'support'].forEach(t => {
-        $('ptab-' + t)?.classList.add('hidden');
-        const btn = $('ptab-btn-' + t);
-        if (!panel) console.warn(`[profile] Missing panel element: ptab-${t}`);
-        else panel.classList.add('hidden');
-        if (!btn) console.warn(`[profile] Missing tab button element: ptab-btn-${t}`);
-        else {
+        const panel = $('ptab-' + t);
+        const btn   = $('ptab-btn-' + t);
+
+        if (panel) panel.classList.add('hidden');
+        if (btn) {
             btn.classList.remove('active');
             btn.classList.add('inactive');
         }
     });
+
     $('ptab-' + tab)?.classList.remove('hidden');
-    const ab = $('ptab-btn-' + tab);
-    if (ab) { ab.classList.add('active'); ab.classList.remove('inactive'); }
+    const activeBtn = $('ptab-btn-' + tab);
+    if (activeBtn) {
+        activeBtn.classList.add('active');
+        activeBtn.classList.remove('inactive');
+    }
 
     localStorage.setItem(STORE_PROFILE_TAB_KEY, tab);
+
     if (tab === 'overview') history.replaceState(null, '', location.pathname + location.search);
     else history.replaceState(null, '', `#${tab}`);
 
