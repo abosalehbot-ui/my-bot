@@ -548,7 +548,7 @@ async def customer_buy(
         "time":     now_str,
         "source":   "Web Store",
     })
-    await log_wallet_txn(email, -price, currency, f"Order #{order_id}", ref=order_id)
+    await log_wallet_txn(email, -trusted_price, currency, f"Order #{order_id}", ref=order_id)
 
     return JSONResponse({"success": True, "code": code_str, "new_balance": new_bal,
                          "currency": currency, "msg": "Purchase successful!"})
