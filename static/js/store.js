@@ -600,7 +600,7 @@ function showTab(tabName) {
 
 function _isStoreLoggedIn() {
     if (_serverAuthKnown) return _serverLoggedIn;
-    return !!localStorage.getItem('store_email');
+    return !!(localStorage.getItem('store_email') && localStorage.getItem('store_name'));
 }
 
 function _applyProfileAuthGuard() {
@@ -725,6 +725,7 @@ async function fetchAndApplyProfile() {
         _fillProfileUI(d);
         return true;
     } catch {
+        // Network glitch: keep last-known state without forcing guest/auth flip-flop.
         return _isStoreLoggedIn();
     } finally {
         _applyProfileAuthGuard();
