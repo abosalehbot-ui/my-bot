@@ -8,10 +8,19 @@ let pendingPurchase  = null;
 let ordersLoaded     = false;
 let _forgotEmail     = '';
 let _profileLoaded   = false;
-let _serverAuthKnown  = false;
-let _serverLoggedIn   = false;
+let _serverAuthKnown = false;
+let _serverLoggedIn = false;
 const STORE_PROFILE_TAB_KEY = 'sz_active_profile_tab';
-
+const STORE_AUTH_KEYS = [
+    'store_email',
+    'store_name',
+    'store_username',
+    'store_user_id',
+    'store_avatar',
+    'bal_egp',
+    'bal_usd',
+    STORE_PROFILE_TAB_KEY,
+];
 // ─── Cart State — persisted in localStorage under 'sz_cart' ──────────────
 let cart = [];
 
@@ -123,6 +132,10 @@ function _saveLocals(data) {
     localStorage.setItem('bal_usd',        data.balance_usd ?? 0);
 }
 
+function _clearAuthLocals() {
+    STORE_AUTH_KEYS.forEach(k => localStorage.removeItem(k));
+}
+
 async function saveAndLogin(data) {
     _saveLocals(data);
     updateUI(data.name, data.balance_egp, data.balance_usd);
@@ -153,7 +166,7 @@ function _applyGuestUI() {
 
 async function logout() {
     await fetch('/api/store/logout', { method: 'POST' });
-    _clearAuthLocalState();
+    _clearAuthLocals();
     location.reload();
 }
 
@@ -591,147 +604,155 @@ async function confirmCartPurchase() {
 }
 
 // ─── Profile Modal ───────────────────────────────────────────────────────
-
-function showTab(tabName) {
-    if (tabName === 'profile') {
-        openProfileModal();
-    }
-}
-
 function _isStoreLoggedIn() {
-    if (_serverAuthKnown) return _serverLoggedIn;
-    return !!(localStorage.getItem('store_email') && localStorage.getItem('store_name'));
+  if (localStorage.getItem('store_email')) return true;
+  if (_serverAuthKnown) return _serverLoggedIn;
+
+  const bodyAuth = document.body?.dataset?.storeAuth === '1';
+  if (bodyAuth) return true;
+
+  const sidebarName = $('sidebar-ui-name')?.textContent?.trim() || '';
+  const sidebarUser = $('sidebar-ui-username')?.textContent?.trim() || '';
+
+  return (
+    (sidebarName && sidebarName !== 'Name') ||
+    (sidebarUser && sidebarUser !== '@')
+  );
 }
 
 function _applyProfileAuthGuard() {
-    const authContent = $('profile-auth-content');
-    const required = $('profile-login-required');
-    const loggedIn = _isStoreLoggedIn();
+  const loggedIn = _isStoreLoggedIn();
 
-    if (authContent) authContent.classList.toggle('hidden', !loggedIn);
-    if (required) required.classList.toggle('hidden', loggedIn);
+  const authContent = $('profile-auth-content');
+  const required = $('profile-login-required');
+
+  if (authContent) authContent.classList.toggle('hidden', !loggedIn);
+  if (required) required.classList.toggle('hidden', loggedIn);
 }
 
 async function openProfileModal() {
-    openModal('profile-modal');
+  openModal('profile-modal');
+  _applyProfileAuthGuard();
 
-    if (!_serverAuthKnown || !localStorage.getItem('store_email')) {
-        await fetchAndApplyProfile();
-    }
+  if (!localStorage.getItem('store_email')) {
+    await fetchAndApplyProfile();
+  }
+
+  if (!_isStoreLoggedIn()) return;
+
+  const remembered = localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview';
+  switchProfileTab(remembered);
+
+  if (!_profileLoaded) {
+    _profileLoaded = true;
+    await fetchAndApplyProfile();
+  } else {
+    _applyLocalProfile();
     _applyProfileAuthGuard();
-
-    if (!_isStoreLoggedIn()) {
-        return;
-    }
-
-    const remembered = localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview';
-    switchProfileTab(remembered);
-    if (!_profileLoaded) {
-        _profileLoaded = true;
-        await fetchAndApplyProfile();
-    } else {
-        _applyLocalProfile();
-    }
+  }
 }
 
 function switchProfileTab(tab) {
-    if (!_isStoreLoggedIn()) {
-        _applyProfileAuthGuard();
-        return;
+  if (!_isStoreLoggedIn()) return;
+
+  ['overview', 'edit', 'security', 'history', 'support'].forEach(t => {
+    const panel = $('ptab-' + t);
+    const btn = $('ptab-btn-' + t);
+
+    if (panel) panel.classList.add('hidden');
+
+    if (btn) {
+      btn.classList.remove('active');
+      btn.classList.add('inactive');
     }
+  });
 
-    const tabs = ['overview', 'edit', 'security', 'history', 'support'];
-    const targetTab = tabs.includes(tab) ? tab : 'overview';
+  $('ptab-' + tab)?.classList.remove('hidden');
 
-    tabs.forEach(t => {
-        const panel = $('ptab-' + t);
-        if (!panel) {
-            console.warn(`[profile] Missing panel: ptab-${t}`);
-            return;
-        }
-        panel.classList.add('hidden');
+  const activeBtn = $('ptab-btn-' + tab);
+  if (activeBtn) {
+    activeBtn.classList.add('active');
+    activeBtn.classList.remove('inactive');
+  }
 
-        const btn = $('ptab-btn-' + t);
-        if (btn) {
-            btn.classList.remove('active');
-            btn.classList.add('inactive');
-        }
-    });
+  localStorage.setItem(STORE_PROFILE_TAB_KEY, tab);
 
-    const activePanel = $('ptab-' + targetTab);
-    if (!activePanel) {
-        console.warn(`[profile] Missing active panel target: ptab-${targetTab}`);
-        return;
-    }
-    activePanel.classList.remove('hidden');
+  if (tab === 'overview') {
+    history.replaceState(null, '', location.pathname + location.search);
+  } else {
+    history.replaceState(null, '', `#${tab}`);
+  }
 
-    const ab = $('ptab-btn-' + targetTab);
-    if (ab) {
-        ab.classList.add('active');
-        ab.classList.remove('inactive');
-    }
+  if (tab === 'history' && !ordersLoaded) {
+    fetchMyOrders();
+    fetchWalletHistory();
+  }
 
-    localStorage.setItem(STORE_PROFILE_TAB_KEY, targetTab);
-    if (targetTab === 'overview') history.replaceState(null, '', location.pathname + location.search);
-    else history.replaceState(null, '', `#${targetTab}`);
-
-    if (targetTab === 'history' && !ordersLoaded) {
-        fetchMyOrders();
-        fetchWalletHistory();
-    }
-    if (targetTab === 'support' && !_ticketsLoaded) loadMyTickets();
+  if (tab === 'support' && !_ticketsLoaded) {
+    loadMyTickets();
+  }
 }
 
 function _applyLocalProfile() {
-    _fillProfileUI({
-        name:        localStorage.getItem('store_name'),
-        email:       localStorage.getItem('store_email'),
-        username:    localStorage.getItem('store_username'),
-        user_id:     localStorage.getItem('store_user_id'),
-        avatar:      localStorage.getItem('store_avatar'),
-        balance_egp: localStorage.getItem('bal_egp'),
-        balance_usd: localStorage.getItem('bal_usd'),
-    });
+  _fillProfileUI({
+    name: localStorage.getItem('store_name'),
+    email: localStorage.getItem('store_email'),
+    username: localStorage.getItem('store_username'),
+    user_id: localStorage.getItem('store_user_id'),
+    avatar: localStorage.getItem('store_avatar'),
+    balance_egp: localStorage.getItem('bal_egp'),
+    balance_usd: localStorage.getItem('bal_usd'),
+  });
 }
 
 function _fillProfileUI(d) {
-    setText('prof-name',     d.name);
-    setText('prof-email',    d.email);
-    setText('prof-username', d.username ? '@' + d.username : '—');
-    setText('prof-user-id',  d.user_id ? '#' + d.user_id : '');
-    setText('prof-bal-egp',  d.balance_egp ?? '0');
-    setText('prof-bal-usd',  d.balance_usd ?? '0');
-    setText('prof-joined',   d.created_at  ?? '');
-    const ni = $('edit-name'), ui = $('edit-username');
-    if (ni) ni.value = d.name     ?? '';
-    if (ui) ui.value = d.username ?? '';
-    _applyAvatar(d.avatar || '');
+  setText('prof-name', d.name);
+  setText('prof-email', d.email);
+  setText('prof-username', d.username ? '@' + d.username : '—');
+  setText('prof-user-id', d.user_id ? '#' + d.user_id : '');
+  setText('prof-bal-egp', d.balance_egp ?? '0');
+  setText('prof-bal-usd', d.balance_usd ?? '0');
+  setText('prof-joined', d.created_at ?? '');
+
+  const ni = $('edit-name');
+  const ui = $('edit-username');
+
+  if (ni) ni.value = d.name ?? '';
+  if (ui) ui.value = d.username ?? '';
+
+  _applyAvatar(d.avatar || '');
 }
 
 async function fetchAndApplyProfile() {
-    try {
-        const d = await (await fetch('/api/store/me', { cache: 'no-store' })).json();
-        _serverAuthKnown = true;
-        _serverLoggedIn = !!d.success;
+  try {
+    const res = await fetch('/api/store/me', {
+      method: 'GET',
+      cache: 'no-store',
+      credentials: 'same-origin',
+    });
 
-        if (!d.success) {
-            _clearAuthLocalState();
-            _applyGuestUI();
-            return false;
-        }
+    const d = await res.json();
 
-        _saveLocals(d);
-        updateUI(d.name, d.balance_egp, d.balance_usd);
-        _fillProfileUI(d);
-        return true;
-    } catch {
-        // Network glitch: keep last-known state without forcing guest/auth flip-flop.
-        return _isStoreLoggedIn();
-    } finally {
-        _applyProfileAuthGuard();
+    _serverAuthKnown = true;
+    _serverLoggedIn = !!d.success;
+
+    if (!d.success) {
+      _clearAuthLocalState?.();
+      _clearAuthLocals?.();
+      _applyGuestUI?.();
+      return false;
     }
-}
 
+    _saveLocals(d);
+    updateUI(d.name, d.balance_egp, d.balance_usd);
+    _fillProfileUI(d);
+    return true;
+  } catch {
+    return _isStoreLoggedIn();
+  } finally {
+    _applyProfileAuthGuard();
+  }
+}
 function triggerAvatarUpload() { $('avatar-file-input')?.click(); }
 
 async function handleAvatarChange(input) {
@@ -1079,23 +1100,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     _loadCart();
     updateCartUI();
 
-    // Optimistic UI restore before server confirmation
-    const email = localStorage.getItem('store_email');
-    const name = localStorage.getItem('store_name');
-    if (email && name) {
-        updateUI(name, localStorage.getItem('bal_egp') || '0', localStorage.getItem('bal_usd') || '0');
-        _applyAvatar(localStorage.getItem('store_avatar') || '');
-    }
+   // Optimistic UI restore before server confirmation
+const email = localStorage.getItem('store_email');
+const name  = localStorage.getItem('store_name');
 
-    const isLoggedIn = await fetchAndApplyProfile();
+if (email && name) {
+  updateUI(
+    name,
+    localStorage.getItem('bal_egp') || '0',
+    localStorage.getItem('bal_usd') || '0'
+  );
+  _applyAvatar(localStorage.getItem('store_avatar') || '');
+}
 
-    const hashTab = (location.hash || '').replace('#', '').trim();
-    const allowed = ['overview', 'edit', 'security', 'history', 'support'];
-    const initialTab = allowed.includes(hashTab) ? hashTab : (localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview');
-    if (isLoggedIn && allowed.includes(initialTab)) {
-        await openProfileModal();
-        switchProfileTab(initialTab);
-    }
+const isLoggedIn = await fetchAndApplyProfile();
+
+// Deep-link profile tab via hash
+const allowed = ['overview', 'edit', 'security', 'history', 'support'];
+const hashTab = (location.hash || '').replace('#', '').trim();
+const initialTab = allowed.includes(hashTab)
+  ? hashTab
+  : (localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview');
+
+// افتح المودال لو السيرفر أكد إن المستخدم داخل
+// أو لو عندك optimistic auth من localStorage
+if ((isLoggedIn || (email && name)) && allowed.includes(initialTab)) {
+  openProfileModal();
+  switchProfileTab(initialTab);
+}
+
+// طبّق الجارد بعد ما تظبط الـ state
+_applyProfileAuthGuard();
 
     // Scroll-to-top button
     const ms = $('main-scroll'), sb = $('scrollToTopBtn');

@@ -23,7 +23,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
-        response.headers.setdefault("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://accounts.google.com https://apis.google.com https://telegram.org; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; frame-src https://accounts.google.com https://telegram.org; connect-src 'self' https://oauth2.googleapis.com https://telegram.org; base-uri 'self'; form-action 'self'")
+        response.headers.setdefault("Content-Security-Policy", "default-src 'self' 'unsafe-inline' https: data: blob:")
         return response
 
 
@@ -553,7 +553,7 @@ async def api_return_orders_bulk(request: Request, order_ids: str = Form(...)):
     if not check_auth(request):
         return JSONResponse({"success": False, "msg": "Unauthorized"}, status_code=401)
 
-    ids = _parse_bulk_order_ids(order_ids)
+    ids = [x.strip() for x in order_ids.replace(',', '\\n').splitlines() if x.strip()]
     if not ids:
         return JSONResponse({"success": False, "msg": "No order IDs provided"})
 

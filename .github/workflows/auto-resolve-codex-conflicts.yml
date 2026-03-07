@@ -1,0 +1,53 @@
+name: Auto-resolve conflicts for codex branches (prefer ours)
+
+on:
+  push:
+    branches:
+      - "codex/**"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-resolve-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  merge-main-into-codex:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch main
+        run: |
+          git fetch origin main:refs/remotes/origin/main
+
+      - name: Merge main into current branch (prefer ours)
+        run: |
+          # Merge main into this branch, auto-resolving content conflicts by keeping current branch changes.
+          git merge -X ours --no-edit origin/main || true
+
+          # If there are still unresolved conflicts, abort and fail (needs human).
+          if git diff --name-only --diff-filter=U | grep -q .; then
+            echo "Unresolved conflicts remain. Aborting."
+            git merge --abort || true
+            exit 1
+          fi
+
+      - name: Push back to branch
+        run: |
+          # Only push if merge produced changes
+          if ! git diff --quiet HEAD^ HEAD 2>/dev/null; then
+            git push origin HEAD:${{ github.ref_name }}
+          else
+            echo "No changes to push."
+          fi
