@@ -615,7 +615,9 @@ function _applyProfileAuthGuard() {
 async function openProfileModal() {
     openModal('profile-modal');
 
-    if (!_serverAuthKnown || !localStorage.getItem('store_email')) {
+    // Always re-validate when server state is unknown OR currently unauthenticated.
+    // This prevents stale local state from forcing guest view while cookie session is valid.
+    if (!_serverAuthKnown || !_isStoreLoggedIn()) {
         await fetchAndApplyProfile();
     }
     _applyProfileAuthGuard();
