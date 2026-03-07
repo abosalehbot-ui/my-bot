@@ -9,7 +9,16 @@ let ordersLoaded     = false;
 let _forgotEmail     = '';
 let _profileLoaded   = false;
 const STORE_PROFILE_TAB_KEY = 'sz_active_profile_tab';
-
+const STORE_AUTH_KEYS = [
+    'store_email',
+    'store_name',
+    'store_username',
+    'store_user_id',
+    'store_avatar',
+    'bal_egp',
+    'bal_usd',
+    STORE_PROFILE_TAB_KEY,
+];
 // ─── Cart State — persisted in localStorage under 'sz_cart' ──────────────
 let cart = [];
 
