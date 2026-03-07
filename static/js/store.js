@@ -613,19 +613,29 @@ function _isStoreLoggedIn() {
 
   const sidebarName = $('sidebar-ui-name')?.textContent?.trim() || '';
   const sidebarUser = $('sidebar-ui-username')?.textContent?.trim() || '';
+
   return (
     (sidebarName && sidebarName !== 'Name') ||
     (sidebarUser && sidebarUser !== '@')
   );
 }
+
+function _applyProfileAuthGuard() {
+  const loggedIn = _isStoreLoggedIn();
+
+  const authContent = $('profile-auth-content');
+  const required = $('profile-login-required');
+
+  if (authContent) authContent.classList.toggle('hidden', !loggedIn);
+  if (required) required.classList.toggle('hidden', loggedIn);
+}
+
 async function openProfileModal() {
   openModal('profile-modal');
+  _applyProfileAuthGuard();
 
-  // إجبار الموقع يجيب البيانات من السيرفر لو الـ localStorage فاضية
   if (!localStorage.getItem('store_email')) {
     await fetchAndApplyProfile();
-  } else {
-    _applyProfileAuthGuard();
   }
 
   if (!_isStoreLoggedIn()) return;
@@ -641,63 +651,76 @@ async function openProfileModal() {
     _applyProfileAuthGuard();
   }
 }
+
 function switchProfileTab(tab) {
-    if (!_isStoreLoggedIn()) return;
+  if (!_isStoreLoggedIn()) return;
 
-    ['overview', 'edit', 'security', 'history', 'support'].forEach(t => {
-        const panel = $('ptab-' + t);
-        const btn   = $('ptab-btn-' + t);
+  ['overview', 'edit', 'security', 'history', 'support'].forEach(t => {
+    const panel = $('ptab-' + t);
+    const btn = $('ptab-btn-' + t);
 
-        if (panel) panel.classList.add('hidden');
-        if (btn) {
-            btn.classList.remove('active');
-            btn.classList.add('inactive');
-        }
-    });
+    if (panel) panel.classList.add('hidden');
 
-    $('ptab-' + tab)?.classList.remove('hidden');
-    const activeBtn = $('ptab-btn-' + tab);
-    if (activeBtn) {
-        activeBtn.classList.add('active');
-        activeBtn.classList.remove('inactive');
+    if (btn) {
+      btn.classList.remove('active');
+      btn.classList.add('inactive');
     }
+  });
 
-    localStorage.setItem(STORE_PROFILE_TAB_KEY, tab);
+  $('ptab-' + tab)?.classList.remove('hidden');
 
-    if (tab === 'overview') history.replaceState(null, '', location.pathname + location.search);
-    else history.replaceState(null, '', `#${tab}`);
+  const activeBtn = $('ptab-btn-' + tab);
+  if (activeBtn) {
+    activeBtn.classList.add('active');
+    activeBtn.classList.remove('inactive');
+  }
 
-    if (tab === 'history' && !ordersLoaded) {
-        fetchMyOrders();
-        fetchWalletHistory();
-    }
-    if (tab === 'support' && !_ticketsLoaded) loadMyTickets();
+  localStorage.setItem(STORE_PROFILE_TAB_KEY, tab);
+
+  if (tab === 'overview') {
+    history.replaceState(null, '', location.pathname + location.search);
+  } else {
+    history.replaceState(null, '', `#${tab}`);
+  }
+
+  if (tab === 'history' && !ordersLoaded) {
+    fetchMyOrders();
+    fetchWalletHistory();
+  }
+
+  if (tab === 'support' && !_ticketsLoaded) {
+    loadMyTickets();
+  }
 }
 
 function _applyLocalProfile() {
-    _fillProfileUI({
-        name:        localStorage.getItem('store_name'),
-        email:       localStorage.getItem('store_email'),
-        username:    localStorage.getItem('store_username'),
-        user_id:     localStorage.getItem('store_user_id'),
-        avatar:      localStorage.getItem('store_avatar'),
-        balance_egp: localStorage.getItem('bal_egp'),
-        balance_usd: localStorage.getItem('bal_usd'),
-    });
+  _fillProfileUI({
+    name: localStorage.getItem('store_name'),
+    email: localStorage.getItem('store_email'),
+    username: localStorage.getItem('store_username'),
+    user_id: localStorage.getItem('store_user_id'),
+    avatar: localStorage.getItem('store_avatar'),
+    balance_egp: localStorage.getItem('bal_egp'),
+    balance_usd: localStorage.getItem('bal_usd'),
+  });
 }
 
 function _fillProfileUI(d) {
-    setText('prof-name',     d.name);
-    setText('prof-email',    d.email);
-    setText('prof-username', d.username ? '@' + d.username : '—');
-    setText('prof-user-id',  d.user_id ? '#' + d.user_id : '');
-    setText('prof-bal-egp',  d.balance_egp ?? '0');
-    setText('prof-bal-usd',  d.balance_usd ?? '0');
-    setText('prof-joined',   d.created_at  ?? '');
-    const ni = $('edit-name'), ui = $('edit-username');
-    if (ni) ni.value = d.name     ?? '';
-    if (ui) ui.value = d.username ?? '';
-    _applyAvatar(d.avatar || '');
+  setText('prof-name', d.name);
+  setText('prof-email', d.email);
+  setText('prof-username', d.username ? '@' + d.username : '—');
+  setText('prof-user-id', d.user_id ? '#' + d.user_id : '');
+  setText('prof-bal-egp', d.balance_egp ?? '0');
+  setText('prof-bal-usd', d.balance_usd ?? '0');
+  setText('prof-joined', d.created_at ?? '');
+
+  const ni = $('edit-name');
+  const ui = $('edit-username');
+
+  if (ni) ni.value = d.name ?? '';
+  if (ui) ui.value = d.username ?? '';
+
+  _applyAvatar(d.avatar || '');
 }
 
 async function fetchAndApplyProfile() {
@@ -730,7 +753,6 @@ async function fetchAndApplyProfile() {
     _applyProfileAuthGuard();
   }
 }
-
 function triggerAvatarUpload() { $('avatar-file-input')?.click(); }
 
 async function handleAvatarChange(input) {
