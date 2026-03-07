@@ -8,6 +8,9 @@ let pendingPurchase  = null;
 let ordersLoaded     = false;
 let _forgotEmail     = '';
 let _profileLoaded   = false;
+let _serverAuthKnown  = false;
+let _serverLoggedIn   = false;
+const STORE_PROFILE_TAB_KEY = 'sz_active_profile_tab';
 
 // ─── Cart State — persisted in localStorage under 'sz_cart' ──────────────
 let cart = [];
@@ -23,6 +26,13 @@ function _loadCart() {
 // ─── Helpers ─────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
 const setText = (id, val) => { const el = $(id); if (el) el.innerText = val ?? ''; };
+const escapeHtml = (val) => String(val ?? '').replace(/[&<>"']/g, (ch) => {
+    if (ch === '&') return '&amp;';
+    if (ch === '<') return '&lt;';
+    if (ch === '>') return '&gt;';
+    if (ch === '"') return '&quot;';
+    return '&#39;';
+});
 
 // ─── Modal ───────────────────────────────────────────────────────────────
 function openModal(id)  { $(id)?.classList.remove('hidden'); }
@@ -32,7 +42,7 @@ function openAuthModal(view) { openModal('auth-modal'); switchAuthView(view); }
 // ─── Toast ───────────────────────────────────────────────────────────────
 function setStatus(msg, isError = false) {
     const el = $('auth-status');
-    if (el) el.innerHTML = isError ? `<span class="text-red-500">${msg}</span>` : `<span class="text-szcyan">${msg}</span>`;
+    if (el) el.innerHTML = isError ? `<span class="text-red-500">${escapeHtml(msg)}</span>` : `<span class="text-szcyan">${escapeHtml(msg)}</span>`;
 }
 
 // ─── Theme ───────────────────────────────────────────────────────────────
@@ -122,9 +132,28 @@ async function saveAndLogin(data) {
     fetchAndApplyProfile();
 }
 
+function _clearAuthLocalState() {
+    [
+        'store_email',
+        'store_name',
+        'store_username',
+        'store_user_id',
+        'store_avatar',
+        'bal_egp',
+        'bal_usd',
+        STORE_PROFILE_TAB_KEY,
+    ].forEach(k => localStorage.removeItem(k));
+}
+
+function _applyGuestUI() {
+    $('sidebar-guest')?.classList.remove('hidden');
+    $('sidebar-user')?.classList.add('hidden');
+    $('sidebar-logout-btn')?.classList.add('hidden');
+}
+
 async function logout() {
     await fetch('/api/store/logout', { method: 'POST' });
-    localStorage.clear();
+    _clearAuthLocalState();
     location.reload();
 }
 
@@ -263,17 +292,17 @@ function backToCatalog() {
 // ─── Purchase Flow (Buy Now) ─────────────────────────────────────────────
 
 /**
- * buyProduct(stock_key, pricesObj, name, iconClass)
+ * buyProduct(stock_key, pricesObj, name, imageUrl, iconClass)
  * Opens the Buy Now confirmation modal with correct product details.
  */
-function buyProduct(stock_key, pricesObj, name, iconClass) {
+function buyProduct(stock_key, pricesObj, name, imageUrl, iconClass) {
     if (!localStorage.getItem('store_email')) { openAuthModal('signin'); return; }
 
     const finalPrice = (pricesObj && pricesObj[currentCurrency] != null)
         ? pricesObj[currentCurrency]
         : (pricesObj && pricesObj['EGP'] != null ? pricesObj['EGP'] : 0);
 
-    pendingPurchase = { stock_key, price: finalPrice, currency: currentCurrency };
+    pendingPurchase = { stock_key, price: finalPrice, currency: currentCurrency, imageUrl, iconClass };
 
     const priceText = finalPrice + ' ' + currentCurrency;
     const pColor    = currentCurrency === 'EGP' ? 'text-yellow-500'
@@ -285,7 +314,17 @@ function buyProduct(stock_key, pricesObj, name, iconClass) {
     setText('checkout-item-name',  name);
 
     const icon = $('checkout-item-icon');
-    if (icon && iconClass) icon.className = `fas ${iconClass}`;
+    const img  = $('checkout-item-image');
+    if (imageUrl) {
+        if (img) { img.src = imageUrl; img.classList.remove('hidden'); }
+        if (icon) icon.classList.add('hidden');
+    } else {
+        if (img) { img.src = ''; img.classList.add('hidden'); }
+        if (icon) {
+            icon.className = `fas ${iconClass || 'fa-box'}`;
+            icon.classList.remove('hidden');
+        }
+    }
 
     const pe = $('checkout-item-price');
     if (pe) { pe.innerText = priceText; pe.className = `p-4 text-right font-black text-lg ${pColor}`; }
@@ -341,17 +380,17 @@ function copyPurchasedCode() {
 // ─── Cart System ─────────────────────────────────────────────────────────
 
 /**
- * addToCart(stock_key, pricesObj, name, iconClass)
+ * addToCart(stock_key, pricesObj, name, imageUrl, iconClass)
  * Adds an item (or increments qty) and persists the cart to localStorage.
  */
-function addToCart(stock_key, pricesObj, name, iconClass) {
+function addToCart(stock_key, pricesObj, name, imageUrl, iconClass) {
     if (!localStorage.getItem('store_email')) { openAuthModal('signin'); return; }
 
     const existing = cart.find(i => i.stock_key === stock_key);
     if (existing) {
         existing.qty += 1;
     } else {
-        cart.push({ stock_key, prices: pricesObj, name, iconClass, qty: 1 });
+        cart.push({ stock_key, prices: pricesObj, name, image: imageUrl || '', iconClass, qty: 1 });
     }
     _saveCart();
     updateCartUI();
@@ -433,8 +472,10 @@ window.openCartModal = function() {
         html += `
         <div class="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-black border border-gray-800 rounded-xl mb-3 hover:border-szcyan/50 transition gap-4">
             <div class="flex items-center gap-3 flex-1 min-w-0">
-                <div class="w-10 h-10 rounded-lg bg-szcyan/10 border border-szcyan/20 flex items-center justify-center text-szcyan shrink-0">
-                    <i class="fas ${item.iconClass || 'fa-box'} text-sm"></i>
+                <div class="w-10 h-10 rounded-lg bg-szcyan/10 border border-szcyan/20 flex items-center justify-center text-szcyan shrink-0 overflow-hidden">
+                    ${item.image
+                        ? `<img src="${item.image}" alt="${item.name}" class="w-full h-full object-cover">`
+                        : `<i class="fas ${item.iconClass || 'fa-box'} text-sm"></i>`}
                 </div>
                 <div class="min-w-0">
                     <h4 class="text-white font-bold text-sm truncate">${item.name}</h4>
@@ -550,24 +591,95 @@ async function confirmCartPurchase() {
 }
 
 // ─── Profile Modal ───────────────────────────────────────────────────────
-function openProfileModal() {
+
+function showTab(tabName) {
+    if (tabName === 'profile') {
+        openProfileModal();
+    }
+}
+
+function _isStoreLoggedIn() {
+    if (_serverAuthKnown) return _serverLoggedIn;
+    return !!(localStorage.getItem('store_email') && localStorage.getItem('store_name'));
+}
+
+function _applyProfileAuthGuard() {
+    const authContent = $('profile-auth-content');
+    const required = $('profile-login-required');
+    const loggedIn = _isStoreLoggedIn();
+
+    if (authContent) authContent.classList.toggle('hidden', !loggedIn);
+    if (required) required.classList.toggle('hidden', loggedIn);
+}
+
+async function openProfileModal() {
     openModal('profile-modal');
-    switchProfileTab('overview');
-    if (!_profileLoaded) { _profileLoaded = true; fetchAndApplyProfile(); }
-    else _applyLocalProfile();
+
+    if (!_serverAuthKnown || !localStorage.getItem('store_email')) {
+        await fetchAndApplyProfile();
+    }
+    _applyProfileAuthGuard();
+
+    if (!_isStoreLoggedIn()) {
+        return;
+    }
+
+    const remembered = localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview';
+    switchProfileTab(remembered);
+    if (!_profileLoaded) {
+        _profileLoaded = true;
+        await fetchAndApplyProfile();
+    } else {
+        _applyLocalProfile();
+    }
 }
 
 function switchProfileTab(tab) {
-    ['overview', 'edit', 'security', 'history', 'support'].forEach(t => {
-        $('ptab-' + t)?.classList.add('hidden');
+    if (!_isStoreLoggedIn()) {
+        _applyProfileAuthGuard();
+        return;
+    }
+
+    const tabs = ['overview', 'edit', 'security', 'history', 'support'];
+    const targetTab = tabs.includes(tab) ? tab : 'overview';
+
+    tabs.forEach(t => {
+        const panel = $('ptab-' + t);
+        if (!panel) {
+            console.warn(`[profile] Missing panel: ptab-${t}`);
+            return;
+        }
+        panel.classList.add('hidden');
+
         const btn = $('ptab-btn-' + t);
-        if (btn) { btn.classList.remove('active'); btn.classList.add('inactive'); }
+        if (btn) {
+            btn.classList.remove('active');
+            btn.classList.add('inactive');
+        }
     });
-    $('ptab-' + tab)?.classList.remove('hidden');
-    const ab = $('ptab-btn-' + tab);
-    if (ab) { ab.classList.add('active'); ab.classList.remove('inactive'); }
-    if (tab === 'history' && !ordersLoaded) fetchMyOrders();
-    if (tab === 'support' && !_ticketsLoaded) loadMyTickets();
+
+    const activePanel = $('ptab-' + targetTab);
+    if (!activePanel) {
+        console.warn(`[profile] Missing active panel target: ptab-${targetTab}`);
+        return;
+    }
+    activePanel.classList.remove('hidden');
+
+    const ab = $('ptab-btn-' + targetTab);
+    if (ab) {
+        ab.classList.add('active');
+        ab.classList.remove('inactive');
+    }
+
+    localStorage.setItem(STORE_PROFILE_TAB_KEY, targetTab);
+    if (targetTab === 'overview') history.replaceState(null, '', location.pathname + location.search);
+    else history.replaceState(null, '', `#${targetTab}`);
+
+    if (targetTab === 'history' && !ordersLoaded) {
+        fetchMyOrders();
+        fetchWalletHistory();
+    }
+    if (targetTab === 'support' && !_ticketsLoaded) loadMyTickets();
 }
 
 function _applyLocalProfile() {
@@ -598,12 +710,26 @@ function _fillProfileUI(d) {
 
 async function fetchAndApplyProfile() {
     try {
-        const d = await (await fetch('/api/store/me')).json();
-        if (!d.success) return;
+        const d = await (await fetch('/api/store/me', { cache: 'no-store' })).json();
+        _serverAuthKnown = true;
+        _serverLoggedIn = !!d.success;
+
+        if (!d.success) {
+            _clearAuthLocalState();
+            _applyGuestUI();
+            return false;
+        }
+
         _saveLocals(d);
         updateUI(d.name, d.balance_egp, d.balance_usd);
         _fillProfileUI(d);
-    } catch {}
+        return true;
+    } catch {
+        // Network glitch: keep last-known state without forcing guest/auth flip-flop.
+        return _isStoreLoggedIn();
+    } finally {
+        _applyProfileAuthGuard();
+    }
 }
 
 function triggerAvatarUpload() { $('avatar-file-input')?.click(); }
@@ -733,6 +859,38 @@ async function fetchMyOrders() {
     } catch { if (loader) loader.innerHTML = '<span class="text-red-500">Error loading orders.</span>'; }
 }
 
+
+async function fetchWalletHistory() {
+    const list = $('wallet-history-list');
+    const loader = $('wallet-loading');
+    if (!list) return;
+    if (loader) loader.classList.remove('hidden');
+    list.innerHTML = '';
+    try {
+        const d = await (await fetch('/api/store/wallet-history')).json();
+        if (loader) loader.classList.add('hidden');
+        if (!d.success || !d.txns.length) {
+            list.innerHTML = '<div class="text-center text-gray-500 text-xs py-4">No wallet transactions yet.</div>';
+            return;
+        }
+        list.innerHTML = d.txns.map(t => {
+            const isPlus = Number(t.amount) >= 0;
+            const amount = `${isPlus ? '+' : '-'} ${Math.abs(Number(t.amount)).toFixed(2)} ${t.currency}`;
+            const amountClr = isPlus ? 'text-szgreen' : 'text-red-400';
+            return `<div class="border border-gray-800 rounded-xl p-3 flex items-center justify-between gap-3 bg-[#080808]">
+                <div>
+                    <div class="text-xs font-black ${amountClr}">${amount}</div>
+                    <div class="text-[11px] text-gray-300 mt-0.5">${t.note || 'Wallet transaction'}</div>
+                </div>
+                <div class="text-[10px] text-gray-500 whitespace-nowrap">${t.created_at || ''}</div>
+            </div>`;
+        }).join('');
+    } catch {
+        if (loader) loader.classList.add('hidden');
+        list.innerHTML = '<div class="text-center text-red-500 text-xs py-4">Failed to load wallet ledger.</div>';
+    }
+}
+
 // ============================================================
 // Support Tickets — Customer Side (unchanged from v3.0)
 // ============================================================
@@ -768,7 +926,7 @@ async function submitTicket() {
             _ticketsLoaded = false;
             await loadMyTickets();
         } else {
-            if (statusEl) statusEl.innerHTML = `<span class="text-red-500">${d.msg}</span>`;
+            if (statusEl) statusEl.innerHTML = `<span class="text-red-500">${escapeHtml(d.msg)}</span>`;
             Core.showToast(d.msg, 'error');
             if (d.force_logout) logout();
         }
@@ -903,7 +1061,7 @@ async function sendCustomerReply() {
             if (statusEl) statusEl.innerHTML = '';
             await openTicketConvo(_activeConvoTicketId); // refresh messages
         } else {
-            if (statusEl) statusEl.innerHTML = `<span class="text-red-500">${d.msg}</span>`;
+            if (statusEl) statusEl.innerHTML = `<span class="text-red-500">${escapeHtml(d.msg)}</span>`;
             Core.showToast(d.msg, 'error');
         }
     } catch {
@@ -912,7 +1070,7 @@ async function sendCustomerReply() {
 }
 
 // ─── DOMContentLoaded ────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // Apply saved theme
     const theme = localStorage.getItem('sz_theme') || 'default';
     document.documentElement.setAttribute('data-theme', theme);
@@ -921,13 +1079,22 @@ document.addEventListener('DOMContentLoaded', () => {
     _loadCart();
     updateCartUI();
 
-    // Restore user session from localStorage
+    // Optimistic UI restore before server confirmation
     const email = localStorage.getItem('store_email');
-    const name  = localStorage.getItem('store_name');
+    const name = localStorage.getItem('store_name');
     if (email && name) {
         updateUI(name, localStorage.getItem('bal_egp') || '0', localStorage.getItem('bal_usd') || '0');
         _applyAvatar(localStorage.getItem('store_avatar') || '');
-        fetchAndApplyProfile();
+    }
+
+    const isLoggedIn = await fetchAndApplyProfile();
+
+    const hashTab = (location.hash || '').replace('#', '').trim();
+    const allowed = ['overview', 'edit', 'security', 'history', 'support'];
+    const initialTab = allowed.includes(hashTab) ? hashTab : (localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview');
+    if (isLoggedIn && allowed.includes(initialTab)) {
+        await openProfileModal();
+        switchProfileTab(initialTab);
     }
 
     // Scroll-to-top button
@@ -935,11 +1102,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (ms && sb) {
         ms.addEventListener('scroll', () => {
             const past = ms.scrollTop > 300;
-            sb.classList.toggle('opacity-0',           !past);
+            sb.classList.toggle('opacity-0', !past);
             sb.classList.toggle('pointer-events-none', !past);
-            sb.classList.toggle('translate-y-4',       !past);
-            sb.classList.toggle('opacity-100',          past);
-            sb.classList.toggle('translate-y-0',        past);
+            sb.classList.toggle('translate-y-4', !past);
+            sb.classList.toggle('opacity-100', past);
+            sb.classList.toggle('translate-y-0', past);
         });
         sb.onclick = () => ms.scrollTo({ top: 0, behavior: 'smooth' });
     }
