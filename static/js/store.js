@@ -8,6 +8,8 @@ let pendingPurchase  = null;
 let ordersLoaded     = false;
 let _forgotEmail     = '';
 let _profileLoaded   = false;
+let _serverAuthKnown = false;
+let _serverLoggedIn = false;
 const STORE_PROFILE_TAB_KEY = 'sz_active_profile_tab';
 const STORE_AUTH_KEYS = [
     'store_email',
@@ -603,28 +605,42 @@ async function confirmCartPurchase() {
 
 // ─── Profile Modal ───────────────────────────────────────────────────────
 function _isStoreLoggedIn() {
-    return !!localStorage.getItem('store_email');
-}
+  if (localStorage.getItem('store_email')) return true;
+  if (_serverAuthKnown) return _serverLoggedIn;
 
-function _applyProfileAuthGuard() {
-    const authContent = $('profile-auth-content');
-    const required    = $('profile-login-required');
-    const loggedIn    = _isStoreLoggedIn();
-    if (authContent) authContent.classList.toggle('hidden', !loggedIn);
-    if (required) required.classList.toggle('hidden', loggedIn);
-}
+  const bodyAuth = document.body?.dataset?.storeAuth === '1';
+  if (bodyAuth) return true;
 
-function openProfileModal() {
-    openModal('profile-modal');
+  const sidebarName = $('sidebar-ui-name')?.textContent?.trim() || '';
+  const sidebarUser = $('sidebar-ui-username')?.textContent?.trim() || '';
+  return (
+    (sidebarName && sidebarName !== 'Name') ||
+    (sidebarUser && sidebarUser !== '@')
+  );
+}
+async function openProfileModal() {
+  openModal('profile-modal');
+
+  // إجبار الموقع يجيب البيانات من السيرفر لو الـ localStorage فاضية
+  if (!localStorage.getItem('store_email')) {
+    await fetchAndApplyProfile();
+  } else {
     _applyProfileAuthGuard();
-    if (!_isStoreLoggedIn()) return;
+  }
 
-    const remembered = localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview';
-    switchProfileTab(remembered);
-    if (!_profileLoaded) { _profileLoaded = true; fetchAndApplyProfile(); }
-    else _applyLocalProfile();
+  if (!_isStoreLoggedIn()) return;
+
+  const remembered = localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview';
+  switchProfileTab(remembered);
+
+  if (!_profileLoaded) {
+    _profileLoaded = true;
+    await fetchAndApplyProfile();
+  } else {
+    _applyLocalProfile();
+    _applyProfileAuthGuard();
+  }
 }
-
 function switchProfileTab(tab) {
     if (!_isStoreLoggedIn()) return;
 
@@ -685,24 +701,34 @@ function _fillProfileUI(d) {
 }
 
 async function fetchAndApplyProfile() {
-    try {
-        const d = await (await fetch('/api/store/me', { cache: 'no-store' })).json();
-        _serverAuthKnown = true;
-        _serverLoggedIn = !!d.success;
+  try {
+    const res = await fetch('/api/store/me', {
+      method: 'GET',
+      cache: 'no-store',
+      credentials: 'same-origin',
+    });
 
-        if (!d.success) {
-            _clearAuthLocals();
-            return false;
-        }
-        _saveLocals(d);
-        updateUI(d.name, d.balance_egp, d.balance_usd);
-        _fillProfileUI(d);
-        return true;
-    } catch {
-        return _isStoreLoggedIn();
-    } finally {
-        _applyProfileAuthGuard();
+    const d = await res.json();
+
+    _serverAuthKnown = true;
+    _serverLoggedIn = !!d.success;
+
+    if (!d.success) {
+      _clearAuthLocalState?.();
+      _clearAuthLocals?.();
+      _applyGuestUI?.();
+      return false;
     }
+
+    _saveLocals(d);
+    updateUI(d.name, d.balance_egp, d.balance_usd);
+    _fillProfileUI(d);
+    return true;
+  } catch {
+    return _isStoreLoggedIn();
+  } finally {
+    _applyProfileAuthGuard();
+  }
 }
 
 function triggerAvatarUpload() { $('avatar-file-input')?.click(); }
