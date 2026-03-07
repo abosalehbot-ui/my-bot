@@ -160,7 +160,64 @@ def _clear_store_session_cookie(response: JSONResponse, request: Request):
         samesite="lax",
         secure=_cookie_is_secure(request),
     )
+async def get_server_price(stock_key: str, currency: str):
+    currency = (currency or "").upper()
+    cat = await db.store_categories.find_one(
+        {"products.stock_key": stock_key},
+        {"products.$": 1},
+    )
+    if not cat or not cat.get("products"):
+        return None
 
+    product = cat["products"][0]
+    prices = product.get("prices") or {}
+    if currency in prices:
+        return float(prices[currency])
+
+    legacy_key = f"price_{currency.lower()}"
+    if legacy_key in product:
+        return float(product.get(legacy_key) or 0)
+
+    if "EGP" in prices:
+        return float(prices["EGP"])
+
+    return None
+
+async def _acquire_txn_lock(transaction_id: str, email: str, action: str):
+    txid = (transaction_id or str(uuid.uuid4())).strip()
+    now = datetime.now()
+
+    existing = await db.store_txn_locks.find_one({"_id": txid})
+    if existing and existing.get("status") == "done":
+        return None
+
+    await db.store_txn_locks.update_one(
+        {"_id": txid},
+        {
+            "$setOnInsert": {
+                "_id": txid,
+                "email": email,
+                "action": action,
+                "created_at": now,
+                "status": "pending",
+            }
+        },
+        upsert=True,
+    )
+    return txid
+
+async def _finish_txn_lock(txid: str, status_value: str, note: str = ""):
+    await db.store_txn_locks.update_one(
+        {"_id": txid},
+        {
+            "$set": {
+                "status": status_value,
+                "note": note,
+                "finished_at": datetime.now(),
+            }
+        },
+        upsert=True,
+    )
 def get_user_data(user):
     return {
         "email": user["email"],
