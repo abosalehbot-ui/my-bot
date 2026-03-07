@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Saleh Zone | Storefront</title>
+    <link rel="icon" type="image/png" href="/static/logo.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 
@@ -1327,6 +1328,7 @@
 
                     </div>
                 </div>
+            </div>
 
                             <div id="profile-login-required" class="hidden flex-1 p-6 flex items-center justify-center">
                 <div class="w-full max-w-md bg-black border border-gray-800 rounded-2xl p-6 text-center shadow-2xl">
@@ -1349,10 +1351,24 @@
                     </div>
                 </div>
             </div>
+
+            <div id="profile-login-required" class="flex-1 p-6 flex items-center justify-center {% if user %}hidden{% endif %}">
+                <div class="w-full max-w-md bg-black border border-gray-800 rounded-2xl p-6 text-center shadow-2xl">
+                        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-szcyan/10 border border-szcyan/30 flex items-center justify-center">
+                            <i class="fas fa-lock text-2xl text-szcyan"></i>
+                        </div>
+                        <h3 class="text-white font-black text-xl mb-2">Login to View Your Wallet</h3>
+                        <p class="text-gray-400 text-sm mb-5">Access your balance, transaction history, profile settings, and support tickets after signing in.</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <button onclick='closeModal("profile-modal"); openAuthModal("signin")' class="w-full bg-gradient-to-r from-szgreen to-szcyan text-black font-black py-3 rounded-xl hover:opacity-90 transition">Login</button>
+                            <button onclick='closeModal("profile-modal"); openAuthModal("signup")' class="w-full bg-gray-900 border border-gray-700 text-white font-black py-3 rounded-xl hover:border-szgreen hover:text-szgreen transition">Register</button>
+                        </div>
+                    </div>
+                </div>
         </div>
     </div>
     <script src="/static/js/core.js"></script>
-    <script src="/static/js/store.js"></script>
+    <script src="/static/js/store.js?v=20260307"></script>
     {% endif %}
 
 </body>
