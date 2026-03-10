@@ -311,7 +311,7 @@
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 
-<body class="selection:bg-szgreen selection:text-black flex h-screen" data-store-auth="{{ '1' if request.cookies.get('store_session') else '0' }}">
+<body class="selection:bg-szgreen selection:text-black flex h-screen">
     <div id="toast-container" class="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"></div>
 
     {% if maintenance %}
@@ -673,15 +673,19 @@
 
                             <div class="mt-2 mb-4 bg-black w-full py-2 rounded-lg border border-gray-800">
                                 {% for cur in currencies %}
+                                {% set price_value = p.prices.get(cur._id) if p.prices is defined and p.prices.get(cur._id) is not none else (p.prices.get(cur._id.lower()) if p.prices is defined and p.prices.get(cur._id.lower()) is not none else (p.price_egp if cur._id == 'EGP' else p.price_usd)) %}
                                 <div
                                     class="price-display {{ cur._id.lower() }}-price {% if not loop.first %}hidden{% endif %}">
+                                    {% if price_value is not none %}
                                     <span
                                         class="text-xl md:text-2xl font-black {% if cur._id == 'EGP' %}text-yellow-500{% elif cur._id == 'USD' %}text-szcyan{% else %}text-szgreen{% endif %}">
-                                        {{ p.prices.get(cur._id, p.prices.get(cur._id.lower(), 0)) if p.prices is
-                                        defined else (p.price_egp if cur._id == 'EGP' else p.price_usd) }}
+                                        {{ price_value }}
                                     </span>
-                                    <span class="text-[10px] text-gray-500 font-bold uppercase ml-1">{{ cur.symbol
-                                        }}</span>
+                                    <span class="text-[10px] text-gray-500 font-bold uppercase ml-1">{{ cur.symbol }}</span>
+                                    {% else %}
+                                    <span class="text-sm md:text-base font-black text-red-400">N/A</span>
+                                    <span class="text-[10px] text-gray-600 font-bold uppercase ml-1">Unavailable</span>
+                                    {% endif %}
                                 </div>
                                 {% endfor %}
                             </div>
@@ -783,6 +787,7 @@
                     <dd class="text-2xl font-black text-szcyan" id="cart-total-price">0.00</dd>
                 </dl>
 
+                <div id="cart-currency-warning" class="text-xs font-bold text-center min-h-[1rem] mb-3"></div>
                 <div class="flex items-center mb-5">
                     <input id="cart-terms-checkbox" type="checkbox" checked
                         class="h-5 w-5 rounded border-gray-700 bg-[#050505] text-szgreen focus:ring-2 focus:ring-szgreen accent-szgreen cursor-pointer shrink-0" />
@@ -1077,7 +1082,7 @@
                         class="fas fa-times text-xl"></i></button>
             </div>
 
-            <div id="profile-auth-content" class="hidden">
+            <div id="profile-auth-content" class="hidden flex flex-col flex-1 min-h-0">
                 <div class="flex border-b border-gray-800 shrink-0 px-4 overflow-x-auto">
                     <button id="ptab-btn-overview" onclick='switchProfileTab("overview")'
                         class="prof-tab-btn active  py-3 px-3 text-xs font-bold whitespace-nowrap transition"><i
@@ -1313,7 +1318,8 @@
                                 <i class="fas fa-arrow-left"></i>Back to tickets
                             </button>
                             <h3 id="convo-subject" class="font-black text-white text-base mb-1 leading-tight"></h3>
-                            <div id="convo-status-badge" class="mb-3"></div>
+                            <div id="convo-status-badge" class="mb-2"></div>
+                            <div id="convo-live-status" class="mb-3 text-[10px] font-bold text-gray-500 min-h-[1rem]"></div>
                             <div id="convo-messages" class="space-y-3 mb-4 max-h-56 overflow-y-auto pr-1"></div>
                             <div id="convo-reply-section">
                                 <textarea id="convo-reply-input" rows="2" placeholder="Write a reply..."
@@ -1330,27 +1336,6 @@
                 </div>
             </div>
 
-                            <div id="profile-login-required" class="hidden flex-1 p-6 flex items-center justify-center">
-                <div class="w-full max-w-md bg-black border border-gray-800 rounded-2xl p-6 text-center shadow-2xl">
-                    <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-szcyan/10 border border-szcyan/30 flex items-center justify-center">
-                        <i class="fas fa-lock text-2xl text-szcyan"></i>
-                    </div>
-                    <h3 class="text-white font-black text-xl mb-2">Login to View Your Wallet</h3>
-                    <p class="text-gray-400 text-sm mb-5">
-                        Access your balance, transaction history, profile settings, and support tickets after signing in.
-                    </p>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <button onclick='closeModal("profile-modal"); openAuthModal("signin")'
-                            class="w-full bg-gradient-to-r from-szgreen to-szcyan text-black font-black py-3 rounded-xl hover:opacity-90 transition">
-                            Login
-                        </button>
-                        <button onclick='closeModal("profile-modal"); openAuthModal("signup")'
-                            class="w-full bg-gray-900 border border-gray-700 text-white font-black py-3 rounded-xl hover:border-szgreen hover:text-szgreen transition">
-                            Register
-                        </button>
-                    </div>
-                </div>
-            </div>
 
             <div id="profile-login-required" class="flex-1 p-6 flex items-center justify-center {% if user %}hidden{% endif %}">
                 <div class="w-full max-w-md bg-black border border-gray-800 rounded-2xl p-6 text-center shadow-2xl">
@@ -1374,3 +1359,9 @@
 </body>
 
 </html>
+
+
+
+
+
+

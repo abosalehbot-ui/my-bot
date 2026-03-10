@@ -8,10 +8,9 @@ let pendingPurchase  = null;
 let ordersLoaded     = false;
 let _forgotEmail     = '';
 let _profileLoaded   = false;
-let _serverAuthKnown = false;
-let _serverLoggedIn = false;
+let _profileBootstrapPromise = null;
 const STORE_PROFILE_TAB_KEY = 'sz_active_profile_tab';
-const STORE_AUTH_KEYS = [
+const LEGACY_STORE_AUTH_KEYS = [
     'store_email',
     'store_name',
     'store_username',
@@ -19,8 +18,12 @@ const STORE_AUTH_KEYS = [
     'store_avatar',
     'bal_egp',
     'bal_usd',
-    STORE_PROFILE_TAB_KEY,
 ];
+const storeSession = {
+    loaded: false,
+    loggedIn: false,
+    profile: null,
+};
 // ─── Cart State — persisted in localStorage under 'sz_cart' ──────────────
 let cart = [];
 
@@ -43,6 +46,149 @@ const escapeHtml = (val) => String(val ?? '').replace(/[&<>"']/g, (ch) => {
     return '&#39;';
 });
 
+function clearNode(node) {
+    if (!node) return;
+    while (node.firstChild) node.removeChild(node.firstChild);
+}
+
+function setInlineStatus(el, msg = '', { iconClass = '', textClass = '' } = {}) {
+    if (!el) return;
+    clearNode(el);
+    if (!msg) return;
+
+    const span = document.createElement('span');
+    if (textClass) span.className = textClass;
+    if (iconClass) {
+        const icon = document.createElement('i');
+        icon.className = iconClass;
+        span.appendChild(icon);
+    }
+    span.appendChild(document.createTextNode(msg));
+    el.appendChild(span);
+}
+
+function normalizeStoreProfile(data = {}) {
+    return {
+        user_id: data.user_id ?? '',
+        name: data.name ?? '',
+        username: data.username ?? '',
+        email: data.email ?? '',
+        balance_egp: data.balance_egp ?? 0,
+        balance_usd: data.balance_usd ?? 0,
+        avatar: data.avatar ?? '',
+        created_at: data.created_at ?? '',
+    };
+}
+
+function getStoreProfile() {
+    return storeSession.profile ? { ...storeSession.profile } : null;
+}
+
+function getStoreBalance(currency) {
+    const profile = storeSession.profile;
+    if (!profile) return 0;
+    return profile[`balance_${String(currency || '').toLowerCase()}`] ?? 0;
+}
+
+function setStoreSession(profile) {
+    if (!profile) {
+        storeSession.loaded = true;
+        storeSession.loggedIn = false;
+        storeSession.profile = null;
+        return;
+    }
+
+    storeSession.loaded = true;
+    storeSession.loggedIn = true;
+    storeSession.profile = normalizeStoreProfile(profile);
+}
+
+function clearLegacyAuthCache() {
+    LEGACY_STORE_AUTH_KEYS.forEach(key => localStorage.removeItem(key));
+}
+
+function mergeStoreProfile(updates = {}) {
+    if (!storeSession.profile) return;
+    setStoreSession({ ...storeSession.profile, ...updates });
+}
+
+function applyBalanceSnapshot(balances = {}) {
+    if (!storeSession.profile) return;
+    mergeStoreProfile({
+        balance_egp: balances.balance_egp ?? storeSession.profile.balance_egp ?? 0,
+        balance_usd: balances.balance_usd ?? storeSession.profile.balance_usd ?? 0,
+    });
+    updateUI(storeSession.profile);
+    _fillProfileUI(storeSession.profile);
+}
+
+function getProductPrice(pricesObj, currency) {
+    if (!pricesObj || !currency) return null;
+
+    const rawPrice = pricesObj[currency] ?? pricesObj[String(currency).toLowerCase()];
+    if (rawPrice == null || rawPrice === '') return null;
+
+    const numericPrice = Number(rawPrice);
+    return Number.isFinite(numericPrice) ? numericPrice : null;
+}
+
+function splitCartItemsByCurrency(currency) {
+    const purchasable = [];
+    const unavailable = [];
+
+    cart.forEach(item => {
+        const price = getProductPrice(item.prices, currency);
+        if (price == null) {
+            unavailable.push(item);
+            return;
+        }
+        purchasable.push({ item, price });
+    });
+
+    return { purchasable, unavailable };
+}
+
+function removePurchasedCartItems(results = []) {
+    const purchasedCounts = new Map();
+    results.forEach(result => {
+        const stockKey = String(result?.stock_key || '').trim();
+        if (!stockKey) return;
+        purchasedCounts.set(stockKey, (purchasedCounts.get(stockKey) || 0) + 1);
+    });
+
+    cart = cart.reduce((items, item) => {
+        const stockKey = String(item.stock_key || '').trim();
+        const purchasedCount = purchasedCounts.get(stockKey) || 0;
+        if (!purchasedCount) {
+            items.push(item);
+            return items;
+        }
+
+        const currentQty = Number(item.qty || 0);
+        const leftoverQty = Math.max(currentQty - purchasedCount, 0);
+        purchasedCounts.set(stockKey, Math.max(purchasedCount - currentQty, 0));
+        if (leftoverQty > 0) {
+            items.push({ ...item, qty: leftoverQty });
+        }
+        return items;
+    }, []);
+}
+
+async function ensureStoreSessionLoaded(forceRefresh = false) {
+    if (storeSession.loaded && !forceRefresh) return storeSession.loggedIn;
+    if (_profileBootstrapPromise && !forceRefresh) return _profileBootstrapPromise;
+
+    _profileBootstrapPromise = fetchAndApplyProfile(forceRefresh)
+        .finally(() => { _profileBootstrapPromise = null; });
+    return _profileBootstrapPromise;
+}
+
+function requireStoreAuth() {
+    if (storeSession.loggedIn) return true;
+    openAuthModal('signin');
+    return false;
+}
+
 // ─── Modal ───────────────────────────────────────────────────────────────
 function openModal(id)  { $(id)?.classList.remove('hidden'); }
 function closeModal(id) { $(id)?.classList.add('hidden'); }
@@ -50,8 +196,9 @@ function openAuthModal(view) { openModal('auth-modal'); switchAuthView(view); }
 
 // ─── Toast ───────────────────────────────────────────────────────────────
 function setStatus(msg, isError = false) {
-    const el = $('auth-status');
-    if (el) el.innerHTML = isError ? `<span class="text-red-500">${escapeHtml(msg)}</span>` : `<span class="text-szcyan">${escapeHtml(msg)}</span>`;
+    setInlineStatus($('auth-status'), msg, {
+        textClass: isError ? 'text-red-500' : 'text-szcyan',
+    });
 }
 
 // ─── Theme ───────────────────────────────────────────────────────────────
@@ -73,6 +220,10 @@ function toggleCurrency() {
     currentCurrency = $('currency-toggle').value;
     document.querySelectorAll('.price-display').forEach(el => el.classList.add('hidden'));
     document.querySelectorAll(`.${currentCurrency.toLowerCase()}-price`).forEach(el => el.classList.remove('hidden'));
+
+    if (!$('cart-modal')?.classList.contains('hidden')) {
+        openCartModal();
+    }
 }
 
 // ─── Auth View Switcher ──────────────────────────────────────────────────
@@ -96,20 +247,21 @@ function switchAuthView(view) {
 }
 
 // ─── UI Update ───────────────────────────────────────────────────────────
-function updateUI(name, balEgp, balUsd) {
+function updateUI(profile) {
+    const currentProfile = profile ? normalizeStoreProfile(profile) : storeSession.profile;
+    if (!currentProfile) {
+        _applyGuestUI();
+        return;
+    }
+
     $('sidebar-guest')?.classList.add('hidden');
     $('sidebar-user')?.classList.remove('hidden');
     $('sidebar-logout-btn')?.classList.remove('hidden');
 
-    setText('sidebar-ui-name',    name);
-    setText('sidebar-ui-bal-egp', balEgp ?? '0');
-    setText('sidebar-ui-bal-usd', balUsd ?? '0');
-
-    const uname = localStorage.getItem('store_username');
-    setText('sidebar-ui-username', uname ? '@' + uname : '');
-
-    localStorage.setItem('bal_egp', balEgp ?? '0');
-    localStorage.setItem('bal_usd', balUsd ?? '0');
+    setText('sidebar-ui-name', currentProfile.name);
+    setText('sidebar-ui-bal-egp', currentProfile.balance_egp ?? '0');
+    setText('sidebar-ui-bal-usd', currentProfile.balance_usd ?? '0');
+    setText('sidebar-ui-username', currentProfile.username ? '@' + currentProfile.username : '');
 }
 
 // ─── Avatar Helper ───────────────────────────────────────────────────────
@@ -121,52 +273,48 @@ function _applyAvatar(src) {
     });
 }
 
+function _resetProfileUI() {
+    setText('prof-name', '...');
+    setText('prof-email', '...');
+    setText('prof-username', '�');
+    setText('prof-user-id', '');
+    setText('prof-bal-egp', '0');
+    setText('prof-bal-usd', '0');
+    setText('prof-joined', '');
+    if ($('edit-name')) $('edit-name').value = '';
+    if ($('edit-username')) $('edit-username').value = '';
+}
+
 // ─── Save & Login ────────────────────────────────────────────────────────
-function _saveLocals(data) {
-    localStorage.setItem('store_email',    data.email    ?? '');
-    localStorage.setItem('store_name',     data.name     ?? '');
-    localStorage.setItem('store_username', data.username ?? '');
-    localStorage.setItem('store_user_id',  data.user_id  ?? '');
-    localStorage.setItem('store_avatar',   data.avatar   ?? '');
-    localStorage.setItem('bal_egp',        data.balance_egp ?? 0);
-    localStorage.setItem('bal_usd',        data.balance_usd ?? 0);
-}
-
-function _clearAuthLocals() {
-    STORE_AUTH_KEYS.forEach(k => localStorage.removeItem(k));
-}
-
 async function saveAndLogin(data) {
-    _saveLocals(data);
-    updateUI(data.name, data.balance_egp, data.balance_usd);
-    _applyAvatar(data.avatar || '');
+    const loggedIn = await ensureStoreSessionLoaded(true);
+    if (!loggedIn) {
+        setStatus('Unable to confirm your session. Please try again.', true);
+        return;
+    }
+
     closeModal('auth-modal');
-    Core.showToast(`Welcome, ${data.name}!`);
-    fetchAndApplyProfile();
+    Core.showToast(`Welcome, ${(getStoreProfile()?.name || data?.name || 'back')}!`);
 }
 
 function _clearAuthLocalState() {
-    [
-        'store_email',
-        'store_name',
-        'store_username',
-        'store_user_id',
-        'store_avatar',
-        'bal_egp',
-        'bal_usd',
-        STORE_PROFILE_TAB_KEY,
-    ].forEach(k => localStorage.removeItem(k));
+    clearLegacyAuthCache();
 }
 
 function _applyGuestUI() {
     $('sidebar-guest')?.classList.remove('hidden');
     $('sidebar-user')?.classList.add('hidden');
     $('sidebar-logout-btn')?.classList.add('hidden');
+    _applyAvatar('');
 }
 
 async function logout() {
-    await fetch('/api/store/logout', { method: 'POST' });
-    _clearAuthLocals();
+    try {
+        await fetch('/api/store/logout', { method: 'POST', credentials: 'same-origin' });
+    } catch {}
+    setStoreSession(null);
+    _clearAuthLocalState();
+    _profileLoaded = false;
     location.reload();
 }
 
@@ -252,20 +400,36 @@ async function doResetPassword(e) {
 
 // ─── Auth: Google & Telegram ─────────────────────────────────────────────
 async function handleGoogleResponse(response) {
-    setStatus('<i class="fas fa-spinner fa-spin"></i>');
-    const fd = new FormData(); fd.append('credential', response.credential);
+    setStatus('Signing in...');
+    const fd = new FormData();
+    fd.append('credential', response.credential);
     try {
-        const d = await (await fetch('/api/store/google-login', { method: 'POST', body: fd })).json();
+        const d = await (await fetch('/api/store/google-login', {
+            method: 'POST',
+            body: fd,
+            credentials: 'same-origin',
+        })).json();
         if (d.success) saveAndLogin(d); else setStatus(d.msg, true);
     } catch { setStatus('Error!', true); }
 }
 
 async function onTelegramAuth(user) {
-    setStatus('<i class="fas fa-spinner fa-spin"></i>');
+    if (!user?.id || !user?.auth_date || !user?.hash) {
+        setStatus('Telegram login payload is incomplete.', true);
+        return;
+    }
+
+    setStatus('Signing in...');
     const fd = new FormData();
-    fd.append('tg_id', user.id); fd.append('name', user.first_name); fd.append('username', user.username || '');
+    Object.entries(user).forEach(([key, value]) => {
+        if (value != null) fd.append(key, value);
+    });
     try {
-        const d = await (await fetch('/api/store/telegram-login', { method: 'POST', body: fd })).json();
+        const d = await (await fetch('/api/store/telegram-login', {
+            method: 'POST',
+            body: fd,
+            credentials: 'same-origin',
+        })).json();
         if (d.success) saveAndLogin(d); else setStatus(d.msg, true);
     } catch { setStatus('Error!', true); }
 }
@@ -308,12 +472,15 @@ function backToCatalog() {
  * buyProduct(stock_key, pricesObj, name, imageUrl, iconClass)
  * Opens the Buy Now confirmation modal with correct product details.
  */
-function buyProduct(stock_key, pricesObj, name, imageUrl, iconClass) {
-    if (!localStorage.getItem('store_email')) { openAuthModal('signin'); return; }
+async function buyProduct(stock_key, pricesObj, name, imageUrl, iconClass) {
+    await ensureStoreSessionLoaded();
+    if (!requireStoreAuth()) return;
 
-    const finalPrice = (pricesObj && pricesObj[currentCurrency] != null)
-        ? pricesObj[currentCurrency]
-        : (pricesObj && pricesObj['EGP'] != null ? pricesObj['EGP'] : 0);
+    const finalPrice = getProductPrice(pricesObj, currentCurrency);
+    if (finalPrice == null) {
+        Core.showToast(`This item is not available in ${currentCurrency} yet.`, 'error');
+        return;
+    }
 
     pendingPurchase = { stock_key, price: finalPrice, currency: currentCurrency, imageUrl, iconClass };
 
@@ -321,9 +488,10 @@ function buyProduct(stock_key, pricesObj, name, imageUrl, iconClass) {
     const pColor    = currentCurrency === 'EGP' ? 'text-yellow-500'
                     : currentCurrency === 'USD' ? 'text-szcyan'
                     : 'text-szgreen';
+    const profile = getStoreProfile();
 
-    setText('checkout-user-name',  localStorage.getItem('store_name'));
-    setText('checkout-user-email', localStorage.getItem('store_email'));
+    setText('checkout-user-name',  profile?.name || '');
+    setText('checkout-user-email', profile?.email || '');
     setText('checkout-item-name',  name);
 
     const icon = $('checkout-item-icon');
@@ -352,6 +520,65 @@ function buyProduct(stock_key, pricesObj, name, imageUrl, iconClass) {
  * confirmPurchase()
  * Submits the single-item Buy Now order to the server.
  */
+function createIdempotencyKey(prefix = 'checkout') {
+    if (window.crypto?.randomUUID) {
+        return `${prefix}-${window.crypto.randomUUID()}`;
+    }
+    return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+async function revealOrderCode(orderId) {
+    const fd = new FormData();
+    fd.append('order_id', orderId);
+
+    const res = await fetch('/api/store/orders/reveal', {
+        method: 'POST',
+        body: fd,
+        credentials: 'same-origin',
+        cache: 'no-store',
+    });
+    return res.json();
+}
+
+function renderDeliveryHtml(deliveries) {
+    if (!deliveries?.length) {
+        return '<div class="text-xs text-gray-500">No delivery details available.</div>';
+    }
+
+    return deliveries.map((delivery) => {
+        const meta = `${escapeHtml(delivery.stock_key || 'Item')} � ${escapeHtml(String(delivery.price ?? ''))} ${escapeHtml(delivery.currency || '')}`;
+        if (delivery.success) {
+            return `<div class="bg-black border border-szgreen/30 rounded-lg p-3 mb-2">
+                <div class="text-[10px] text-gray-500 mb-1">${meta}</div>
+                <div class="text-szgreen font-mono font-bold select-all break-all">${escapeHtml(delivery.code)}</div>
+            </div>`;
+        }
+
+        const masked = delivery.code_masked
+            ? `<div class="text-yellow-500 font-mono font-bold break-all">${escapeHtml(delivery.code_masked)}</div>`
+            : '';
+        return `<div class="bg-black border border-yellow-500/30 rounded-lg p-3 mb-2">
+            <div class="text-[10px] text-gray-500 mb-1">${meta}</div>
+            ${masked}
+            <div class="text-xs text-gray-400 mt-2">${escapeHtml(delivery.msg || 'Code reveal unavailable.')}</div>
+        </div>`;
+    }).join('');
+}
+
+function showPurchaseSuccess(content, useHtml = false) {
+    const ce = $('purchased-code');
+    if (ce) {
+        if (useHtml) {
+            ce.innerHTML = content || 'No delivery details available.';
+            ce.classList.add('text-left');
+        } else {
+            ce.innerText = content || '';
+            ce.classList.remove('text-left');
+        }
+    }
+    openModal('success-modal');
+}
+
 async function confirmPurchase() {
     if (!pendingPurchase) return;
     if (!$('terms-checkbox').checked) return Core.showToast('Please agree to the Terms of Service.', 'error');
@@ -361,26 +588,58 @@ async function confirmPurchase() {
 
     const fd = new FormData();
     fd.append('stock_key', pendingPurchase.stock_key);
-    fd.append('price',     pendingPurchase.price);
-    fd.append('currency',  pendingPurchase.currency);
+    fd.append('price', pendingPurchase.price);
+    fd.append('currency', pendingPurchase.currency);
 
     try {
-        const d = await (await fetch('/api/store/buy', { method: 'POST', body: fd })).json();
+        const d = await (await fetch('/api/store/buy', {
+            method: 'POST',
+            headers: { 'Idempotency-Key': createIdempotencyKey('buy') },
+            body: fd,
+        })).json();
+
         if (d.success) {
-            const newEgp = d.currency === 'EGP' ? d.new_balance : localStorage.getItem('bal_egp');
-            const newUsd = d.currency === 'USD' ? d.new_balance : localStorage.getItem('bal_usd');
-            updateUI(localStorage.getItem('store_name'), newEgp, newUsd);
+            applyBalanceSnapshot(d.new_balances || {});
             ordersLoaded = false;
             closeModal('checkout-modal');
-            const ce = $('purchased-code');
-            if (ce) { ce.innerText = d.code; ce.classList.remove('text-left'); }
-            openModal('success-modal');
+
+            try {
+                const reveal = await revealOrderCode(d.order_id);
+                if (reveal.success) {
+                    showPurchaseSuccess(reveal.code, false);
+                } else {
+                    showPurchaseSuccess(renderDeliveryHtml([
+                        {
+                            success: false,
+                            stock_key: pendingPurchase.stock_key,
+                            price: pendingPurchase.price,
+                            currency: pendingPurchase.currency,
+                            code_masked: reveal.code_masked || d.code_masked,
+                            msg: reveal.msg || 'Purchase completed, but the secure reveal step did not finish. Check your order history.',
+                        },
+                    ]), true);
+                    if (reveal.force_logout) logout();
+                }
+            } catch {
+                showPurchaseSuccess(renderDeliveryHtml([
+                    {
+                        success: false,
+                        stock_key: pendingPurchase.stock_key,
+                        price: pendingPurchase.price,
+                        currency: pendingPurchase.currency,
+                        code_masked: d.code_masked,
+                        msg: 'Purchase completed, but the secure reveal request did not finish. Check your order history.',
+                    },
+                ]), true);
+            }
         } else {
             Core.showToast(d.msg, 'error');
             if (d.force_logout) logout();
             else if (d.msg.includes('balance') || d.msg.includes('stock')) location.reload();
         }
-    } catch { Core.showToast('An error occurred!', 'error'); }
+    } catch {
+        Core.showToast('An error occurred!', 'error');
+    }
 
     btn.innerHTML = orig; btn.disabled = false;
 }
@@ -396,8 +655,14 @@ function copyPurchasedCode() {
  * addToCart(stock_key, pricesObj, name, imageUrl, iconClass)
  * Adds an item (or increments qty) and persists the cart to localStorage.
  */
-function addToCart(stock_key, pricesObj, name, imageUrl, iconClass) {
-    if (!localStorage.getItem('store_email')) { openAuthModal('signin'); return; }
+async function addToCart(stock_key, pricesObj, name, imageUrl, iconClass) {
+    await ensureStoreSessionLoaded();
+    if (!requireStoreAuth()) return;
+
+    if (getProductPrice(pricesObj, currentCurrency) == null) {
+        Core.showToast(`This item is not available in ${currentCurrency} yet.`, 'error');
+        return;
+    }
 
     const existing = cart.find(i => i.stock_key === stock_key);
     if (existing) {
@@ -450,11 +715,16 @@ function updateCartUI() {
  * openCartModal()
  * Renders current cart items and opens the modal.
  */
-window.openCartModal = function() {
-    if (!localStorage.getItem('store_email')) { openAuthModal('signin'); return; }
+window.openCartModal = async function() {
+    await ensureStoreSessionLoaded();
+    if (!requireStoreAuth()) return;
 
     const container = $('cart-items-container');
+    const warningEl = $('cart-currency-warning');
+    const checkoutBtn = $('btn-confirm-cart');
     if (!container) return;
+
+    if (warningEl) setInlineStatus(warningEl);
 
     if (cart.length === 0) {
         container.innerHTML = `
@@ -465,25 +735,32 @@ window.openCartModal = function() {
             </div>`;
         const tp = $('cart-total-price');
         if (tp) { tp.innerText = '0.00 ' + currentCurrency; tp.className = 'text-2xl font-black text-szcyan'; }
+        if (checkoutBtn) checkoutBtn.disabled = true;
         openModal('cart-modal');
         return;
     }
 
     let html  = '';
     let total = 0;
+    const { purchasable, unavailable } = splitCartItemsByCurrency(currentCurrency);
 
-    cart.forEach(item => {
-        const price     = (item.prices && item.prices[currentCurrency] != null)
-                        ? item.prices[currentCurrency]
-                        : (item.prices && item.prices['EGP'] != null ? item.prices['EGP'] : 0);
-        const itemTotal = price * item.qty;
+    [...purchasable, ...unavailable.map(item => ({ item, price: null }))].forEach(({ item, price }) => {
+        const isUnavailable = price == null;
+        const itemTotal = isUnavailable ? 0 : price * item.qty;
         total += itemTotal;
-        const pColor    = currentCurrency === 'EGP' ? 'text-yellow-500'
-                        : currentCurrency === 'USD' ? 'text-szcyan'
-                        : 'text-szgreen';
+        const pColor = isUnavailable
+            ? 'text-red-400'
+            : currentCurrency === 'EGP' ? 'text-yellow-500'
+            : currentCurrency === 'USD' ? 'text-szcyan'
+            : 'text-szgreen';
+        const priceLabel = isUnavailable ? `Unavailable in ${currentCurrency}` : `${price} ${currentCurrency}`;
+        const totalLabel = isUnavailable ? 'N/A' : itemTotal.toFixed(2);
+        const stateBadge = isUnavailable
+            ? '<span class="text-[10px] uppercase tracking-wide text-red-400 font-bold">Waiting for pricing</span>'
+            : '<span class="text-[10px] uppercase tracking-wide text-gray-500 font-bold">Ready</span>';
 
         html += `
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-black border border-gray-800 rounded-xl mb-3 hover:border-szcyan/50 transition gap-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-black border ${isUnavailable ? 'border-red-900/40' : 'border-gray-800'} rounded-xl mb-3 hover:border-szcyan/50 transition gap-4">
             <div class="flex items-center gap-3 flex-1 min-w-0">
                 <div class="w-10 h-10 rounded-lg bg-szcyan/10 border border-szcyan/20 flex items-center justify-center text-szcyan shrink-0 overflow-hidden">
                     ${item.image
@@ -491,9 +768,12 @@ window.openCartModal = function() {
                         : `<i class="fas ${item.iconClass || 'fa-box'} text-sm"></i>`}
                 </div>
                 <div class="min-w-0">
-                    <h4 class="text-white font-bold text-sm truncate">${item.name}</h4>
-                    <div class="${pColor} font-black text-sm">${price} ${currentCurrency}
-                        <span class="text-gray-500 text-[10px] font-bold uppercase ml-1">each</span>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <h4 class="text-white font-bold text-sm truncate">${item.name}</h4>
+                        ${stateBadge}
+                    </div>
+                    <div class="${pColor} font-black text-sm">${priceLabel}
+                        ${isUnavailable ? '' : '<span class="text-gray-500 text-[10px] font-bold uppercase ml-1">each</span>'}
                     </div>
                 </div>
             </div>
@@ -509,7 +789,7 @@ window.openCartModal = function() {
                         <i class="fas fa-plus text-xs"></i>
                     </button>
                 </div>
-                <div class="${pColor} font-black text-sm w-20 text-right">${itemTotal.toFixed(2)}</div>
+                <div class="${pColor} font-black text-sm w-20 text-right">${totalLabel}</div>
                 <button onclick="removeFromCart('${item.stock_key}')"
                     class="text-red-500 hover:text-white hover:bg-red-600 bg-red-900/20 w-9 h-9 rounded-lg flex items-center justify-center transition shrink-0">
                     <i class="fas fa-trash-alt text-xs"></i>
@@ -520,15 +800,23 @@ window.openCartModal = function() {
 
     container.innerHTML = html;
 
+    if (warningEl && unavailable.length > 0) {
+        setInlineStatus(warningEl, `${unavailable.length} cart item${unavailable.length === 1 ? '' : 's'} will stay in your cart until ${currentCurrency} pricing is available.`, {
+            iconClass: 'fas fa-exclamation-triangle mr-1',
+            textClass: 'text-yellow-500',
+        });
+    }
+
     const tColor  = currentCurrency === 'EGP' ? 'text-yellow-500'
                   : currentCurrency === 'USD' ? 'text-szcyan'
                   : 'text-szgreen';
     const totalEl = $('cart-total-price');
     if (totalEl) {
         totalEl.innerText  = total.toFixed(2) + ' ' + currentCurrency;
-        totalEl.className  = `text-2xl font-black ${tColor}`;
+        totalEl.className  = `text-2xl font-black ${purchasable.length ? tColor : 'text-gray-500'}`;
     }
 
+    if (checkoutBtn) checkoutBtn.disabled = purchasable.length === 0;
     openModal('cart-modal');
 };
 
@@ -540,218 +828,227 @@ async function confirmCartPurchase() {
     if (cart.length === 0) return Core.showToast('Your cart is empty.', 'error');
     if (!$('cart-terms-checkbox').checked) return Core.showToast('Please agree to the Terms of Service.', 'error');
 
+    const { purchasable, unavailable } = splitCartItemsByCurrency(currentCurrency);
+    if (!purchasable.length) {
+        Core.showToast(`No cart items are available in ${currentCurrency} right now.`, 'error');
+        await openCartModal();
+        return;
+    }
+
     const btn = $('btn-confirm-cart'), orig = btn.innerHTML;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...'; btn.disabled = true;
 
-    const cartItems = cart.map(item => ({
+    const cartItems = purchasable.map(({ item, price }) => ({
         stock_key: item.stock_key,
-        quantity:  item.qty,
-        price:     (item.prices && item.prices[currentCurrency] != null)
-                    ? item.prices[currentCurrency]
-                    : (item.prices && item.prices['EGP'] != null ? item.prices['EGP'] : 0),
-        currency:  currentCurrency,
+        quantity: item.qty,
+        price,
+        currency: currentCurrency,
     }));
 
     try {
         const res = await fetch('/api/store/checkout-cart', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ cart: cartItems }),
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Idempotency-Key': createIdempotencyKey('cart'),
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ cart: cartItems }),
         });
         const d = await res.json();
 
         if (d.success) {
-            const newEgp = d.new_balances?.balance_egp ?? localStorage.getItem('bal_egp');
-            const newUsd = d.new_balances?.balance_usd ?? localStorage.getItem('bal_usd');
-            updateUI(localStorage.getItem('store_name'), newEgp, newUsd);
-            localStorage.setItem('bal_egp', newEgp ?? '0');
-            localStorage.setItem('bal_usd', newUsd ?? '0');
-
-            // Clear cart
-            cart = [];
+            const processedResults = Array.isArray(d.results) ? d.results : [];
+            applyBalanceSnapshot(d.new_balances || {});
+            removePurchasedCartItems(processedResults);
             _saveCart();
             updateCartUI();
             ordersLoaded = false;
             closeModal('cart-modal');
 
-            const successItems = d.results.filter(r => r.status === 'Success');
-            const failedItems  = d.results.filter(r => r.status === 'Failed');
+            const deliveries = await Promise.all(processedResults.map(async (result) => {
+                try {
+                    const reveal = await revealOrderCode(result.order_id);
+                    if (reveal.success) {
+                        return {
+                            success: true,
+                            stock_key: result.stock_key,
+                            price: result.price,
+                            currency: result.currency,
+                            code: reveal.code,
+                        };
+                    }
 
-            let codesHtml = successItems.map(r =>
-                `<div class="bg-black border border-szgreen/30 rounded-lg p-3 mb-2">
-                    <div class="text-[10px] text-gray-500 mb-1">${r.stock_key} · ${r.price} ${r.currency}</div>
-                    <div class="text-szgreen font-mono font-bold select-all">${r.code}</div>
-                 </div>`
-            ).join('');
+                    return {
+                        success: false,
+                        stock_key: result.stock_key,
+                        price: result.price,
+                        currency: result.currency,
+                        code_masked: reveal.code_masked || result.code_masked,
+                        msg: reveal.msg || 'Code reveal unavailable.',
+                        force_logout: reveal.force_logout,
+                    };
+                } catch {
+                    return {
+                        success: false,
+                        stock_key: result.stock_key,
+                        price: result.price,
+                        currency: result.currency,
+                        code_masked: result.code_masked,
+                        msg: 'Purchase completed, but the secure reveal request did not finish. Check your order history.',
+                    };
+                }
+            }));
 
-            if (failedItems.length > 0) {
-                codesHtml += `<div class="mt-3 border-t border-gray-800 pt-3">
-                    <p class="text-xs text-red-400 font-bold mb-2"><i class="fas fa-exclamation-triangle mr-1"></i>Failed items (${failedItems.length}):</p>
-                    ${failedItems.map(r => `<div class="text-xs text-gray-500">${r.stock_key}: ${r.msg}</div>`).join('')}
-                </div>`;
+            const remainingCount = cart.reduce((sum, item) => sum + Number(item.qty || 0), 0);
+            if (remainingCount > 0) {
+                Core.showToast(`${remainingCount} item${remainingCount === 1 ? '' : 's'} stayed in your cart and were not charged.`, 'success');
+            } else if (unavailable.length > 0) {
+                Core.showToast(`${unavailable.length} item${unavailable.length === 1 ? '' : 's'} stayed in your cart because ${currentCurrency} pricing is unavailable.`, 'success');
             }
 
-            const ce = $('purchased-code');
-            if (ce) { ce.innerHTML = codesHtml || 'No successful items.'; ce.classList.add('text-left'); }
-            openModal('success-modal');
+            if (deliveries.some(item => item.force_logout)) logout();
+            showPurchaseSuccess(renderDeliveryHtml(deliveries), true);
         } else {
             Core.showToast(d.msg, 'error');
             if (d.force_logout) logout();
+            await openCartModal();
         }
-    } catch { Core.showToast('An error occurred!', 'error'); }
+    } catch {
+        Core.showToast('An error occurred!', 'error');
+        await openCartModal();
+    }
 
     btn.innerHTML = orig; btn.disabled = false;
 }
 
 // ─── Profile Modal ───────────────────────────────────────────────────────
 function _isStoreLoggedIn() {
-  if (localStorage.getItem('store_email')) return true;
-  if (_serverAuthKnown) return _serverLoggedIn;
-
-  const bodyAuth = document.body?.dataset?.storeAuth === '1';
-  if (bodyAuth) return true;
-
-  const sidebarName = $('sidebar-ui-name')?.textContent?.trim() || '';
-  const sidebarUser = $('sidebar-ui-username')?.textContent?.trim() || '';
-
-  return (
-    (sidebarName && sidebarName !== 'Name') ||
-    (sidebarUser && sidebarUser !== '@')
-  );
+    return storeSession.loaded && storeSession.loggedIn;
 }
 
 function _applyProfileAuthGuard() {
-  const loggedIn = _isStoreLoggedIn();
+    const loggedIn = _isStoreLoggedIn();
 
-  const authContent = $('profile-auth-content');
-  const required = $('profile-login-required');
+    const authContent = $('profile-auth-content');
+    const required = $('profile-login-required');
 
-  if (authContent) authContent.classList.toggle('hidden', !loggedIn);
-  if (required) required.classList.toggle('hidden', loggedIn);
+    if (authContent) authContent.classList.toggle('hidden', !loggedIn);
+    if (required) required.classList.toggle('hidden', loggedIn);
 }
 
-async function openProfileModal() {
-  openModal('profile-modal');
-  _applyProfileAuthGuard();
-
-  if (!localStorage.getItem('store_email')) {
-    await fetchAndApplyProfile();
-  }
-
-  if (!_isStoreLoggedIn()) return;
-
-  const remembered = localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview';
-  switchProfileTab(remembered);
-
-  if (!_profileLoaded) {
-    _profileLoaded = true;
-    await fetchAndApplyProfile();
-  } else {
-    _applyLocalProfile();
+async function openProfileModal(targetTab = null) {
+    openModal('profile-modal');
+    const loggedIn = await ensureStoreSessionLoaded();
     _applyProfileAuthGuard();
-  }
+    if (!loggedIn) return;
+
+    const allowed = ['overview', 'edit', 'security', 'history', 'support'];
+    const remembered = localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview';
+    const nextTab = allowed.includes(targetTab) ? targetTab : remembered;
+    _profileLoaded = true;
+    switchProfileTab(nextTab);
 }
 
 function switchProfileTab(tab) {
-  if (!_isStoreLoggedIn()) return;
+    if (!_isStoreLoggedIn()) return;
 
-  ['overview', 'edit', 'security', 'history', 'support'].forEach(t => {
-    const panel = $('ptab-' + t);
-    const btn = $('ptab-btn-' + t);
+    ['overview', 'edit', 'security', 'history', 'support'].forEach(t => {
+        const panel = $('ptab-' + t);
+        const btn = $('ptab-btn-' + t);
 
-    if (panel) panel.classList.add('hidden');
+        if (panel) panel.classList.add('hidden');
 
-    if (btn) {
-      btn.classList.remove('active');
-      btn.classList.add('inactive');
+        if (btn) {
+            btn.classList.remove('active');
+            btn.classList.add('inactive');
+        }
+    });
+
+    $('ptab-' + tab)?.classList.remove('hidden');
+
+    const activeBtn = $('ptab-btn-' + tab);
+    if (activeBtn) {
+        activeBtn.classList.add('active');
+        activeBtn.classList.remove('inactive');
     }
-  });
 
-  $('ptab-' + tab)?.classList.remove('hidden');
+    localStorage.setItem(STORE_PROFILE_TAB_KEY, tab);
 
-  const activeBtn = $('ptab-btn-' + tab);
-  if (activeBtn) {
-    activeBtn.classList.add('active');
-    activeBtn.classList.remove('inactive');
-  }
+    if (tab === 'overview') {
+        history.replaceState(null, '', location.pathname + location.search);
+    } else {
+        history.replaceState(null, '', `#${tab}`);
+    }
 
-  localStorage.setItem(STORE_PROFILE_TAB_KEY, tab);
+    if (tab === 'history' && !ordersLoaded) {
+        fetchMyOrders();
+        fetchWalletHistory();
+    }
 
-  if (tab === 'overview') {
-    history.replaceState(null, '', location.pathname + location.search);
-  } else {
-    history.replaceState(null, '', `#${tab}`);
-  }
-
-  if (tab === 'history' && !ordersLoaded) {
-    fetchMyOrders();
-    fetchWalletHistory();
-  }
-
-  if (tab === 'support' && !_ticketsLoaded) {
-    loadMyTickets();
-  }
-}
-
-function _applyLocalProfile() {
-  _fillProfileUI({
-    name: localStorage.getItem('store_name'),
-    email: localStorage.getItem('store_email'),
-    username: localStorage.getItem('store_username'),
-    user_id: localStorage.getItem('store_user_id'),
-    avatar: localStorage.getItem('store_avatar'),
-    balance_egp: localStorage.getItem('bal_egp'),
-    balance_usd: localStorage.getItem('bal_usd'),
-  });
+    if (tab === 'support' && !_ticketsLoaded) {
+        loadMyTickets();
+    }
 }
 
 function _fillProfileUI(d) {
-  setText('prof-name', d.name);
-  setText('prof-email', d.email);
-  setText('prof-username', d.username ? '@' + d.username : '—');
-  setText('prof-user-id', d.user_id ? '#' + d.user_id : '');
-  setText('prof-bal-egp', d.balance_egp ?? '0');
-  setText('prof-bal-usd', d.balance_usd ?? '0');
-  setText('prof-joined', d.created_at ?? '');
+    const profile = normalizeStoreProfile(d || {});
+    setText('prof-name', profile.name);
+    setText('prof-email', profile.email);
+    setText('prof-username', profile.username ? '@' + profile.username : '�');
+    setText('prof-user-id', profile.user_id ? '#' + profile.user_id : '');
+    setText('prof-bal-egp', profile.balance_egp ?? '0');
+    setText('prof-bal-usd', profile.balance_usd ?? '0');
+    setText('prof-joined', profile.created_at ?? '');
 
-  const ni = $('edit-name');
-  const ui = $('edit-username');
+    const ni = $('edit-name');
+    const ui = $('edit-username');
 
-  if (ni) ni.value = d.name ?? '';
-  if (ui) ui.value = d.username ?? '';
+    if (ni) ni.value = profile.name ?? '';
+    if (ui) ui.value = profile.username ?? '';
 
-  _applyAvatar(d.avatar || '');
+    _applyAvatar(profile.avatar || '');
 }
 
-async function fetchAndApplyProfile() {
-  try {
-    const res = await fetch('/api/store/me', {
-      method: 'GET',
-      cache: 'no-store',
-      credentials: 'same-origin',
-    });
-
-    const d = await res.json();
-
-    _serverAuthKnown = true;
-    _serverLoggedIn = !!d.success;
-
-    if (!d.success) {
-      _clearAuthLocalState?.();
-      _clearAuthLocals?.();
-      _applyGuestUI?.();
-      return false;
+async function fetchAndApplyProfile(forceRefresh = false) {
+    if (!forceRefresh && storeSession.loaded && storeSession.profile) {
+        updateUI(storeSession.profile);
+        _fillProfileUI(storeSession.profile);
+        _applyProfileAuthGuard();
+        return true;
     }
 
-    _saveLocals(d);
-    updateUI(d.name, d.balance_egp, d.balance_usd);
-    _fillProfileUI(d);
-    return true;
-  } catch {
-    return _isStoreLoggedIn();
-  } finally {
-    _applyProfileAuthGuard();
-  }
+    try {
+        const res = await fetch('/api/store/me', {
+            method: 'GET',
+            cache: 'no-store',
+            credentials: 'same-origin',
+        });
+
+        const d = await res.json();
+        if (!d.success) {
+            setStoreSession(null);
+            clearLegacyAuthCache();
+            _applyGuestUI();
+            _resetProfileUI();
+            return false;
+        }
+
+        setStoreSession(d);
+        clearLegacyAuthCache();
+        updateUI(storeSession.profile);
+        _fillProfileUI(storeSession.profile);
+        return true;
+    } catch {
+        if (!storeSession.loaded) {
+            setStoreSession(null);
+            _applyGuestUI();
+            _resetProfileUI();
+        }
+        return storeSession.loggedIn;
+    } finally {
+        _applyProfileAuthGuard();
+    }
 }
 function triggerAvatarUpload() { $('avatar-file-input')?.click(); }
 
@@ -765,7 +1062,7 @@ async function handleAvatarChange(input) {
         const fd = new FormData(); fd.append('avatar_b64', b64);
         try {
             const d = await (await fetch('/api/store/upload-avatar', { method: 'POST', body: fd })).json();
-            if (d.success) { localStorage.setItem('store_avatar', b64); Core.showToast('Avatar updated!'); }
+            if (d.success) { mergeStoreProfile({ avatar: b64 }); updateUI(storeSession.profile); _fillProfileUI(storeSession.profile); Core.showToast('Avatar updated!'); }
             else Core.showToast(d.msg, 'error');
         } catch { Core.showToast('Upload failed!', 'error'); }
     };
@@ -782,12 +1079,9 @@ async function doUpdateProfile(e) {
     try {
         const d = await (await fetch('/api/store/update-profile', { method: 'POST', body: fd })).json();
         if (d.success) {
-            localStorage.setItem('store_name',     d.name);
-            localStorage.setItem('store_username', d.username);
-            setText('sidebar-ui-name',     d.name);
-            setText('sidebar-ui-username', '@' + d.username);
-            setText('prof-name',     d.name);
-            setText('prof-username', '@' + d.username);
+            mergeStoreProfile({ name: d.name, username: d.username });
+            updateUI(storeSession.profile);
+            _fillProfileUI(storeSession.profile);
             _setFormStatus('edit-status', d.msg, false);
         } else _setFormStatus('edit-status', d.msg, true);
     } catch { _setFormStatus('edit-status', 'Error!', true); }
@@ -835,8 +1129,9 @@ async function doChangeEmailVerify(e) {
     try {
         const d = await (await fetch('/api/store/change-email-verify', { method: 'POST', body: fd })).json();
         if (d.success) {
-            localStorage.setItem('store_email', d.new_email);
-            setText('prof-email', d.new_email);
+            mergeStoreProfile({ email: d.new_email });
+            updateUI(storeSession.profile);
+            _fillProfileUI(storeSession.profile);
             _setFormStatus('sec-status', d.msg, false);
             $('email-change-form').reset();
             $('email-otp-step')?.classList.add('hidden');
@@ -847,37 +1142,80 @@ async function doChangeEmailVerify(e) {
 }
 
 function _setFormStatus(id, msg, isError) {
-    const el = $(id);
-    if (!el) return;
-    el.innerHTML = isError
-        ? `<span class="text-red-500"><i class="fas fa-times-circle mr-1"></i>${msg}</span>`
-        : `<span class="text-szgreen"><i class="fas fa-check-circle mr-1"></i>${msg}</span>`;
+    setInlineStatus($(id), msg, {
+        iconClass: isError ? 'fas fa-times-circle mr-1' : 'fas fa-check-circle mr-1',
+        textClass: isError ? 'text-red-500' : 'text-szgreen',
+    });
+}
+
+async function revealOrderFromHistory(orderId, btn) {
+    if (!orderId) return;
+
+    const originalLabel = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    }
+
+    try {
+        const d = await revealOrderCode(orderId);
+        if (d.success) {
+            ordersLoaded = false;
+            showPurchaseSuccess(d.code, false);
+            await fetchMyOrders();
+        } else {
+            Core.showToast(d.msg || 'Unable to reveal this code.', 'error');
+            if (d.force_logout) logout();
+            ordersLoaded = false;
+            await fetchMyOrders();
+        }
+    } catch {
+        Core.showToast('Unable to reveal this code right now.', 'error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalLabel;
+        }
+    }
 }
 
 async function fetchMyOrders() {
     const loader = $('orders-loading'), tbody = $('orders-table-body');
     if (loader) loader.classList.remove('hidden');
-    if (tbody)  tbody.innerHTML = '';
+    if (tbody) tbody.innerHTML = '';
     try {
-        const d = await (await fetch('/api/store/my-orders')).json();
+        const d = await (await fetch('/api/store/my-orders', {
+            cache: 'no-store',
+            credentials: 'same-origin',
+        })).json();
         if (loader) loader.classList.add('hidden');
+        if (d.force_logout) {
+            logout();
+            return;
+        }
         if (d.success && d.orders.length > 0) {
             tbody.innerHTML = d.orders.map(o => {
                 const pc = o.currency === 'USD' ? 'text-szcyan' : 'text-yellow-500';
-                const sc = String(o.code).replace(/'/g, "\\'");
+                const orderId = String(o.order_id || '');
+                const codeMasked = escapeHtml(o.code_masked || 'Hidden');
+                const actionHtml = o.can_reveal
+                    ? `<button onclick="revealOrderFromHistory('${orderId}', this)" class="bg-gray-900 text-szgreen border border-gray-700 px-3 py-1 rounded text-xs font-mono hover:bg-szgreen hover:text-black transition">Reveal Once</button>`
+                    : '<span class="text-[10px] uppercase tracking-wide text-gray-500 font-bold">Revealed</span>';
                 return `<tr class="hover:bg-[#111] transition">
-                    <td class="px-4 py-3 font-mono text-szcyan">#${o.order_id}</td>
-                    <td class="px-4 py-3 text-xs text-gray-500">${o.date}</td>
-                    <td class="px-4 py-3 font-bold text-white">${o.category}</td>
-                    <td class="px-4 py-3 font-black ${pc}">${o.price} <span class="text-[10px] text-gray-500">${o.currency}</span></td>
-                    <td class="px-4 py-3"><button onclick="Core.copy('${sc}')" class="bg-gray-900 text-szgreen border border-gray-700 px-3 py-1 rounded text-xs font-mono hover:bg-szgreen hover:text-black transition">Copy</button></td>
+                    <td class="px-4 py-3 font-mono text-szcyan">#${escapeHtml(orderId)}</td>
+                    <td class="px-4 py-3 text-xs text-gray-500">${escapeHtml(o.date)}</td>
+                    <td class="px-4 py-3 font-bold text-white">${escapeHtml(o.category)}</td>
+                    <td class="px-4 py-3 font-black ${pc}">${escapeHtml(String(o.price))} <span class="text-[10px] text-gray-500">${escapeHtml(o.currency)}</span></td>
+                    <td class="px-4 py-3"><div class="flex flex-wrap items-center gap-2"><span class="font-mono text-szgreen break-all">${codeMasked}</span>${actionHtml}</div></td>
                 </tr>`;
             }).join('');
             ordersLoaded = true;
         } else if (tbody) {
             tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500 font-bold">No purchases found.</td></tr>';
         }
-    } catch { if (loader) loader.innerHTML = '<span class="text-red-500">Error loading orders.</span>'; }
+    } catch {
+        if (loader) loader.innerHTML = '<span class="text-red-500">Error loading orders.</span>';
+    }
 }
 
 
@@ -913,25 +1251,409 @@ async function fetchWalletHistory() {
 }
 
 // ============================================================
-// Support Tickets — Customer Side (unchanged from v3.0)
+// Support Tickets � Customer Side (transport + sanitized rendering)
 // ============================================================
 let _activeConvoTicketId = '';
-let _ticketsLoaded       = false;
+let _ticketsLoaded = false;
+let _storeChatSocket = null;
+let _storeChatJoinedThread = '';
+let _storeChatReconnectTimer = null;
+let _storeChatConnected = false;
+let _activeCustomerPresence = null;
 
-async function submitTicket() {
-    const subject  = $('ticket-subject')?.value.trim();
-    const message  = $('ticket-message')?.value.trim();
-    const statusEl = $('ticket-submit-status');
+function clearChildren(node) {
+    if (!node) return;
+    while (node.firstChild) node.removeChild(node.firstChild);
+}
 
-    if (!subject || !message) {
-        if (statusEl) statusEl.innerHTML = '<span class="text-red-500">Please fill in both fields.</span>';
+function appendTextNode(parent, tag, className, text) {
+    const el = document.createElement(tag);
+    if (className) el.className = className;
+    el.textContent = text ?? '';
+    parent?.appendChild(el);
+    return el;
+}
+
+function appendIconText(parent, iconClass, text, className = '') {
+    const wrap = document.createElement('span');
+    if (className) wrap.className = className;
+    if (iconClass) {
+        const icon = document.createElement('i');
+        icon.className = iconClass;
+        wrap.appendChild(icon);
+        wrap.appendChild(document.createTextNode(' '));
+    }
+    wrap.appendChild(document.createTextNode(text ?? ''));
+    parent?.appendChild(wrap);
+    return wrap;
+}
+
+function setTicketStatusMessage(el, msg = '', type = 'neutral') {
+    if (!el) return;
+    clearChildren(el);
+    if (!msg) return;
+
+    const cls = type === 'error'
+        ? 'text-red-500'
+        : type === 'success'
+            ? 'text-szgreen'
+            : 'text-gray-400';
+    const iconClass = type === 'error'
+        ? 'fas fa-times-circle mr-1'
+        : type === 'success'
+            ? 'fas fa-check-circle mr-1'
+            : 'fas fa-spinner fa-spin mr-1';
+
+    const span = document.createElement('span');
+    span.className = cls;
+    const icon = document.createElement('i');
+    icon.className = iconClass;
+    span.appendChild(icon);
+    span.appendChild(document.createTextNode(msg));
+    el.appendChild(span);
+}
+
+function renderCustomerLiveStatus() {
+    const host = $('convo-live-status');
+    if (!host) return;
+
+    if (!_activeConvoTicketId) {
+        clearChildren(host);
         return;
     }
 
-    const btn  = document.querySelector('[onclick="submitTicket()"]');
+    let msg = 'Connecting to support...';
+    let textClass = 'text-gray-500';
+    let iconClass = 'fas fa-circle-notch fa-spin mr-1';
+
+    if (_storeChatConnected) {
+        if (_activeCustomerPresence?.admin_online) {
+            msg = 'Support is online';
+            textClass = 'text-szgreen';
+            iconClass = 'fas fa-circle mr-1';
+        } else {
+            msg = 'Support replies will appear here when a merchant joins';
+            iconClass = 'far fa-clock mr-1';
+        }
+    }
+
+    setInlineStatus(host, msg, { iconClass, textClass });
+}
+
+function customerTicketStatusClasses(status) {
+    return {
+        open: 'text-green-400 border-green-900/40 bg-green-900/10',
+        in_progress: 'text-yellow-400 border-yellow-900/40 bg-yellow-900/10',
+        closed: 'text-red-400 border-red-900/40 bg-red-900/10',
+    }[status] || 'text-green-400 border-green-900/40 bg-green-900/10';
+}
+
+function buildCustomerStatusBadge(status) {
+    const badge = document.createElement('span');
+    badge.className = `text-[10px] font-bold border px-2 py-0.5 rounded shrink-0 ${customerTicketStatusClasses(status)}`;
+    badge.textContent = String(status || 'open').replace('_', ' ');
+    return badge;
+}
+
+function buildCustomerTicketListItem(ticket) {
+    const item = document.createElement('div');
+    item.className = 'cursor-pointer bg-black border border-gray-800 rounded-xl p-3 hover:border-szcyan/50 transition group';
+    item.addEventListener('click', () => openTicketConvo(ticket.ticket_id));
+
+    const top = document.createElement('div');
+    top.className = 'flex items-start justify-between gap-2 mb-1';
+    item.appendChild(top);
+
+    appendTextNode(top, 'span', 'text-white font-bold text-xs leading-tight flex-1 group-hover:text-szcyan transition', ticket.subject || 'Untitled Ticket');
+    top.appendChild(buildCustomerStatusBadge(ticket.status));
+
+    if (ticket.last_message_preview) {
+        appendTextNode(item, 'p', 'text-[10px] text-gray-600 mb-1 truncate', ticket.last_message_preview);
+    }
+
+    const meta = document.createElement('div');
+    meta.className = 'flex items-center justify-between text-[10px] text-gray-600 gap-2';
+    item.appendChild(meta);
+
+    appendTextNode(meta, 'span', 'font-mono', ticket.ticket_id || '');
+    appendIconText(meta, 'fas fa-comments mr-1', `${Number(ticket.message_count || 0)} msg${Number(ticket.message_count || 0) !== 1 ? 's' : ''}`);
+    appendTextNode(meta, 'span', '', ticket.created_at || '');
+
+    return item;
+}
+
+function buildCustomerMessageNode(message) {
+    const isAdmin = message.sender === 'admin';
+    const wrap = document.createElement('div');
+    wrap.className = `${isAdmin ? 'bg-szgreen/10 border-szgreen/20 ml-4' : 'bg-szcyan/10 border-szcyan/20 mr-4'} border rounded-xl p-3`;
+    wrap.dataset.messageId = message.message_id || '';
+
+    const header = document.createElement('div');
+    header.className = 'flex items-center justify-between gap-3 mb-1';
+    wrap.appendChild(header);
+
+    const name = document.createElement('span');
+    name.className = `text-xs font-black ${isAdmin ? 'text-szgreen' : 'text-szcyan'}`;
+    name.textContent = message.name || (isAdmin ? 'Support Team' : 'Customer');
+    if (isAdmin) {
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-shield-alt ml-1 text-[10px]';
+        name.appendChild(icon);
+    }
+    header.appendChild(name);
+    appendTextNode(header, 'span', 'text-[10px] text-gray-600 shrink-0', message.time || '');
+
+    const body = document.createElement('p');
+    body.className = 'text-sm text-gray-200 whitespace-pre-wrap leading-relaxed';
+    body.textContent = message.message || '';
+    wrap.appendChild(body);
+
+    return wrap;
+}
+
+function renderCustomerTicketList(tickets) {
+    const list = $('my-tickets-list');
+    if (!list) return;
+    clearChildren(list);
+
+    if (!tickets.length) {
+        appendTextNode(list, 'p', 'text-center text-gray-600 text-xs font-bold py-4', 'No tickets found. Submit your first ticket above.');
+        return;
+    }
+
+    tickets.forEach(ticket => list.appendChild(buildCustomerTicketListItem(ticket)));
+}
+
+function renderCustomerConversation(thread, messages) {
+    if ($('convo-subject')) $('convo-subject').innerText = thread.subject || '';
+
+    const badgeHost = $('convo-status-badge');
+    if (badgeHost) {
+        clearChildren(badgeHost);
+        badgeHost.appendChild(buildCustomerStatusBadge(thread.status));
+    }
+
+    const replySection = $('convo-reply-section');
+    if (replySection) replySection.style.display = thread.status === 'closed' ? 'none' : '';
+    renderCustomerLiveStatus();
+
+    const msgContainer = $('convo-messages');
+    if (!msgContainer) return;
+    clearChildren(msgContainer);
+
+    if (!messages.length) {
+        appendTextNode(msgContainer, 'p', 'text-center text-gray-600 text-xs py-6', 'No messages yet.');
+        return;
+    }
+
+    messages.forEach(message => msgContainer.appendChild(buildCustomerMessageNode(message)));
+    msgContainer.scrollTop = msgContainer.scrollHeight;
+}
+
+function appendCustomerIncomingMessage(message) {
+    const msgContainer = $('convo-messages');
+    if (!msgContainer) return;
+    const duplicate = Array.from(msgContainer.children).some(node => node.dataset?.messageId === message.message_id);
+    if (duplicate) return;
+    msgContainer.appendChild(buildCustomerMessageNode(message));
+    msgContainer.scrollTop = msgContainer.scrollHeight;
+}
+
+function storeChatSocketUrl(role = 'customer') {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    return `${proto}://${location.host}/ws/store-chat?role=${encodeURIComponent(role)}`;
+}
+
+function sendStoreChatAction(payload) {
+    if (!_storeChatSocket || _storeChatSocket.readyState !== WebSocket.OPEN) return false;
+    _storeChatSocket.send(JSON.stringify(payload));
+    return true;
+}
+
+function joinActiveCustomerThread() {
+    if (!_activeConvoTicketId || _storeChatSocket?.readyState !== WebSocket.OPEN) return;
+    _storeChatJoinedThread = _activeConvoTicketId;
+    sendStoreChatAction({ action: 'join_room', thread_id: _activeConvoTicketId });
+}
+
+function scheduleStoreChatReconnect() {
+    if (_storeChatReconnectTimer || !_activeConvoTicketId) return;
+    _storeChatReconnectTimer = window.setTimeout(() => {
+        _storeChatReconnectTimer = null;
+        ensureStoreChatSocket();
+    }, 1500);
+}
+
+function applyCustomerThreadStatus(thread) {
+    const badgeHost = $('convo-status-badge');
+    if (badgeHost) {
+        clearChildren(badgeHost);
+        badgeHost.appendChild(buildCustomerStatusBadge(thread.status));
+    }
+    const replySection = $('convo-reply-section');
+    if (replySection) replySection.style.display = thread.status === 'closed' ? 'none' : '';
+    renderCustomerLiveStatus();
+}
+
+function handleStoreChatSocketMessage(event) {
+    let payload = null;
+    try {
+        payload = JSON.parse(event.data);
+    } catch {
+        return;
+    }
+
+    if (payload.event === 'system:connected') {
+        _storeChatConnected = true;
+        renderCustomerLiveStatus();
+        joinActiveCustomerThread();
+        return;
+    }
+
+    if (payload.event === 'system:joined') {
+        if (payload.thread) applyCustomerThreadStatus(payload.thread);
+        if (payload.thread_id === _activeConvoTicketId) {
+            sendStoreChatAction({ action: 'mark_read', thread_id: _activeConvoTicketId });
+        }
+        return;
+    }
+
+    if (payload.event === 'message:new') {
+        if (payload.thread_id === _activeConvoTicketId && payload.message) {
+            appendCustomerIncomingMessage(payload.message);
+            if (payload.thread) applyCustomerThreadStatus(payload.thread);
+            if (payload.message.sender !== 'customer') {
+                sendStoreChatAction({ action: 'mark_read', thread_id: payload.thread_id });
+            }
+        }
+        loadMyTickets();
+        return;
+    }
+
+    if (payload.event === 'thread:status_changed') {
+        if (payload.thread_id === _activeConvoTicketId && payload.thread) {
+            applyCustomerThreadStatus(payload.thread);
+        }
+        loadMyTickets();
+        return;
+    }
+
+    if (payload.event === 'message:read') {
+        if (payload.thread) applyCustomerThreadStatus(payload.thread);
+        loadMyTickets();
+        return;
+    }
+
+    if (payload.event === 'presence') {
+        if (payload.thread_id === _activeConvoTicketId) {
+            _activeCustomerPresence = payload.presence || null;
+            renderCustomerLiveStatus();
+        }
+        return;
+    }
+
+    if (payload.event === 'error' && payload.msg) {
+        Core.showToast(payload.msg, 'error');
+    }
+}
+
+function ensureStoreChatSocket() {
+    if (_storeChatSocket && (_storeChatSocket.readyState === WebSocket.OPEN || _storeChatSocket.readyState === WebSocket.CONNECTING)) {
+        return;
+    }
+
+    _storeChatSocket = new WebSocket(storeChatSocketUrl('customer'));
+    _storeChatSocket.addEventListener('open', () => {
+        _storeChatConnected = true;
+        renderCustomerLiveStatus();
+        joinActiveCustomerThread();
+    });
+    _storeChatSocket.addEventListener('message', handleStoreChatSocketMessage);
+    _storeChatSocket.addEventListener('close', () => {
+        _storeChatConnected = false;
+        _storeChatJoinedThread = '';
+        renderCustomerLiveStatus();
+        scheduleStoreChatReconnect();
+    });
+}
+
+async function loadMyTickets() {
+    const list = $('my-tickets-list');
+    const loader = $('my-tickets-loading');
+    if (!list) return;
+    if (loader) loader.classList.remove('hidden');
+    clearChildren(list);
+
+    try {
+        const d = await (await fetch('/api/store/tickets/my', {
+            cache: 'no-store',
+            credentials: 'same-origin',
+        })).json();
+        if (loader) loader.classList.add('hidden');
+        if (!d.success) {
+            if (d.force_logout) logout();
+            renderCustomerTicketList([]);
+            return;
+        }
+        renderCustomerTicketList(d.tickets || []);
+        _ticketsLoaded = true;
+    } catch {
+        if (loader) loader.classList.add('hidden');
+        appendTextNode(list, 'p', 'text-center text-red-500 text-xs py-4', 'Failed to load tickets.');
+    }
+}
+
+async function openTicketConvo(ticketId) {
+    _activeConvoTicketId = ticketId;
+    _activeCustomerPresence = null;
+    renderCustomerLiveStatus();
+    $('support-new-ticket-section')?.classList.add('hidden');
+    $('support-ticket-list-section')?.classList.add('hidden');
+    const convo = $('ticket-convo-section');
+    if (convo) convo.classList.remove('hidden');
+
+    const msgContainer = $('convo-messages');
+    if (msgContainer) {
+        clearChildren(msgContainer);
+        appendTextNode(msgContainer, 'div', 'text-center text-szcyan py-6', 'Loading conversation...');
+    }
+
+    try {
+        const url = `/api/store/tickets/history?ticket_id=${encodeURIComponent(ticketId)}&page=1&limit=50`;
+        const d = await (await fetch(url, { cache: 'no-store', credentials: 'same-origin' })).json();
+        if (!d.success) {
+            Core.showToast(d.msg || 'Ticket not found.', 'error');
+            closeTicketConvo();
+            return;
+        }
+        renderCustomerConversation(d.thread || {}, d.messages || []);
+        ensureStoreChatSocket();
+        if (_storeChatSocket?.readyState === WebSocket.OPEN) {
+            joinActiveCustomerThread();
+            sendStoreChatAction({ action: 'mark_read', thread_id: ticketId });
+        }
+    } catch {
+        Core.showToast('Error loading ticket.', 'error');
+        closeTicketConvo();
+    }
+}
+async function submitTicket() {
+    const subject = $('ticket-subject')?.value.trim();
+    const message = $('ticket-message')?.value.trim();
+    const statusEl = $('ticket-submit-status');
+
+    if (!subject || !message) {
+        setTicketStatusMessage(statusEl, 'Please fill in both fields.', 'error');
+        return;
+    }
+
+    const btn = document.querySelector('[onclick="submitTicket()"]');
     const orig = btn?.innerHTML;
-    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Submitting...'; btn.disabled = true; }
-    if (statusEl) statusEl.innerHTML = '';
+    if (btn) {
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Submitting...';
+        btn.disabled = true;
+    }
+    setTicketStatusMessage(statusEl, 'Submitting...', 'pending');
 
     const fd = new FormData();
     fd.append('subject', subject);
@@ -943,196 +1665,98 @@ async function submitTicket() {
             Core.showToast(d.msg, 'success');
             if ($('ticket-subject')) $('ticket-subject').value = '';
             if ($('ticket-message')) $('ticket-message').value = '';
-            if (statusEl) statusEl.innerHTML = `<span class="text-szgreen"><i class="fas fa-check-circle mr-1"></i>${d.msg}</span>`;
+            setTicketStatusMessage(statusEl, d.msg, 'success');
             _ticketsLoaded = false;
+            ensureStoreChatSocket();
             await loadMyTickets();
         } else {
-            if (statusEl) statusEl.innerHTML = `<span class="text-red-500">${escapeHtml(d.msg)}</span>`;
+            setTicketStatusMessage(statusEl, d.msg || 'Unable to submit ticket.', 'error');
             Core.showToast(d.msg, 'error');
             if (d.force_logout) logout();
         }
     } catch {
-        if (statusEl) statusEl.innerHTML = '<span class="text-red-500">Connection error!</span>';
+        setTicketStatusMessage(statusEl, 'Connection error!', 'error');
     }
-    if (btn) { btn.innerHTML = orig; btn.disabled = false; }
-}
 
-async function loadMyTickets() {
-    const list   = $('my-tickets-list');
-    const loader = $('my-tickets-loading');
-    if (!list) return;
-    if (loader) loader.classList.remove('hidden');
-    list.innerHTML = '';
-    try {
-        const d = await (await fetch('/api/store/tickets/my')).json();
-        if (loader) loader.classList.add('hidden');
-        if (!d.success || !d.tickets.length) {
-            list.innerHTML = '<p class="text-center text-gray-600 text-xs font-bold py-4">No tickets found. Submit your first ticket above.</p>';
-            return;
-        }
-        const statusColors = {
-            open:        'text-green-400 border-green-900/40 bg-green-900/10',
-            in_progress: 'text-yellow-400 border-yellow-900/40 bg-yellow-900/10',
-            closed:      'text-red-400   border-red-900/40   bg-red-900/10',
-        };
-        list.innerHTML = d.tickets.map(t => {
-            const sc       = statusColors[t.status] || statusColors.open;
-            const msgCount = (t.messages || []).length;
-            const lastMsg  = t.messages?.[t.messages.length - 1]?.message?.substring(0, 60) || '';
-            return `<div onclick="openTicketConvo('${t.ticket_id}')"
-                        class="cursor-pointer bg-black border border-gray-800 rounded-xl p-3 hover:border-szcyan/50 transition group">
-                <div class="flex items-start justify-between gap-2 mb-1">
-                    <span class="text-white font-bold text-xs leading-tight flex-1 group-hover:text-szcyan transition">${t.subject}</span>
-                    <span class="text-[10px] font-bold border px-2 py-0.5 rounded shrink-0 ${sc}">${(t.status || 'open').replace('_', ' ')}</span>
-                </div>
-                ${lastMsg ? `<p class="text-[10px] text-gray-600 mb-1 truncate">${lastMsg}${lastMsg.length >= 60 ? '...' : ''}</p>` : ''}
-                <div class="flex items-center justify-between text-[10px] text-gray-600">
-                    <span class="font-mono">${t.ticket_id}</span>
-                    <span><i class="fas fa-comments mr-1"></i>${msgCount} msg${msgCount !== 1 ? 's' : ''}</span>
-                    <span>${t.created_at}</span>
-                </div>
-            </div>`;
-        }).join('');
-        _ticketsLoaded = true;
-    } catch {
-        if (loader) loader.classList.add('hidden');
-        if (list) list.innerHTML = '<p class="text-center text-red-500 text-xs py-4">Failed to load tickets.</p>';
+    if (btn) {
+        btn.innerHTML = orig;
+        btn.disabled = false;
     }
-}
-
-async function openTicketConvo(ticketId) {
-    _activeConvoTicketId = ticketId;
-    $('support-new-ticket-section')?.classList.add('hidden');
-    $('support-ticket-list-section')?.classList.add('hidden');
-    const convo = $('ticket-convo-section');
-    if (convo) convo.classList.remove('hidden');
-    if ($('convo-messages')) $('convo-messages').innerHTML = '<div class="text-center text-szcyan py-6"><i class="fas fa-spinner fa-spin text-2xl"></i></div>';
-
-    try {
-        const d = await (await fetch('/api/store/tickets/my')).json();
-        const ticket = d.tickets?.find(t => t.ticket_id === ticketId);
-        if (!ticket) { Core.showToast('Ticket not found.', 'error'); closeTicketConvo(); return; }
-
-        if ($('convo-subject')) $('convo-subject').innerText = ticket.subject;
-
-        const statusColors = {
-            open:        'text-green-400 border-green-900/40 bg-green-900/10',
-            in_progress: 'text-yellow-400 border-yellow-900/40 bg-yellow-900/10',
-            closed:      'text-red-400   border-red-900/40   bg-red-900/10',
-        };
-        const sc     = statusColors[ticket.status] || statusColors.open;
-        const sLabel = (ticket.status || 'open').replace('_', ' ');
-        if ($('convo-status-badge')) {
-            $('convo-status-badge').innerHTML = `<span class="text-[10px] font-bold border px-2 py-0.5 rounded ${sc}">${sLabel}</span>`;
-        }
-
-        // Hide reply input if ticket is closed
-        const replySection = $('convo-reply-section');
-        if (replySection) replySection.style.display = ticket.status === 'closed' ? 'none' : '';
-
-        const msgs         = ticket.messages || [];
-        const msgContainer = $('convo-messages');
-        if (!msgs.length) {
-            msgContainer.innerHTML = '<p class="text-center text-gray-600 text-xs py-6">No messages yet.</p>';
-            return;
-        }
-        msgContainer.innerHTML = msgs.map(m => {
-            const isAdmin = m.sender === 'admin';
-            const wrapCls = isAdmin ? 'bg-szgreen/10 border-szgreen/20 ml-4' : 'bg-szcyan/10 border-szcyan/20 mr-4';
-            const nameClr = isAdmin ? 'text-szgreen' : 'text-szcyan';
-            const icon    = isAdmin ? '<i class="fas fa-shield-alt ml-1 text-[10px]"></i>' : '';
-            return `<div class="${wrapCls} border rounded-xl p-3">
-                <div class="flex items-center justify-between gap-3 mb-1">
-                    <span class="text-xs font-black ${nameClr}">${m.name}${icon}</span>
-                    <span class="text-[10px] text-gray-600 shrink-0">${m.time}</span>
-                </div>
-                <p class="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">${m.message}</p>
-            </div>`;
-        }).join('');
-        msgContainer.scrollTop = msgContainer.scrollHeight;
-    } catch { Core.showToast('Error loading ticket.', 'error'); closeTicketConvo(); }
 }
 
 function closeTicketConvo() {
+    if (_activeConvoTicketId && _storeChatSocket?.readyState === WebSocket.OPEN) {
+        sendStoreChatAction({ action: 'leave_room', thread_id: _activeConvoTicketId });
+    }
     _activeConvoTicketId = '';
+    _activeCustomerPresence = null;
+    _storeChatJoinedThread = '';
     $('ticket-convo-section')?.classList.add('hidden');
     $('support-new-ticket-section')?.classList.remove('hidden');
     $('support-ticket-list-section')?.classList.remove('hidden');
-    if ($('convo-reply-input'))  $('convo-reply-input').value  = '';
-    if ($('convo-reply-status')) $('convo-reply-status').innerHTML = '';
+    if ($('convo-reply-input')) $('convo-reply-input').value = '';
+    setTicketStatusMessage($('convo-reply-status'));
+    renderCustomerLiveStatus();
 }
 
 async function sendCustomerReply() {
     if (!_activeConvoTicketId) return;
-    const input    = $('convo-reply-input');
+    const input = $('convo-reply-input');
     const statusEl = $('convo-reply-status');
-    const msg      = input?.value.trim();
-    if (!msg) { Core.showToast('Reply cannot be empty.', 'error'); return; }
+    const msg = input?.value.trim();
+    if (!msg) {
+        Core.showToast('Reply cannot be empty.', 'error');
+        return;
+    }
 
-    if (statusEl) statusEl.innerHTML = '<span class="text-gray-400"><i class="fas fa-spinner fa-spin mr-1"></i>Sending...</span>';
+    setTicketStatusMessage(statusEl, 'Sending...', 'pending');
+    ensureStoreChatSocket();
+    if (sendStoreChatAction({ action: 'send_message', thread_id: _activeConvoTicketId, message: msg })) {
+        if (input) input.value = '';
+        setTicketStatusMessage(statusEl);
+        return;
+    }
+
     const fd = new FormData();
     fd.append('ticket_id', _activeConvoTicketId);
-    fd.append('message',   msg);
+    fd.append('message', msg);
 
     try {
         const d = await (await fetch('/api/store/tickets/reply', { method: 'POST', body: fd })).json();
         if (d.success) {
             Core.showToast(d.msg, 'success');
             if (input) input.value = '';
-            if (statusEl) statusEl.innerHTML = '';
-            await openTicketConvo(_activeConvoTicketId); // refresh messages
+            setTicketStatusMessage(statusEl);
+            await openTicketConvo(_activeConvoTicketId);
         } else {
-            if (statusEl) statusEl.innerHTML = `<span class="text-red-500">${escapeHtml(d.msg)}</span>`;
+            setTicketStatusMessage(statusEl, d.msg || 'Unable to send reply.', 'error');
             Core.showToast(d.msg, 'error');
         }
     } catch {
-        if (statusEl) statusEl.innerHTML = '<span class="text-red-500">Connection error!</span>';
+        setTicketStatusMessage(statusEl, 'Connection error!', 'error');
     }
 }
-
-// ─── DOMContentLoaded ────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-    // Apply saved theme
     const theme = localStorage.getItem('sz_theme') || 'default';
     document.documentElement.setAttribute('data-theme', theme);
 
-    // Restore cart from localStorage — must happen before updateCartUI()
     _loadCart();
     updateCartUI();
+    clearLegacyAuthCache();
+    _resetProfileUI();
+    _applyGuestUI();
 
-   // Optimistic UI restore before server confirmation
-const email = localStorage.getItem('store_email');
-const name  = localStorage.getItem('store_name');
+    const isLoggedIn = await ensureStoreSessionLoaded(true);
 
-if (email && name) {
-  updateUI(
-    name,
-    localStorage.getItem('bal_egp') || '0',
-    localStorage.getItem('bal_usd') || '0'
-  );
-  _applyAvatar(localStorage.getItem('store_avatar') || '');
-}
+    const allowed = ['overview', 'edit', 'security', 'history', 'support'];
+    const hashTab = (location.hash || '').replace('#', '').trim();
 
-const isLoggedIn = await fetchAndApplyProfile();
+    if (isLoggedIn && allowed.includes(hashTab)) {
+        await openProfileModal(hashTab);
+    }
 
-// Deep-link profile tab via hash
-const allowed = ['overview', 'edit', 'security', 'history', 'support'];
-const hashTab = (location.hash || '').replace('#', '').trim();
-const initialTab = allowed.includes(hashTab)
-  ? hashTab
-  : (localStorage.getItem(STORE_PROFILE_TAB_KEY) || 'overview');
+    _applyProfileAuthGuard();
 
-// افتح المودال لو السيرفر أكد إن المستخدم داخل
-// أو لو عندك optimistic auth من localStorage
-if ((isLoggedIn || (email && name)) && allowed.includes(initialTab)) {
-  openProfileModal();
-  switchProfileTab(initialTab);
-}
-
-// طبّق الجارد بعد ما تظبط الـ state
-_applyProfileAuthGuard();
-
-    // Scroll-to-top button
     const ms = $('main-scroll'), sb = $('scrollToTopBtn');
     if (ms && sb) {
         ms.addEventListener('scroll', () => {
@@ -1146,3 +1770,28 @@ _applyProfileAuthGuard();
         sb.onclick = () => ms.scrollTo({ top: 0, behavior: 'smooth' });
     }
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
