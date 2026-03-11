@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en" data-theme="default">
 
 <head>
@@ -509,86 +509,13 @@
             <!-- CATALOG VIEW  (shown by default)                               -->
             <!-- ═══════════════════════════════════════════════════════════════ -->
             <div id="catalog-view">
-                {% if storefront_config.hero_banners %}
-                <section class="mb-10 fade-in">
-                    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        {% for banner in storefront_config.hero_banners %}
-                        <div class="relative overflow-hidden rounded-[28px] border border-white/10 bg-black/40 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
-                            <img src="{{ banner }}" alt="Saleh Zone banner {{ loop.index }}" class="h-52 w-full object-cover opacity-80">
-                            <div class="absolute inset-0 bg-gradient-to-t from-black via-black/35 to-transparent"></div>
-                            <div class="absolute inset-x-0 bottom-0 p-5">
-                                <p class="text-[11px] font-black uppercase tracking-[0.35em] text-emerald-200/80">Saleh Zone</p>
-                                <h2 class="mt-2 text-2xl font-black text-white">Pre-orders, manual top-ups, and wallet transfers in one flow.</h2>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </section>
-                {% endif %}
-
                 <div class="text-center md:text-left mb-10 fade-in">
-                    <h1 class="text-3xl md:text-5xl font-black mb-3 text-white uppercase tracking-widest">Managed <span
-                            class="text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">Pre-orders</span>
+                    <h1 class="text-3xl md:text-5xl font-black mb-3 text-white uppercase tracking-widest">Instant <span
+                            class="text-transparent bg-clip-text bg-gradient-to-r from-szgreen to-szcyan text-gradient-animate">Delivery</span>
                     </h1>
-                    <p class="text-gray-400 max-w-2xl text-sm">Every item stays visible by web allocation, inactive products are clearly disabled, and manual fulfillment orders flow straight to the staff workspace.</p>
+                    <p class="text-gray-400 max-w-xl text-sm">Pick a category below. Codes delivered instantly after
+                        payment.</p>
                 </div>
-
-                {% if best_sellers %}
-                <section class="mb-10 rounded-[28px] border border-white/10 bg-black/35 p-5 md:p-6 fade-in">
-                    <div class="mb-5 flex items-center justify-between gap-3">
-                        <div>
-                            <p class="text-[11px] font-black uppercase tracking-[0.3em] text-yellow-300/80">Best Sellers</p>
-                            <h2 class="mt-2 text-2xl font-black text-white">Featured products from the live catalog</h2>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        {% for p in best_sellers %}
-                        <div class="rounded-3xl border {% if p.effective_is_active %}border-white/10 bg-white/5{% else %}border-red-400/15 bg-red-950/10 opacity-70{% endif %} p-5 text-left">
-                            <div class="flex items-start justify-between gap-3">
-                                <div>
-                                    <p class="text-[11px] font-black uppercase tracking-[0.25em] text-gray-500">{{ p.category_name }}</p>
-                                    <h3 class="mt-2 text-xl font-black text-white">{{ p.name }}</h3>
-                                </div>
-                                {% if not p.effective_is_active %}
-                                <span class="rounded-full border border-red-400/20 bg-red-400/10 px-2 py-1 text-[10px] font-black text-red-200">Temporarily Disabled / متوقف مؤقتاً</span>
-                                {% elif p.effective_web_available <= 0 %}
-                                <span class="rounded-full border border-red-400/20 bg-red-400/10 px-2 py-1 text-[10px] font-black text-red-200">OUT OF STOCK</span>
-                                {% else %}
-                                <span class="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-1 text-[10px] font-black text-emerald-200">{{ p.effective_web_available }} Web Items</span>
-                                {% endif %}
-                            </div>
-                            <p class="mt-3 text-sm text-gray-400">{{ p.effective_description or 'No description yet.' }}</p>
-                            <p class="mt-2 text-xs font-bold text-cyan-200">{{ p.effective_estimated_completion_time or 'Estimated completion time will appear at checkout.' }}</p>
-                            <div class="mt-4 flex items-center justify-between gap-3">
-                                <button onclick="showCategory('{{ p.category_id }}')" class="rounded-2xl border border-white/10 bg-black/40 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-gray-200 transition hover:border-white/20">Open Category</button>
-                                <button onclick='buyProduct({{ p.stock_key | tojson | safe }}, {{ p.prices | tojson | safe }}, {{ p.name | tojson | safe }}, {{ p.image | tojson | safe }}, {{ p.category_icon | tojson | safe }})' {% if not p.effective_is_active %}disabled{% endif %} class="rounded-2xl px-4 py-2 text-xs font-black uppercase tracking-[0.2em] transition {% if p.effective_is_active %}bg-gradient-to-r from-szgreen to-szcyan text-black btn-glow{% else %}cursor-not-allowed border border-white/10 bg-white/5 text-gray-500{% endif %}">طلب مسبق</button>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </section>
-                {% endif %}
-
-                {% if storefront_config.how_it_works and storefront_config.how_it_works.steps %}
-                <section class="mb-10 rounded-[28px] border border-white/10 bg-black/35 p-5 md:p-6 fade-in">
-                    <div class="mb-5">
-                        <p class="text-[11px] font-black uppercase tracking-[0.3em] text-cyan-200/80">How It Works</p>
-                        <h2 class="mt-2 text-2xl font-black text-white">{{ storefront_config.how_it_works.title }}</h2>
-                        <p class="mt-2 max-w-2xl text-sm text-gray-400">{{ storefront_config.how_it_works.subtitle }}</p>
-                    </div>
-                    <div class="grid gap-4 md:grid-cols-3">
-                        {% for step in storefront_config.how_it_works.steps %}
-                        <div class="rounded-3xl border border-white/10 bg-white/5 p-5">
-                            <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
-                                <i class="fas {{ step.icon }}"></i>
-                            </div>
-                            <h3 class="text-lg font-black text-white">{{ step.title }}</h3>
-                            <p class="mt-2 text-sm text-gray-400">{{ step.description }}</p>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </section>
-                {% endif %}
 
                 {% if not categories %}
                 <div class="text-center text-gray-500 mt-20"><i class="fas fa-box-open text-6xl mb-4 opacity-50"></i>
@@ -600,26 +527,21 @@
                 <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                     {% for cat in categories %}
                     {% set ns = namespace(avail=0) %}
-                    {% for p in cat.products %}{% set ns.avail = ns.avail + p.effective_web_available %}{% endfor %}
+                    {% for p in cat.products %}{% set ns.avail = ns.avail + stock.get(p.stock_key, 0) %}{% endfor %}
 
                     <div onclick="showCategory('{{ cat._id }}')"
-                        class="uc-card animated-card cat-card rounded-2xl p-6 flex flex-col items-center text-center cursor-pointer group relative fade-in {% if not cat.is_active %}opacity-70{% endif %}">
+                        class="uc-card animated-card cat-card rounded-2xl p-6 flex flex-col items-center text-center cursor-pointer group relative fade-in">
 
                         <!-- Stock badge — top left -->
-                        {% if not cat.is_active %}
-                        <div
-                            class="absolute top-3 left-3 bg-red-900/40 text-red-200 text-[9px] font-bold px-2 py-0.5 rounded-full border border-red-900/30">
-                            Temporarily Disabled / متوقف مؤقتاً
-                        </div>
-                        {% elif ns.avail > 0 %}
+                        {% if ns.avail > 0 %}
                         <div
                             class="absolute top-3 left-3 bg-szgreen/20 text-szgreen text-[9px] font-bold px-2 py-0.5 rounded-full border border-szgreen/30">
-                            <i class="fas fa-layer-group mr-0.5"></i>{{ ns.avail }} web items
+                            <i class="fas fa-bolt mr-0.5"></i>{{ ns.avail }} in stock
                         </div>
                         {% else %}
                         <div
                             class="absolute top-3 left-3 bg-red-900/40 text-red-400 text-[9px] font-bold px-2 py-0.5 rounded-full border border-red-900/30">
-                            OUT OF STOCK
+                            EMPTY
                         </div>
                         {% endif %}
 
@@ -654,12 +576,10 @@
                         </h3>
 
                         <!-- Product count -->
-                        <p class="text-[10px] text-gray-600 mb-2">
+                        <p class="text-[10px] text-gray-600 mb-4">
                             <i class="fas fa-cubes mr-1 text-gray-700"></i>{{ cat.products | length }} product{{ 's' if
                             (cat.products | length) != 1 else '' }}
                         </p>
-                        <p class="text-xs text-gray-400 mb-1">{{ cat.description or 'No description yet.' }}</p>
-                        <p class="text-[10px] font-bold text-cyan-200 mb-4">{{ cat.estimated_completion_time or 'Completion time shown in checkout.' }}</p>
 
                         <!-- Browse CTA -->
                         <div
@@ -708,16 +628,9 @@
                         </div>
                         {% endif %}
                         <div>
-                            <div class="flex flex-wrap items-center gap-2">
-                                <h2 class="text-2xl font-black text-white">{{ cat.name }}</h2>
-                                {% if not cat.is_active %}
-                                <span class="rounded-full border border-red-400/20 bg-red-400/10 px-2 py-1 text-[10px] font-black text-red-200">Temporarily Disabled / متوقف مؤقتاً</span>
-                                {% endif %}
-                            </div>
+                            <h2 class="text-2xl font-black text-white">{{ cat.name }}</h2>
                             <p class="text-xs text-gray-500 mt-0.5">{{ cat.products | length }} product{{ 's' if
                                 (cat.products | length) != 1 else '' }}</p>
-                            <p class="mt-2 max-w-2xl text-sm text-gray-400">{{ cat.description or 'No category description yet.' }}</p>
-                            <p class="mt-2 text-xs font-bold text-cyan-200">{{ cat.estimated_completion_time or 'Completion time shown per product.' }}</p>
                         </div>
                     </div>
 
@@ -729,18 +642,14 @@
                         <div
                             class="uc-card animated-card bg-panelbg rounded-2xl p-5 md:p-6 flex flex-col items-center text-center relative">
 
-                            {% if not p.effective_is_active %}
+                            {% if stock.get(p.stock_key, 0) > 0 %}
                             <div
-                                class="absolute top-3 right-3 bg-red-900/50 text-red-200 text-[10px] font-bold px-2 py-1 rounded border border-red-900/50">
-                                Temporarily Disabled / متوقف مؤقتاً</div>
-                            {% elif p.effective_web_available <= 0 %}
+                                class="absolute top-3 right-3 bg-szgreen/20 text-szgreen text-[10px] font-bold px-2 py-1 rounded border border-szgreen/30">
+                                <i class="fas fa-bolt mr-1"></i> INSTANT</div>
+                            {% else %}
                             <div
                                 class="absolute top-3 right-3 bg-red-900/50 text-red-400 text-[10px] font-bold px-2 py-1 rounded border border-red-900/50">
                                 OUT OF STOCK</div>
-                            {% else %}
-                            <div
-                                class="absolute top-3 right-3 bg-szgreen/20 text-szgreen text-[10px] font-bold px-2 py-1 rounded border border-szgreen/30">
-                                <i class="fas fa-layer-group mr-1"></i> {{ p.effective_web_available }} WEB</div>
                             {% endif %}
 
                             {% if p.image %}
@@ -761,8 +670,6 @@
                             {% endif %}
 
                             <h3 class="text-xl md:text-2xl font-black text-white mb-1">{{ p.name }}</h3>
-                            <p class="mt-2 text-sm text-gray-400">{{ p.effective_description or 'No description yet.' }}</p>
-                            <p class="mt-2 mb-1 text-[11px] font-bold text-cyan-200">{{ p.effective_estimated_completion_time or 'Completion time shown at checkout.' }}</p>
 
                             <div class="mt-2 mb-4 bg-black w-full py-2 rounded-lg border border-gray-800">
                                 {% for cur in currencies %}
@@ -785,20 +692,34 @@
 
                             <div
                                 class="text-xs text-gray-400 mb-4 flex justify-between items-center w-full bg-gray-900/50 p-2.5 rounded-lg border border-gray-800">
-                                <span><i class="fas fa-box text-szcyan mr-1"></i> Web Allocation:</span>
+                                <span><i class="fas fa-box text-szcyan mr-1"></i> Available:</span>
                                 <span
-                                    class="font-bold {% if p.effective_web_available > 0 %}text-szgreen{% else %}text-red-500{% endif %}">
-                                    {% if p.effective_web_available > 0 %}{{ p.effective_web_available }} items{% else %}OUT OF STOCK{% endif %}
+                                    class="font-bold {% if stock.get(p.stock_key, 0) > 0 %}text-szgreen{% else %}text-red-500{% endif %}">
+                                    {{ stock.get(p.stock_key, 0) }} items
                                 </span>
                             </div>
 
-                            <button
-                                onclick='buyProduct({{ p.stock_key | tojson | safe }}, {{ (p.prices if p.prices is defined else {
-                                'EGP': p.price_egp, 'USD': p.price_usd}) | tojson | safe }}, {{ p.name | tojson | safe }}, {{ p.image | tojson | safe }}, {{ cat.icon | tojson | safe }})'
-                                {% if not p.effective_is_active %}disabled{% endif %}
-                                class="w-full font-bold py-2.5 md:py-3 rounded-xl transition text-sm md:text-base {% if p.effective_is_active %}bg-gradient-to-r from-szgreen to-szcyan text-black btn-glow hover:opacity-90{% else %}bg-gray-900 text-gray-600 cursor-not-allowed border border-gray-800{% endif %}">
-                                طلب مسبق
-                            </button>
+                            {% if stock.get(p.stock_key, 0) > 0 %}
+                            <div class="flex gap-2 w-full">
+                                <button
+                                    onclick='buyProduct({{ p.stock_key | tojson | safe }}, {{ (p.prices if p.prices is defined else {'
+                                    EGP': p.price_egp, 'USD' : p.price_usd}) | tojson | safe }}, {{ p.name | tojson |
+                                    safe }}, {{ p.image | tojson | safe }}, {{ cat.icon | tojson | safe }})'
+                                    class="flex-1 bg-gradient-to-r from-szgreen to-szcyan text-black font-bold py-2.5 md:py-3 rounded-xl hover:opacity-90 transition text-sm md:text-base btn-glow">
+                                    Buy Now
+                                </button>
+                                <button
+                                    onclick='addToCart({{ p.stock_key | tojson | safe }}, {{ (p.prices if p.prices is defined else {'
+                                    EGP': p.price_egp, 'USD' : p.price_usd}) | tojson | safe }}, {{ p.name | tojson |
+                                    safe }}, {{ p.image | tojson | safe }}, {{ cat.icon | tojson | safe }})'
+                                    class="bg-gray-800 text-szcyan border border-gray-700 font-bold py-2.5 px-4 md:py-3 md:px-5 rounded-xl hover:bg-szcyan hover:text-white transition flex items-center justify-center">
+                                    <i class="fas fa-cart-plus"></i>
+                                </button>
+                            </div>
+                            {% else %}
+                            <button disabled
+                                class="w-full bg-gray-900 text-gray-600 font-bold py-2.5 md:py-3 rounded-xl cursor-not-allowed border border-gray-800 text-sm md:text-base">UNAVAILABLE</button>
+                            {% endif %}
                         </div>
 
                         {% endfor %}
@@ -916,7 +837,7 @@
                     </dl>
                 </div>
 
-                <div class="relative overflow-x-auto border border-gray-800 rounded-xl bg-[#0a0a0a] mb-4">
+                <div class="relative overflow-x-auto border border-gray-800 rounded-xl bg-[#0a0a0a] mb-6">
                     <table class="w-full text-left text-sm text-gray-300">
                         <tbody class="divide-y divide-gray-800">
                             <tr class="hover:bg-[#111] transition">
@@ -940,42 +861,10 @@
                     </table>
                 </div>
 
-                <div class="mb-6 grid gap-4 md:grid-cols-2">
-                    <div class="rounded-2xl border border-gray-800 bg-black p-4">
-                        <p class="text-[10px] font-black uppercase tracking-[0.25em] text-gray-500 mb-2">Description</p>
-                        <p id="checkout-item-description" class="text-sm text-gray-300">Product details appear here.</p>
-                    </div>
-                    <div class="rounded-2xl border border-gray-800 bg-black p-4">
-                        <p class="text-[10px] font-black uppercase tracking-[0.25em] text-gray-500 mb-2">Estimated Completion</p>
-                        <p id="checkout-item-eta" class="text-sm font-bold text-cyan-200">Completion time appears here.</p>
-                    </div>
-                </div>
-
-                <div id="checkout-manual-fields" class="hidden mb-6 rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-4 space-y-4">
-                    <div class="flex items-center gap-3 text-sm font-black text-yellow-200">
-                        <i class="fas fa-id-card"></i>
-                        <span>This item requires manual ID fulfillment.</span>
-                    </div>
-                    <div class="grid gap-4 md:grid-cols-2">
-                        <div>
-                            <label class="text-[10px] font-black uppercase tracking-[0.25em] text-gray-500 mb-2 block">Player ID</label>
-                            <input id="checkout-player-id" type="text" class="w-full rounded-2xl border border-gray-700 bg-[#050505] px-4 py-3 text-sm text-white outline-none focus:border-yellow-400/40" placeholder="Enter player ID">
-                        </div>
-                        <div>
-                            <label class="text-[10px] font-black uppercase tracking-[0.25em] text-gray-500 mb-2 block">Player Name</label>
-                            <input id="checkout-player-name" type="text" class="w-full rounded-2xl border border-gray-700 bg-[#050505] px-4 py-3 text-sm text-white outline-none focus:border-yellow-400/40" placeholder="Enter player name">
-                        </div>
-                    </div>
-                    <div>
-                        <label class="text-[10px] font-black uppercase tracking-[0.25em] text-gray-500 mb-2 block">Schedule Delivery (Optional)</label>
-                        <input id="checkout-scheduled-time" type="datetime-local" class="w-full rounded-2xl border border-gray-700 bg-[#050505] px-4 py-3 text-sm text-white outline-none focus:border-yellow-400/40">
-                    </div>
-                </div>
-
                 <div class="bg-black border border-gray-800 p-6 rounded-xl">
                     <dl class="flex items-center justify-between gap-4 border-b border-gray-800 pb-4 mb-4">
                         <dt class="text-sm text-gray-400">Delivery Method</dt>
-                        <dd class="text-sm font-bold text-szgreen"><i class="fas fa-list-check mr-1"></i> Managed Store Fulfillment
+                        <dd class="text-sm font-bold text-szgreen"><i class="fas fa-bolt mr-1"></i> Instant Digital Code
                         </dd>
                     </dl>
                     <dl class="flex items-center justify-between gap-4 mb-6">
@@ -996,7 +885,7 @@
                             class="w-1/3 rounded-xl border border-gray-700 bg-[#111] px-5 py-3 text-sm font-bold text-gray-300 hover:bg-gray-800 hover:text-white transition">Cancel</button>
                         <button type="button" id="btn-confirm-pay" onclick="confirmPurchase()"
                             class="w-2/3 flex items-center justify-center rounded-xl bg-gradient-to-r from-szgreen to-szcyan px-5 py-3 text-sm font-black text-black uppercase tracking-wide btn-glow transition">Confirm
-                            Pre-order <i class="fas fa-arrow-right ml-2"></i></button>
+                            & Pay <i class="fas fa-arrow-right ml-2"></i></button>
                     </div>
                 </div>
             </div>
@@ -1010,14 +899,14 @@
             class="bg-panelbg border border-szgreen w-full max-w-md rounded-2xl p-8 text-center relative overflow-hidden shadow-[0_0_40px_rgba(var(--theme-primary),0.15)] fade-in">
             <div class="inline-block bg-szgreen/20 text-szgreen p-4 rounded-full mb-4"><i
                     class="fas fa-check-circle text-4xl"></i></div>
-            <h2 class="text-2xl font-bold text-white mb-2">Request Updated</h2>
-            <p class="text-xs text-gray-400 mb-6">Your latest preorder or delivery details are ready below.</p>
+            <h2 class="text-2xl font-bold text-white mb-2">Purchase Successful!</h2>
+            <p class="text-xs text-gray-400 mb-6">Amount deducted from your balance. Here is your code:</p>
             <div class="bg-[#050505] border border-gray-800 p-4 rounded-xl mb-6 relative group">
                 <p id="purchased-code" class="text-lg font-mono text-szgreen tracking-wider select-all">LOADING...</p>
             </div>
             <button onclick="copyPurchasedCode()"
                 class="w-full bg-gray-800 text-white font-bold py-3 rounded-xl mb-3 hover:bg-szcyan hover:text-black transition flex justify-center items-center gap-2 btn-glow">
-                <span>Copy Details</span> <i class="fas fa-copy"></i>
+                <span>Copy Code</span> <i class="fas fa-copy"></i>
             </button>
             <button onclick="closeModal('success-modal')"
                 class="w-full text-gray-500 font-bold py-2 hover:text-white transition">Close</button>
@@ -1377,37 +1266,20 @@
                                         <th class="px-4 py-3">Order</th>
                                         <th class="px-4 py-3">Date</th>
                                         <th class="px-4 py-3">Item</th>
-                                        <th class="px-4 py-3">State</th>
                                         <th class="px-4 py-3">Price</th>
-                                        <th class="px-4 py-3">Actions</th>
+                                        <th class="px-4 py-3">Code</th>
                                     </tr>
                                 </thead>
                                 <tbody id="orders-table-body" class="divide-y divide-gray-800 text-gray-300"></tbody>
                             </table>
                         </div>
 
-                        <div class="grid gap-4 lg:grid-cols-2 mb-4">
-                            <div class="bg-black border border-gray-800 rounded-xl p-4">
-                                <div class="flex items-center justify-between gap-3 mb-4">
-                                    <h3 class="text-sm font-black text-white"><i class="fas fa-coins text-yellow-500 mr-2"></i>Wallet Actions</h3>
-                                    <div class="flex gap-2">
-                                        <button onclick="openWalletRequestModal('deposit')" class="rounded-xl bg-gradient-to-r from-szgreen to-szcyan px-3 py-2 text-[11px] font-black uppercase tracking-[0.2em] text-black">Deposit</button>
-                                        <button onclick="openWalletRequestModal('withdrawal')" class="rounded-xl border border-yellow-500/20 bg-yellow-500/10 px-3 py-2 text-[11px] font-black uppercase tracking-[0.2em] text-yellow-200">Withdraw</button>
-                                    </div>
-                                </div>
-                                <p class="text-xs text-gray-400">Choose a payment method, create a pending transfer request, and continue with an agent in live chat.</p>
-                            </div>
-                            <div class="bg-black border border-gray-800 rounded-xl p-4">
-                                <h3 class="text-sm font-black text-white mb-3"><i class="fas fa-wallet text-yellow-500 mr-2"></i>Wallet Ledger</h3>
-                                <div id="wallet-loading" class="text-center text-szcyan py-4 font-bold hidden"><i
-                                        class="fas fa-spinner fa-spin"></i></div>
-                                <div id="wallet-history-list" class="space-y-2"></div>
-                            </div>
-                        </div>
-
                         <div class="bg-black border border-gray-800 rounded-xl p-4">
-                            <h3 class="text-sm font-black text-white mb-3"><i class="fas fa-arrows-rotate text-cyan-300 mr-2"></i>Wallet Requests</h3>
-                            <div id="wallet-requests-list" class="space-y-2"></div>
+                            <h3 class="text-sm font-black text-white mb-3"><i
+                                    class="fas fa-wallet text-yellow-500 mr-2"></i>Wallet Ledger</h3>
+                            <div id="wallet-loading" class="text-center text-szcyan py-4 font-bold hidden"><i
+                                    class="fas fa-spinner fa-spin"></i></div>
+                            <div id="wallet-history-list" class="space-y-2"></div>
                         </div>
                     </div>
 
@@ -1480,72 +1352,8 @@
                 </div>
         </div>
     </div>
-    <div id="wallet-request-modal" class="fixed inset-0 bg-black/90 z-[65] hidden items-center justify-center p-4 backdrop-blur-sm">
-        <div class="w-full max-w-3xl rounded-3xl border border-gray-800 bg-panelbg shadow-2xl">
-            <div class="flex items-center justify-between border-b border-gray-800 px-5 py-4">
-                <div>
-                    <p class="text-[10px] font-black uppercase tracking-[0.25em] text-gray-500">Digital Wallet</p>
-                    <h3 id="wallet-request-title" class="text-xl font-black text-white">Wallet Request</h3>
-                </div>
-                <button onclick="closeWalletRequestModal()" class="text-gray-500 hover:text-red-400 transition"><i class="fas fa-times text-xl"></i></button>
-            </div>
-            <div class="p-5 space-y-5">
-                <div class="grid gap-4 md:grid-cols-2">
-                    <div>
-                        <label class="mb-2 block text-[10px] font-black uppercase tracking-[0.25em] text-gray-500">Amount</label>
-                        <input id="wallet-request-amount" type="number" step="0.01" min="0" class="w-full rounded-2xl border border-gray-700 bg-[#050505] px-4 py-3 text-sm text-white outline-none focus:border-szgreen" placeholder="Enter amount">
-                    </div>
-                    <div>
-                        <label class="mb-2 block text-[10px] font-black uppercase tracking-[0.25em] text-gray-500">Currency</label>
-                        <select id="wallet-request-currency" class="w-full rounded-2xl border border-gray-700 bg-[#050505] px-4 py-3 text-sm text-white outline-none focus:border-szgreen">
-                            {% for cur in currencies %}
-                            <option value="{{ cur._id }}">{{ cur.symbol }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-                <div>
-                    <h4 class="text-sm font-black text-white mb-3">Available Payment Methods</h4>
-                    <div id="wallet-request-methods" class="grid gap-4 md:grid-cols-2"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="live-chat-modal" class="fixed inset-0 bg-black/90 z-[66] hidden items-center justify-center p-4 backdrop-blur-sm">
-        <div class="w-full max-w-3xl rounded-3xl border border-gray-800 bg-panelbg shadow-2xl overflow-hidden">
-            <div class="flex items-center justify-between border-b border-gray-800 px-5 py-4">
-                <div>
-                    <p class="text-[10px] font-black uppercase tracking-[0.25em] text-gray-500">Unified Chat</p>
-                    <h3 id="live-chat-title" class="text-xl font-black text-white">Live Chat with Agent</h3>
-                    <p id="live-chat-presence" class="mt-1 text-xs text-gray-500">Connecting...</p>
-                </div>
-                <button onclick="closeLiveChatModal()" class="text-gray-500 hover:text-red-400 transition"><i class="fas fa-times text-xl"></i></button>
-            </div>
-            <div class="p-5">
-                <div id="live-chat-messages" class="space-y-3 max-h-[26rem] overflow-y-auto pr-1"></div>
-                <div class="mt-4">
-                    <textarea id="live-chat-input" rows="3" class="w-full rounded-2xl border border-gray-700 bg-[#050505] px-4 py-3 text-sm text-white outline-none focus:border-szgreen" placeholder="Write a message to the agent..."></textarea>
-                    <div class="mt-3 flex items-center justify-between gap-3">
-                        <p id="live-chat-status" class="text-xs font-bold text-gray-500"></p>
-                        <button onclick="sendLiveChatMessage()" class="rounded-2xl bg-gradient-to-r from-szgreen to-szcyan px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-black btn-glow">Send</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        window.STORE_FRONT_BOOTSTRAP = {
-            categories: {{ categories | tojson }},
-            bestSellers: {{ best_sellers | tojson }},
-            storefrontConfig: {{ storefront_config | tojson }},
-            currencies: {{ currencies | tojson }},
-            currentUser: {{ user | tojson }}
-        };
-    </script>
     <script src="/static/js/core.js"></script>
-    <script src="/static/js/store.js?v=20260311a"></script>
+    <script src="/static/js/store.js?v=20260307"></script>
     {% endif %}
 
 </body>

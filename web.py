@@ -66,21 +66,6 @@ def clean_and_extract_tokens(raw_text):
     return valid_tokens
 
 
-def _parse_bool_form(value, default=False):
-    if value is None:
-        return default
-    normalized = str(value).strip().lower()
-    if normalized in {'1', 'true', 'yes', 'on'}:
-        return True
-    if normalized in {'0', 'false', 'no', 'off'}:
-        return False
-    return default
-
-
-def _clean_catalog_text(value) -> str:
-    return str(value or '').strip()
-
-
 async def save_upload(file: UploadFile) -> str:
     """حفظ الملف المرفوع داخل Mongo كـ data URI لتفادي ضياع الصور مع إعادة التشغيل."""
     if not file or not file.filename:
@@ -276,9 +261,6 @@ async def api_add_category(
     cat_id: str = Form(...),
     name: str = Form(...),
     icon: str = Form("fa-gamepad"),
-    description: str = Form(""),
-    estimated_completion_time: str = Form(""),
-    is_active: str = Form("true"),
     image: UploadFile = File(None),
     logo: UploadFile = File(None),
 ):
@@ -292,17 +274,10 @@ async def api_add_category(
     except ValueError as e:
         return JSONResponse({"success": False, "msg": str(e)})
     await db.store_categories.insert_one({
-        "_id": cat_id,
-        "name": name,
-        "icon": icon,
-        "description": _clean_catalog_text(description),
-        "estimated_completion_time": _clean_catalog_text(estimated_completion_time),
-        "is_active": _parse_bool_form(is_active, True),
-        "image": image_url,
-        "logo": logo_url,
-        "products": [],
+        "_id": cat_id, "name": name, "icon": icon,
+        "image": image_url, "logo": logo_url, "products": []
     })
-    await web_log("Ø¥Ù†Ø´Ø§Ø¡ ÙØ¦Ø© Ø¬Ø¯ÙŠØ¯Ø©", f"Ø§Ù„ÙØ¦Ø©: {name}")
+    await web_log("إنشاء فئة جديدة", f"الفئة: {name}")
     return JSONResponse({"success": True, "msg": "Category Added!"})
 
 @app.post("/api/catalog/category/edit")
@@ -311,20 +286,11 @@ async def api_edit_category(
     cat_id: str = Form(...),
     name: str = Form(...),
     icon: str = Form(...),
-    description: str = Form(""),
-    estimated_completion_time: str = Form(""),
-    is_active: str = Form("true"),
     image: UploadFile = File(None),
     logo: UploadFile = File(None),
 ):
     if not check_auth(request): return JSONResponse({"success": False})
-    update_data = {
-        "name": name,
-        "icon": icon,
-        "description": _clean_catalog_text(description),
-        "estimated_completion_time": _clean_catalog_text(estimated_completion_time),
-        "is_active": _parse_bool_form(is_active, True),
-    }
+    update_data = {"name": name, "icon": icon}
     try:
         if image and image.filename:
             update_data["image"] = await save_upload(image)
@@ -333,7 +299,7 @@ async def api_edit_category(
     except ValueError as e:
         return JSONResponse({"success": False, "msg": str(e)})
     await db.store_categories.update_one({"_id": cat_id}, {"$set": update_data})
-    await web_log("ØªØ¹Ø¯ÙŠÙ„ ÙØ¦Ø©", f"{cat_id} â†’ {name}")
+    await web_log("تعديل فئة", f"{cat_id} → {name}")
     return JSONResponse({"success": True, "msg": "Category Updated!"})
 
 @app.post("/api/catalog/category/delete")
@@ -355,6 +321,7 @@ async def api_add_product(request: Request, image: UploadFile = File(None)):
     except ValueError as e:
         return JSONResponse({"success": False, "msg": str(e)})
 
+    # بناء كائن الأسعار ديناميكياً لدعم أي عملة
     prices = {}
     for key, val in form.items():
         if key.startswith("price_"):
@@ -366,18 +333,14 @@ async def api_add_product(request: Request, image: UploadFile = File(None)):
 
     product = {
         "stock_key": stock_key,
-        "name": name,
-        "image": image_url,
-        "description": _clean_catalog_text(form.get("description")),
-        "estimated_completion_time": _clean_catalog_text(form.get("estimated_completion_time")),
-        "is_active": _parse_bool_form(form.get("is_active"), True),
-        "requires_id_fulfillment": _parse_bool_form(form.get("requires_id_fulfillment"), False),
-        "prices": prices,
+        "name":      name,
+        "image":     image_url,
+        "prices":    prices,
         "price_egp": prices.get("EGP", 0),
         "price_usd": prices.get("USD", 0),
     }
     await db.store_categories.update_one({"_id": cat_id}, {"$push": {"products": product}})
-    await web_log("Ø¥Ø¶Ø§ÙØ© Ù…Ù†ØªØ¬", f"{name} ÙÙŠ {cat_id}")
+    await web_log("إضافة منتج", f"{name} في {cat_id}")
     return JSONResponse({"success": True, "msg": "Product Added!"})
 
 @app.post("/api/catalog/product/edit")
@@ -388,13 +351,7 @@ async def api_edit_product(request: Request, image: UploadFile = File(None)):
     stock_key = form.get("stock_key")
     name      = form.get("name")
 
-    update_fields = {
-        "products.$.name": name,
-        "products.$.description": _clean_catalog_text(form.get("description")),
-        "products.$.estimated_completion_time": _clean_catalog_text(form.get("estimated_completion_time")),
-        "products.$.is_active": _parse_bool_form(form.get("is_active"), True),
-        "products.$.requires_id_fulfillment": _parse_bool_form(form.get("requires_id_fulfillment"), False),
-    }
+    update_fields = {"products.$.name": name}
     try:
         if image and image.filename:
             update_fields["products.$.image"] = await save_upload(image)

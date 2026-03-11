@@ -1,4 +1,4 @@
-from datetime import datetime
+﻿from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import MONGO_URI, ADMIN_ID
 
@@ -28,13 +28,12 @@ async def log_important_action(user_id, user_name, action, details=""):
     })
 
 
-async def get_next_order_id(session=None):
+async def get_next_order_id():
     stat = await db.stats.find_one_and_update(
         {"_id": "global_stats"},
         {"$inc": {"last_order_id": 1}},
         upsert=True,
-        return_document=ReturnDocument.AFTER,
-        session=session,
+        return_document=True,
     )
     return stat["last_order_id"]
 
