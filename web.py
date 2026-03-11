@@ -13,7 +13,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from database import db, get_next_order_id
 from config import SECRET_TOKEN, ADMIN_ID
 
-from store_routes import router as store_router
+from store_routers import router as store_router
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):

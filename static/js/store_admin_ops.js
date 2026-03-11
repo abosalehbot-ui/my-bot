@@ -80,6 +80,25 @@ async function postJSON(url, payload) {
   }));
 }
 
+async function uploadStoreImage(file, statusEl) {
+  if (!file) return null;
+  if (statusEl) statusEl.textContent = 'Uploading...';
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    const data = await parseRes(await fetch('/api/store/admin/upload-image', {
+      method: 'POST', credentials: 'same-origin', body: form
+    }));
+    if (statusEl) statusEl.textContent = '';
+    showToast('Image uploaded successfully!', 'success');
+    return data.url || null;
+  } catch (error) {
+    if (statusEl) statusEl.textContent = error.message || 'Upload failed';
+    showToast(error.message || 'Upload failed', 'error');
+    return null;
+  }
+}
+
 function statusChip(value) {
   const label = labelize(value);
   return `<span class="status-chip ${toneClass(value)} ${esc(String(value || '').toLowerCase())}">${esc(label)}</span>`;
@@ -748,7 +767,7 @@ function chatUrl(readOnly) {
 
 function closeChat() {
   if (STATE.chat.socket) {
-    try { STATE.chat.socket.close(); } catch (_) {}
+    try { STATE.chat.socket.close(); } catch (_) { }
   }
   STATE.chat = { threadId: '', readOnly: false, socket: null, connected: false, messages: [], presence: null };
 }
@@ -957,6 +976,31 @@ function bindGlobalActions() {
       showToast(error.message, 'error');
     }
   });
+  /* ── Image upload wiring ─────────────────────────── */
+  $('hero-banner-file')?.addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const url = await uploadStoreImage(file, $('hero-banner-upload-status'));
+    if (url) {
+      const textarea = $('storefront-hero-banners');
+      if (textarea) {
+        const current = textarea.value.trim();
+        textarea.value = current ? current + '\n' + url : url;
+      }
+    }
+    event.target.value = '';
+  });
+  $('payment-method-image-file')?.addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const url = await uploadStoreImage(file, $('payment-method-upload-status'));
+    if (url) {
+      const form = $('payment-method-form');
+      if (form) form.elements.image_url.value = url;
+    }
+    event.target.value = '';
+  });
+
   $('payment-method-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -984,5 +1028,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   bindGlobalActions();
   const requestedTab = safeTab((location.hash || '').replace('#', '') || localStorage.getItem(TAB_KEY) || 'orders');
   await setTab(requestedTab, { skipState: false });
-  if (BOOT.isStaffAdmin && requestedTab !== 'customers') loadCustomers().catch(() => {});
+  if (BOOT.isStaffAdmin && requestedTab !== 'customers') loadCustomers().catch(() => { });
 });

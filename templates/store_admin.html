@@ -49,6 +49,9 @@
         .ticket-filter-btn.active{background:rgba(125,252,137,0.1);color:var(--theme-primary);border-color:rgba(125,252,137,0.2)}
         .main-tab-panel{display:none}
         .main-tab-panel.active{display:block}
+        .legacy-file-upload{display:inline-flex;align-items:center;gap:8px;border-radius:10px;padding:8px 14px;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.04em;cursor:pointer;transition:.2s;background:rgba(125,252,137,.08);color:var(--theme-primary);border:1px dashed rgba(125,252,137,.25)}
+        .legacy-file-upload:hover{background:rgba(125,252,137,.15);border-color:rgba(125,252,137,.4)}
+        .legacy-file-upload input[type=file]{display:none}
     </style>
 </head>
 <body class="min-h-screen">
@@ -253,6 +256,11 @@
                 <div>
                     <label class="text-xs text-gray-500 uppercase font-bold block mb-1">Hero banner URLs</label>
                     <textarea id="storefront-hero-banners" rows="4" class="legacy-input resize-y" placeholder="One image URL per line"></textarea>
+                    <label class="legacy-file-upload mt-2" id="hero-banner-upload-label">
+                        <i class="fas fa-cloud-upload-alt"></i> Upload Banner Image
+                        <input type="file" id="hero-banner-file" accept="image/*">
+                    </label>
+                    <span id="hero-banner-upload-status" class="text-[11px] text-gray-600 ml-2"></span>
                 </div>
                 <div class="grid gap-4 md:grid-cols-2">
                     <div>
@@ -321,7 +329,14 @@
                 <form id="payment-method-form" class="space-y-3">
                     <input type="hidden" name="method_id">
                     <input name="name" type="text" required placeholder="Method name" class="legacy-input">
-                    <input name="image_url" type="url" placeholder="Image URL" class="legacy-input">
+                    <div class="flex items-center gap-2">
+                        <input name="image_url" type="url" placeholder="Image URL" class="legacy-input flex-1">
+                        <label class="legacy-file-upload shrink-0">
+                            <i class="fas fa-cloud-upload-alt"></i> Upload
+                            <input type="file" id="payment-method-image-file" accept="image/*">
+                        </label>
+                    </div>
+                    <span id="payment-method-upload-status" class="text-[11px] text-gray-600"></span>
                     <div class="grid gap-3 md:grid-cols-2">
                         <select name="type" class="legacy-select w-full">
                             <option value="both">Deposit & Withdraw</option>
