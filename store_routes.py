@@ -1,4 +1,4 @@
-﻿from fastapi import APIRouter, Request, Form, Query, Response, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, Request, Form, Query, Response, WebSocket, WebSocketDisconnect, status
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 import hashlib
@@ -54,6 +54,31 @@ class CheckoutRequest(BaseModel):
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _coerce_utc_datetime(value: Any) -> datetime | None:
+    if not value:
+        return None
+
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+    raw = str(value).strip()
+    if not raw:
+        return None
+
+    for fmt in ('%Y-%m-%d %H:%M', '%Y-%m-%d %H:%M:%S'):
+        try:
+            return datetime.strptime(raw, fmt).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
 def _normalize_email(email: str) -> str:
@@ -206,7 +231,9 @@ async def _get_store_session(request: Request, touch: bool = True) -> dict | Non
         return None
 
     now = _utcnow()
-    expires_at = session.get('expires_at')
+    expires_at = _coerce_utc_datetime(session.get('expires_at'))
+    if expires_at is not None:
+        session['expires_at'] = expires_at
     if expires_at and expires_at <= now:
         await _store_sessions_collection().delete_one({'_id': session['_id']})
         return None
@@ -288,7 +315,9 @@ async def _verify_otp_challenge(identifier: str, purpose: str, code: str) -> tup
         return None, 'Invalid verification code!'
 
     now = _utcnow()
-    expires_at = doc.get('expires_at')
+    expires_at = _coerce_utc_datetime(doc.get('expires_at'))
+    if expires_at is not None:
+        doc['expires_at'] = expires_at
     if expires_at and expires_at <= now:
         await _otp_collection().delete_one({'_id': doc['_id']})
         return None, 'Code expired! Please try again.'
@@ -2601,7 +2630,9 @@ async def _get_store_user_from_raw_session(raw_token: str, touch_session: bool =
         return None
 
     now = _utcnow()
-    expires_at = session.get('expires_at')
+    expires_at = _coerce_utc_datetime(session.get('expires_at'))
+    if expires_at is not None:
+        session['expires_at'] = expires_at
     if expires_at and expires_at <= now:
         await _store_sessions_collection().delete_one({'_id': session['_id']})
         return None
