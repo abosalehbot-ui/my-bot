@@ -1536,8 +1536,7 @@ async def _rollback_store_checkout(
 
 
 
-def _sanitize_positive_intdef _sanitize_positive_int(value, field_name: str, max_value: int | None = None) -> int:
-    """
+def _sanitize_positive_int(value, field_name: str, max_value: int | None = None) -> int:    """
     Validate that value is a positive integer (supports str/float/int inputs).
     Raises ValueError with a user-friendly message.
     """
