@@ -67,6 +67,12 @@ async def store_chat_websocket(websocket: WebSocket):
                         {'event': 'error', 'thread_id': thread_id, 'msg': 'Thread not found.'},
                     )
                     continue
+                if actor.get('spectator'):
+                    await store_chat_manager.send_to_connection(
+                        connection_id,
+                        {'event': 'error', 'thread_id': thread_id, 'msg': 'Spectator mode is read-only.'},
+                    )
+                    continue
                 if actor.get('role') == 'customer' and thread.get('status') == 'closed':
                     await store_chat_manager.send_to_connection(
                         connection_id,
@@ -103,6 +109,13 @@ async def store_chat_websocket(websocket: WebSocket):
                     )
                     continue
 
+                if actor.get('spectator'):
+                    await store_chat_manager.send_to_connection(
+                        connection_id,
+                        {'event': 'error', 'thread_id': thread_id, 'msg': 'Spectator mode is read-only.'},
+                    )
+                    continue
+
                 room = _chat_room_name(thread_id)
                 store_chat_manager.join(connection_id, room)
                 read_count = await _mark_thread_read(thread_id, actor)
@@ -128,7 +141,7 @@ async def store_chat_websocket(websocket: WebSocket):
     finally:
         affected_rooms = await store_chat_manager.disconnect(connection_id)
         for room in affected_rooms:
-            if room.startswith('thread:'):
+            if room.startswith('room:'):
                 await _broadcast_chat_presence(room.split(':', 1)[1])
 
 
