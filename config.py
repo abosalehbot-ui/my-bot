@@ -56,6 +56,33 @@ def _get_int_env(name: str, default: int) -> int:
         return default
 
 
+def _app_env_name() -> str:
+    for name in ('APP_ENV', 'ENV', 'PYTHON_ENV'):
+        value = os.environ.get(name)
+        if value not in (None, ''):
+            return value.strip().lower()
+    return 'development'
+
+
+def _is_local_app_env() -> bool:
+    return _app_env_name() in {'development', 'dev', 'local', 'test'}
+
+
+def _get_secret_token() -> str:
+    value = os.environ.get('SECRET_TOKEN')
+    if value not in (None, ''):
+        return value
+
+    if _is_local_app_env():
+        logger.warning('SECRET_TOKEN is not set. Using a generated/local-development fallback.')
+        return secrets.token_urlsafe(48)
+
+    raise RuntimeError(
+        'SECRET_TOKEN is required in production-like environments. '
+        'Set SECRET_TOKEN in the environment or .env before starting the server.'
+    )
+
+
 BOT_TOKEN = _get_env('BOT_TOKEN')
 ADMIN_ID = _get_int_env('ADMIN_ID', 1635871816)
 API_BASE_URL = _get_env('API_BASE_URL', 'https://buzzmaster.shop')
@@ -65,7 +92,8 @@ PRODUCT_ID = _get_env('PRODUCT_ID', '24h-nongmail')
 MONGO_URI = _get_env('MONGO_URI', 'mongodb://127.0.0.1:27017/salehzon_db', sensitive=True)
 WEBHOOK_URL = _get_env('WEBHOOK_URL')
 PORT = _get_int_env('PORT', 8080)
-SECRET_TOKEN = _get_env('SECRET_TOKEN', secrets.token_urlsafe(48), sensitive=True)
+APP_ENV = _app_env_name()
+SECRET_TOKEN = _get_secret_token()
 
 # Store auth/session settings.
 STORE_SESSION_COOKIE_NAME = _get_env('STORE_SESSION_COOKIE_NAME', 'store_session')
